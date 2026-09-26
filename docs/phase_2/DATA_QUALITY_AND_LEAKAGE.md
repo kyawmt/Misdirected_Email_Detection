@@ -1,6 +1,6 @@
 # Phase 2 — Data quality and leakage checklist
 
-The executable checks live in `src/med_data/validate.py`. `python -m med_data validate` runs them against `data/med-synth-v3` and compares file checksums with `dataset_manifest.json`. Checksums cover file bytes. Row counts are parsed CSV records, not physical lines. A generated `quality_report.json` records each check id, name, and result. The report below is the contract those checks enforce.
+The executable checks live in `src/med_data/validate.py`. `python -m med_data validate` runs them against `data/med-synth-v4` and compares file checksums with `dataset_manifest.json`. Checksums cover file bytes. Row counts are parsed CSV records, not physical lines. A generated `quality_report.json` records each check id, name, and result. The report below is the contract those checks enforce.
 
 ## Quality checks
 
@@ -28,7 +28,7 @@ The executable checks live in `src/med_data/validate.py`. `python -m med_data va
 | Q20 | Feedback contains an uncertain pending row and a rejected row, and no accepted row. |
 | Q21 | A scoring view of a train draft contains none of the denylisted names. |
 | Q22 | `frozen` is true exactly on `test_product_like` and `test_diagnostic`. |
-| Q23 | `dataset_version` is `med-synth-v3` and the seed is `20260926`. |
+| Q23 | `dataset_version` is `med-synth-v4` and the seed is `20260926`. |
 | Q24 | An empty subject or body occurs only on S09 little-text variants, and those variants are empty in one of the two fields. |
 | Q25 | Invalid fixtures are separate from drafts and expect `unable_to_assess`. |
 | Q26 | Product-like sets contain the legitimate hard negatives. Diagnostic sets contain S01–S11, the S08 role variants, clean twins, and a misdirected fraction between 0.30 and 0.70. |
@@ -63,9 +63,9 @@ Warmup mail is visible to later drafts. That is history, not label leakage. The 
 
 - Identities, mail, and labels are fictional. Quality checks show that the generator followed its own rules. They do not measure detection accuracy in real deployments.
 - Template language repeats across time. A later model can memorize phrases that travel with a topic. The hash check blocks exact copies across splits; it does not block a shared writing style.
-- In `med-synth-v3`, topics are shared across multiple relationships and teammates, reducing artificial content shortcuts while retaining semantic signal.
-- In `med-synth-v3`, balanced scheduling prevents fixed-minute timing bursts from distinguishing labels, with same-recipient mail under 5 minutes held to ~1.4% intended and ~0.6% unintended.
-- In `med-synth-v3`, scenario S11 ensures mistaken first contacts are represented alongside legitimate first contacts (S03, S06), preventing models from learning "uncontacted = safe".
+- Content is still a strong signal. Computed on train only with the Phase 3 feature transform, content cosine alone has AUC 0.932 for misdirected recipient rows (0.991 in `med-synth-v2`). S02 and S04 mistakes stay low on content by their scenario definitions: an external vendor added to budget mail, and a familiar contact sent an unusual topic. On-topic S08 mistakes (up to 0.605) and S01 lookalikes (0.176 to 0.259) overlap ordinary mail, and S11 mistakes have no pair text at all. A later model that relies on content alone will still miss those.
+- Timing: on train, 1.37% of intended and 1.90% of unintended recipient rows have same-recipient mail in the five minutes before the draft (Q31). Scenario sends use seeded jitter rather than one fixed time of day. Q31 fails the build if the intended share reaches 10%.
+- Scenario S11 represents mistaken first contacts. On train, 40 legitimate and 30 misdirected recipient rows are first contacts, so novelty alone does not indicate safety.
 - Replies are one sentence and do not quote earlier text. Threads are a message plus that reply, not a long conversation.
 - Product-like test contains 30 misdirected emails and 5,970 legitimate emails (0.5% prevalence). The larger sample size supports rigorous exact binomial confidence bounds for the 1 per 1,000 warning budget.
 - Training enrichment (10%) will inflate precision if a later report uses the train base rate as if it were the deployment mix.

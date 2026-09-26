@@ -18,23 +18,29 @@ def scoring_view(dataset, draft_id: str) -> dict:
         "recipient_order"
     )
     history = visible_history(dataset, draft_id)
+    # Build each contact payload once and group only the visible messages' recipients.
+    payloads: dict[str, dict] = {}
+
+    def payload(contact_id: str) -> dict:
+        if contact_id not in payloads:
+            payloads[contact_id] = _contact_payload(contacts, contact_id)
+        return dict(payloads[contact_id])
+
+    visible_ids = set(history["message_id"])
+    visible_recipients = dataset.message_recipients.loc[dataset.message_recipients["message_id"].isin(visible_ids)]
     history_recipients = {
-        message_id: group.sort_values("recipient_order")
-        for message_id, group in dataset.message_recipients.groupby("message_id", sort=False)
+        message_id: group.sort_values("recipient_order").to_dict("records")
+        for message_id, group in visible_recipients.groupby("message_id", sort=False)
     }
     return {
         "draft_id": draft_id,
         "features": {
             "sent_at": format_ts(draft["sent_at"]),
-            "sender": _contact_payload(contacts, draft["sender_contact_id"]),
+            "sender": payload(draft["sender_contact_id"]),
             "subject": draft["subject"],
             "body": draft["body"],
-            "recipients": [
-                _addressed(contacts, row) for _, row in draft_recipients.iterrows()
-            ],
-            "history": [
-                _history_message(contacts, history_recipients, row) for _, row in history.iterrows()
-            ],
+            "recipients": [_addressed(payload, row) for row in draft_recipients.to_dict("records")],
+            "history": [_history_message(payload, history_recipients, row) for row in history.to_dict("records")],
         },
     }
 
@@ -66,20 +72,20 @@ def _contact_payload(contacts, contact_id: str) -> dict:
     return payload
 
 
-def _addressed(contacts, row) -> dict:
-    payload = _contact_payload(contacts, row["contact_id"])
-    payload["role"] = row["role"]
-    payload["recipient_order"] = int(row["recipient_order"])
-    return payload
+def _addressed(payload, row) -> dict:
+    item = payload(row["contact_id"])
+    item["role"] = row["role"]
+    item["recipient_order"] = int(row["recipient_order"])
+    return item
 
 
-def _history_message(contacts, history_recipients, row) -> dict:
+def _history_message(payload, history_recipients, row) -> dict:
     recipients = history_recipients[row["message_id"]]
     return {
         "message_id": row["message_id"],
         "sent_at": format_ts(row["sent_at"]),
-        "sender": _contact_payload(contacts, row["sender_contact_id"]),
+        "sender": payload(row["sender_contact_id"]),
         "subject": row["subject"],
         "body": row["body"],
-        "recipients": [_addressed(contacts, item) for _, item in recipients.iterrows()],
+        "recipients": [_addressed(payload, item) for item in recipients],
     }

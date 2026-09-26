@@ -1,12 +1,14 @@
 # Phase 2 — Dataset specification
 
-Version: `med-synth-v3`. Generator: `1.2.0`. Seed: `20260926`.
+Version: `med-synth-v4`. Generator: `1.3.0`. Seed: `20260926`.
 
-The published tables are in `data/med-synth-v3/`. Regenerating with this seed and generator version reproduces those files, including checksums in `dataset_manifest.json`. Changing the seed, the quotas, or the generation rules requires a new dataset version. The frozen test subsets belong to this version only.
+The published tables are in `data/med-synth-v4/`. Regenerating with this seed and generator version reproduces those files, including checksums in `dataset_manifest.json`. Changing the seed, the quotas, or the generation rules requires a new dataset version. The frozen test subsets belong to this version only.
 
-`med-synth-v3` supersedes `med-synth-v2` to address artificial shortcuts and provide adequate sample sizes for reliable evaluation:
-- Topics are shared across multiple relationships (e.g. cross-team communication, lookalike teammates sharing topics, S04 topic overlap).
-- Realistic send scheduling eliminates fixed-minute bursts (same-recipient mail < 5 min is spaced across hours, resulting in ~1.4% intended and ~0.6% unintended < 5 min mail).
+`med-synth-v4` supersedes `med-synth-v2`. An intermediate `med-synth-v3` was built with the same quotas but left content cosine as a near-perfect separator on train (AUC 0.98 for misdirected rows); its test subsets were never evaluated, and it was replaced before any feature, model, or policy was built on it. Relative to `med-synth-v2`:
+- Each topic has one template whose wording overlaps a neighbouring topic (budget with purchase orders, compensation with headcount and cost centers, facilities with equipment and kickoffs), so text similarity is a partial signal rather than a topic fingerprint.
+- Half of the single-recipient S08 Cc and Bcc mistakes add an on-topic colleague: someone who regularly receives the sender's project updates but was not meant for that thread. Text similarity cannot separate those mistakes. The other half keep the lookalike or vendor addition.
+- Lookalike pairs share some topics, so S01 wrong recipients have partial topic history.
+- Send scheduling spreads routine mail across working hours, and scenario sends carry seeded jitter in hour, minute, and second. On train, 1.37% of intended and 1.90% of unintended recipient rows have same-recipient mail in the five minutes before the draft (Q31).
 - Scenario S11 (mistaken first contact) adds unintended autocomplete selections from directory contacts who have never been emailed.
 - S07 (legitimate topic change) training coverage is increased to 36 drafts across diverse topics.
 - Sample sizes are expanded to support evaluation of the 1 per 1,000 false-intervention warning budget: 3,000 train drafts (300 misdirected), 4,000 product-like validation drafts (20 misdirected), and 6,000 product-like test drafts (30 misdirected). Diagnostic subsets contain at least 10 families per applicable scenario.
@@ -15,8 +17,8 @@ The published tables are in `data/med-synth-v3/`. Regenerating with this seed an
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-python -m med_data build --output data/med-synth-v3
-python -m med_data validate --data data/med-synth-v3
+python -m med_data build --output data/med-synth-v4
+python -m med_data validate --data data/med-synth-v4
 pytest tests/test_phase2.py
 ```
 
@@ -28,7 +30,7 @@ One fictional organization, `demo.example`, exchanges plain-text mail with inter
 
 Each composed message has a short reply 30 seconds later. Reply text does not quote the parent body. Sent messages are the communication record. A counterfactual mistake is stored only as a draft, so later mail does not observe the mistake as if it had been sent.
 
-Topics are staffing, office equipment, facilities, purchase scheduling, budget, compensation, project status, kickoff, and introductions. In `med-synth-v3`, topics are shared across relationships: lookalike pairs on the same team share overlapping topics, facilities contacts have history across multiple operational topics, and cross-functional threads reflect realistic communication.
+Topics are staffing, office equipment, facilities, purchase scheduling, budget, compensation, project status, kickoff, and introductions. Relationships still have characteristic topics, and the Q17 allow-lists keep scenario stories intact (a vendor normally handles purchase scheduling; an S04 recipient has no earlier compensation mail). Shared vocabulary across topics, lookalike teammates with overlapping topics, and on-topic S08 mistakes keep content from being a perfect separator.
 
 The canonical walkthrough drafts use the addresses from the scenario list and live in `test_diagnostic` with `is_walkthrough = true`:
 

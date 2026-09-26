@@ -48,7 +48,11 @@ def test_walkthrough_history_respects_relationships(dataset):
     assert (history["sent_at"] < s01["sent_at"]).all()
     assert (history["family_id"] != s01["family_id"]).all()
     chan_staffing = history.loc[history["generator_topic"] == "staffing"]
-    chan_ids = set(chan_staffing["message_id"].map(lambda message_id: _recipients(dataset, message_id)).explode())
+    chan_ids = set(
+        dataset.message_recipients.loc[
+            dataset.message_recipients["message_id"].isin(set(chan_staffing["message_id"])), "contact_id"
+        ]
+    )
     assert "c_alex_chan" in chan_ids
     assert _involvements(dataset, "c_alex_chen", s01["sent_at"]) > 0
 
@@ -148,11 +152,6 @@ def test_data_dictionary_lists_every_column():
     text = (ROOT / "docs" / "phase_2" / "DATA_DICTIONARY.md").read_text(encoding="utf-8")
     missing = [column for columns in TABLES.values() for column in columns if f"`{column}`" not in text]
     assert not missing
-
-
-def _recipients(dataset, message_id: str) -> list[str]:
-    rows = dataset.message_recipients.loc[dataset.message_recipients["message_id"] == message_id]
-    return rows["contact_id"].tolist()
 
 
 def _involvements(dataset, contact_id: str, cutoff) -> int:

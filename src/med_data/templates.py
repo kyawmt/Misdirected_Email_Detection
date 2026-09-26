@@ -3,6 +3,12 @@
 Every non-empty body includes a unique Ref token. Marker phrases are present
 in each template of that topic so checks can confirm topic identity without
 treating the marker as a label.
+
+Since med-synth-v4 each topic also has one template whose wording overlaps a
+neighbouring topic (budget with purchase orders, compensation with headcount
+and cost centers, facilities with equipment and kickoffs, and so on). Real
+work mail shares vocabulary across topics, so content similarity should be a
+partial signal rather than a perfect topic fingerprint.
 """
 
 TOPIC_MARKERS = {
@@ -44,6 +50,12 @@ _TEMPLATES: dict[str, list[tuple[str, str]]] = {
             "The staffing slate for {week} is ready. Headcount ticket {ticket} still has one role waiting on a panel. Send any holds today.\n\n"
             "Thanks,\n{sender_name}\nRef: {ref}",
         ),
+        (
+            "Hiring plan {ticket}",
+            "Hi {to_names},\n\n"
+            "The hiring plan for {week} is in ticket {ticket}. The headcount review needs the salary band range for each open role and a laptop order for the new starters. Let me know if the timeline changes.\n\n"
+            "Thanks,\n{sender_name}\nRef: {ref}",
+        ),
     ],
     "office_equipment": [
         (
@@ -56,6 +68,12 @@ _TEMPLATES: dict[str, list[tuple[str, str]]] = {
             "Equipment refresh {week}",
             "Hi {to_names},\n\n"
             "The workplace refresh for {week} needs one replacement laptop. Ticket {ticket} has the desk and asset tag.\n\n"
+            "Thanks,\n{sender_name}\nRef: {ref}",
+        ),
+        (
+            "Desk move {week}",
+            "Hi {to_names},\n\n"
+            "The laptop and monitor order for {week} is in ticket {ticket}. The purchase order should arrive before the desk move, and badge access for the new desks follows the same plan. Let me know if the timeline changes.\n\n"
             "Thanks,\n{sender_name}\nRef: {ref}",
         ),
     ],
@@ -72,6 +90,12 @@ _TEMPLATES: dict[str, list[tuple[str, str]]] = {
             "Facilities ticket {ticket} covers badge readers and meeting room holds for {week}. Confirm the seating plan when you can.\n\n"
             "Thanks,\n{sender_name}\nRef: {ref}",
         ),
+        (
+            "Room plan {ticket}",
+            "Hi {to_names},\n\n"
+            "Ticket {ticket} has the badge list and the meeting room plan for {week}. The project status review and the kickoff both need the larger room, and the cost center covers the extra chairs. Let me know if the timeline changes.\n\n"
+            "Thanks,\n{sender_name}\nRef: {ref}",
+        ),
     ],
     "purchase_scheduling": [
         (
@@ -84,6 +108,12 @@ _TEMPLATES: dict[str, list[tuple[str, str]]] = {
             "Shipment window {week}",
             "Hi {to_names},\n\n"
             "The purchase order for ticket {ticket} should leave the warehouse during {week}. Reply if the dock time needs to move.\n\n"
+            "Thanks,\n{sender_name}\nRef: {ref}",
+        ),
+        (
+            "Delivery and invoice {ticket}",
+            "Hi {to_names},\n\n"
+            "The purchase order in ticket {ticket} is scheduled for {week}. The invoice goes to the cost center named in the forecast, so please confirm the delivery date and the final amount. Let me know if the timeline changes.\n\n"
             "Thanks,\n{sender_name}\nRef: {ref}",
         ),
     ],
@@ -100,6 +130,12 @@ _TEMPLATES: dict[str, list[tuple[str, str]]] = {
             "The {week} cost center review is open. Ticket {ticket} compares the project forecast with the latest actuals.\n\n"
             "Thanks,\n{sender_name}\nRef: {ref}",
         ),
+        (
+            "Budget review {week}",
+            "Hi {to_names},\n\n"
+            "The cost center review for {week} is in ticket {ticket}. It covers the open purchase orders, the delivery costs, and the planning figures that sit in the same forecast. Please confirm the project numbers. Let me know if the timeline changes.\n\n"
+            "Thanks,\n{sender_name}\nRef: {ref}",
+        ),
     ],
     "compensation": [
         (
@@ -112,6 +148,12 @@ _TEMPLATES: dict[str, list[tuple[str, str]]] = {
             "Compensation planning {ticket}",
             "Hi {to_names},\n\n"
             "Salary band adjustments for {week} are listed under ticket {ticket}. This compensation draft is for the people partners on the thread.\n\n"
+            "Thanks,\n{sender_name}\nRef: {ref}",
+        ),
+        (
+            "Compensation and headcount {ticket}",
+            "Hi {to_names},\n\n"
+            "Salary band planning for {week} is in ticket {ticket}. The figures follow the headcount plan and the cost center forecast, so please keep this within the people team and confirm the planning numbers. Let me know if the timeline changes.\n\n"
             "Thanks,\n{sender_name}\nRef: {ref}",
         ),
     ],
@@ -128,6 +170,12 @@ _TEMPLATES: dict[str, list[tuple[str, str]]] = {
             "Please join the kickoff on {week}. Ticket {ticket} is the new workstream charter. I want you in the meeting because the room plan depends on your team.\n\n"
             "Thanks,\n{sender_name}\nRef: {ref}",
         ),
+        (
+            "Kickoff planning {ticket}",
+            "Hi {to_names},\n\n"
+            "The kickoff on {week} needs the meeting room and badge access for the new team. Ticket {ticket} has the charter, the project status plan, and the laptop list. This invitation is intentional.\n\n"
+            "Thanks,\n{sender_name}\nRef: {ref}",
+        ),
     ],
     "project_update": [
         (
@@ -142,6 +190,12 @@ _TEMPLATES: dict[str, list[tuple[str, str]]] = {
             "Sharing this week's project status. Ticket {ticket} covers the {week} milestone and the open questions for the group.\n\n"
             "Thanks,\n{sender_name}\nRef: {ref}",
         ),
+        (
+            "Project status and schedule {week}",
+            "Hi {to_names},\n\n"
+            "The project status for {week} is on ticket {ticket}. The delivery schedule depends on one purchase order, the meeting room plan is set, and the cost center forecast is unchanged. Let me know if the timeline changes.\n\n"
+            "Thanks,\n{sender_name}\nRef: {ref}",
+        ),
     ],
     "introduction": [
         (
@@ -154,6 +208,12 @@ _TEMPLATES: dict[str, list[tuple[str, str]]] = {
             "Welcome and introduction {ticket}",
             "Hi {to_names},\n\n"
             "Welcome. This introduction covers how we will work together from {week}. Ticket {ticket} has the goals and the first milestone.\n\n"
+            "Thanks,\n{sender_name}\nRef: {ref}",
+        ),
+        (
+            "Introduction and next steps {ticket}",
+            "Hi {to_names},\n\n"
+            "This introduction covers the project status and the kickoff plan for {week}. Ticket {ticket} lists the meeting room and the first milestone. Let me know if the timeline changes.\n\n"
             "Thanks,\n{sender_name}\nRef: {ref}",
         ),
     ],

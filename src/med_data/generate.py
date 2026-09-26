@@ -131,6 +131,8 @@ class _Builder:
     def __init__(self, seed: int):
         self.seed = seed
         self.rng = np.random.default_rng(seed)
+        self.time_rng = np.random.default_rng(seed + 1)
+        self.special_seen: set[datetime] = set()
         self.contacts: dict[str, Contact] = {}
         self.messages: list[dict] = []
         self.drafts: list[dict] = []
@@ -582,8 +584,18 @@ class _Builder:
         for index in range(count):
             week_idx = int(index * len(weeks) / count)
             day = (index * 2 + 1) % 5
-            minute = (minute_base + index * 3) % 55
-            times.append(weeks[week_idx] + timedelta(days=day, hours=hour, minutes=minute, seconds=45))
+            # Jitter from a dedicated stream so scenario sends do not sit at one
+            # fixed time of day. Odd seconds keep them apart from routine mail,
+            # which uses even seconds; the seen-set keeps every timestamp unique.
+            while True:
+                jitter_hour = hour + int(self.time_rng.integers(-1, 2))
+                minute = (minute_base + int(self.time_rng.integers(0, 60))) % 60
+                second = 2 * int(self.time_rng.integers(0, 30)) + 1
+                moment = weeks[week_idx] + timedelta(days=day, hours=jitter_hour, minutes=minute, seconds=second)
+                if moment not in self.special_seen:
+                    self.special_seen.add(moment)
+                    break
+            times.append(moment)
         return times
 
     def _emit_split_scenarios(self, split: str) -> None:
@@ -855,9 +867,16 @@ class _Builder:
         lookalike = LOOKALIKE_PAIRS[ordinal % len(LOOKALIKE_PAIRS)][1]
         vendor = VENDORS[ordinal % len(VENDORS)]
         if kind in {"s08_cc", "s08_two"}:
-            rows.append({"contact_id": lookalike, "role": "cc", "recipient_order": len(rows)})
+            # Even ordinals add an on-topic colleague: someone who regularly gets
+            # Maya's project updates but was not meant for this thread. Text
+            # similarity cannot separate that mistake. Odd ordinals keep the lookalike.
+            added = self._s08_on_topic(rows) if ordinal % 2 == 0 else lookalike
+            rows.append({"contact_id": added, "role": "cc", "recipient_order": len(rows)})
         if kind in {"s08_bcc", "s08_two"}:
-            rows.append({"contact_id": vendor, "role": "bcc", "recipient_order": len(rows)})
+            # A single unintended Bcc alternates the same way; the two-recipient
+            # variant keeps the vendor so it always has one off-topic addition.
+            blind = self._s08_on_topic(rows) if kind == "s08_bcc" and ordinal % 2 == 0 else vendor
+            rows.append({"contact_id": blind, "role": "bcc", "recipient_order": len(rows)})
         intended_ids = {row["contact_id"] for row in source["recipients"]}
         labeled = self._label_rows(
             rows,
@@ -874,6 +893,14 @@ class _Builder:
             twin=twin,
             topic="project_update",
         )
+
+    def _s08_on_topic(self, rows: list[dict]) -> str:
+        present = {row["contact_id"] for row in rows}
+        candidates = ("c_lena", *(pair[0] for pair in LOOKALIKE_PAIRS))
+        for contact_id in candidates:
+            if contact_id not in present:
+                return contact_id
+        raise RuntimeError("No on-topic S08 colleague is free for this draft")
 
     def _emit_little_bad(self, split: str, plan: SplitPlan) -> None:
         product_n, diagnostic_n = self._counts(plan, "s09_little_bad")

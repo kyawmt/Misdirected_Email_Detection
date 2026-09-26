@@ -1,0 +1,5 @@
+fixture_id,category,reason,detail,expected_status,dataset_version
+inv_malformed_address,invalid_input,malformed_address,Recipient value 'alex.chen.demo.example' has no @ sign.,unable_to_assess,med-synth-v4
+inv_no_recipients,invalid_input,no_recipients,"To, Cc, and Bcc are all empty.",unable_to_assess,med-synth-v4
+inv_too_many_recipients,invalid_input,too_many_recipients,21 unique recipients exceed the supported maximum of 20.,unable_to_assess,med-synth-v4
+inv_unknown_snapshot,unavailable,unknown_snapshot,Historical context reference 'snap-does-not-exist' cannot be resolved.,unable_to_assess,med-synth-v4

@@ -6,6 +6,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
 
+import numpy as np
 import pandas as pd
 
 from med_data.calendar import ASSESSMENT_SPLITS, FROZEN_SUBSETS, split_for
@@ -656,56 +657,54 @@ def _legitimate_bcc(dataset) -> str:
     return f"intended Bcc recipients: {summary}"
 
 
+def _utc_ns(values: pd.Series) -> np.ndarray:
+    """Timestamps as UTC nanoseconds, whether they arrive as datetimes or datetime64."""
+    return pd.to_datetime(values, utc=True).to_numpy(dtype="datetime64[ns]").astype(np.int64)
+
+
 def _timing_diagnostic(dataset) -> str:
-    train_drafts = dataset.drafts.loc[dataset.drafts["subset"] == "train"]
-    labels = dataset.labels.set_index(["draft_id", "contact_id"])
-    messages = dataset.messages
-    msg_recipients = dataset.message_recipients
+    """Share of train recipient rows with same-recipient mail in the five minutes before the draft.
 
-    msg_to_recips = defaultdict(set)
-    for row in msg_recipients.itertuples(index=False):
-        msg_to_recips[row.message_id].add(row.contact_id)
-
-    intended_total = 0
-    intended_under_5m = 0
-    unintended_total = 0
-    unintended_under_5m = 0
-
-    for _, draft in train_drafts.iterrows():
-        draft_id = draft["draft_id"]
-        draft_time = draft["sent_at"]
-        five_min_ago = draft_time - timedelta(minutes=5)
-
-        recent_messages = messages.loc[
-            (messages["sent_at"] >= five_min_ago)
-            & (messages["sent_at"] < draft_time)
-            & (messages["family_id"] != draft["family_id"])
-        ]
-
-        if not recent_messages.empty and draft["body"]:
-            own_hash = draft["body_hash"]
-            if own_hash:
-                recent_messages = recent_messages.loc[recent_messages["body_hash"] != own_hash]
-
-        recent_recipients = set()
-        for mid in recent_messages["message_id"]:
-            recent_recipients.update(msg_to_recips[mid])
-
-        draft_recips = dataset.draft_recipients.loc[dataset.draft_recipients["draft_id"] == draft_id]
-        for _, row in draft_recips.iterrows():
-            cid = row["contact_id"]
-            is_intended = bool(labels.loc[(draft_id, cid), "intended"])
-            has_recent = cid in recent_recipients
-
-            if is_intended:
-                intended_total += 1
-                if has_recent:
-                    intended_under_5m += 1
-            else:
-                unintended_total += 1
-                if has_recent:
-                    unintended_under_5m += 1
-
+    Same exclusions as visible history: the draft's family and its own body hash.
+    Each recipient's sent-mail times are sorted once and searched per row.
+    """
+    drafts = dataset.drafts.loc[dataset.drafts["subset"] == "train", ["draft_id", "sent_at", "family_id", "body", "body_hash"]]
+    events = dataset.message_recipients[["message_id", "contact_id"]].merge(
+        dataset.messages[["message_id", "sent_at", "family_id", "body_hash"]], on="message_id"
+    )
+    events["cutoff_ns"] = _utc_ns(events["sent_at"])
+    events = events.sort_values(["contact_id", "cutoff_ns"], kind="mergesort")
+    by_contact = {}
+    for contact_id, group in events.groupby("contact_id", sort=False):
+        by_contact[contact_id] = (
+            group["cutoff_ns"].to_numpy(),
+            group["family_id"].to_numpy(),
+            group["body_hash"].to_numpy(),
+        )
+    rows = dataset.draft_recipients[["draft_id", "contact_id"]].merge(drafts, on="draft_id")
+    rows = rows.merge(dataset.labels[["draft_id", "contact_id", "intended"]], on=["draft_id", "contact_id"])
+    rows["cutoff_ns"] = _utc_ns(rows["sent_at"])
+    window = pd.Timedelta(minutes=5).value
+    counts = {True: [0, 0], False: [0, 0]}
+    for row in rows.itertuples(index=False):
+        intended = bool(row.intended)
+        counts[intended][0] += 1
+        arrays = by_contact.get(row.contact_id)
+        if arrays is None:
+            continue
+        times, families, hashes = arrays
+        lo = np.searchsorted(times, row.cutoff_ns - window, side="left")
+        hi = np.searchsorted(times, row.cutoff_ns, side="left")
+        own = row.body_hash if row.body else ""
+        for position in range(lo, hi):
+            if families[position] == row.family_id:
+                continue
+            if own and hashes[position] == own:
+                continue
+            counts[intended][1] += 1
+            break
+    intended_total, intended_under_5m = counts[True]
+    unintended_total, unintended_under_5m = counts[False]
     pct_int = (intended_under_5m / intended_total * 100) if intended_total else 0.0
     pct_unint = (unintended_under_5m / unintended_total * 100) if unintended_total else 0.0
 
@@ -716,7 +715,6 @@ def _timing_diagnostic(dataset) -> str:
         f"({intended_under_5m}/{intended_total}), unintended {pct_unint:.2f}% "
         f"({unintended_under_5m}/{unintended_total})"
     )
-
 
 def _markers(dataset) -> str:
     for topic, marker in TOPIC_MARKERS.items():

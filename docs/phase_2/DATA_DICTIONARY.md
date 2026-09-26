@@ -1,6 +1,6 @@
 # Phase 2 — Data dictionary
 
-Status: `med-synth-v3` schema. The tables describe fictional people and fictional mail. A later scoring step may read only the columns marked model-visible. Every other column is an audit field used to build labels, splits, or leakage checks.
+Status: `med-synth-v4` schema. The tables describe fictional people and fictional mail. A later scoring step may read only the columns marked model-visible. Every other column is an audit field used to build labels, splits, or leakage checks.
 
 Empty strings mean "absent" for optional ids and for `asserted_intended`. Timestamps are UTC instants written as `YYYY-MM-DDTHH:MM:SSZ`. Booleans are `true` or `false`.
 
@@ -17,7 +17,7 @@ One row per fictional person or external party. Addresses use reserved `.example
 | `is_internal` | yes | Belongs to the fictional organization. |
 | `department` | yes | Directory department. Context for a person, not a label. |
 | `directory_visible_from` | yes | First time the directory lists this contact. |
-| `dataset_version` | no | `med-synth-v3` on every row. |
+| `dataset_version` | no | `med-synth-v4` on every row. |
 
 ## messages
 
@@ -152,4 +152,4 @@ Inputs that a future scorer should refuse. They are not drafts, not labeled, and
 
 ## Files
 
-The published build is `data/med-synth-v3/`. `dataset_manifest.json` records the seed, row counts, freeze policy, and SHA-256 checksum of each table and of `quality_report.json`. Each `rows` value is the number of parsed CSV records, excluding the header. Newlines inside a quoted body do not add records. Split, subset, timestamp, family, scenario fields, and the frozen flag in `split_manifest` are copies of the draft row and are checked against it.
+The published build is `data/med-synth-v4/`. `dataset_manifest.json` records the seed, row counts, freeze policy, and SHA-256 checksum of each table and of `quality_report.json`. Each `rows` value is the number of parsed CSV records, excluding the header. Newlines inside a quoted body do not add records. Split, subset, timestamp, family, scenario fields, and the frozen flag in `split_manifest` are copies of the draft row and are checked against it.
