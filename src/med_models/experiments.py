@@ -25,6 +25,10 @@ from med_models.data import load_model_table, model_matrix
 from med_models.estimators import AlwaysAllow, FusionModel, LogisticModel, RulesModel, TreeModel
 from med_models.folds import assign_folds, expanding_tests
 from med_models.groups import ABLATIONS, C_GRID, TREE_GRID, ablation_columns
+
+# Every text-derived column, the same set the content-only ablation uses. The
+# eligibility audit treats a flag on any of them as a content shortcut.
+TEXT_DERIVED = tuple(ablation_columns("content_only"))
 from med_models.metrics import breakdowns, email_table, email_view, ranking_metrics, recipient_view
 from med_models.version import SEED
 
@@ -428,7 +432,8 @@ def _fold_margins(better: dict | None, worse: dict | None) -> dict:
 def eligibility_checks(runs: list[dict], audit: dict | None) -> dict:
     """C3: decide from recorded evidence whether all-features models may be selected.
 
-    1. audit: the train shortcut audit flags no content feature as a near-perfect separator
+    1. audit: the train shortcut audit flags no text-derived feature (pair content or
+       draft-text flags, the content-only ablation's columns) as a near-perfect separator
     2. fold stability: all-features beats behavior-only of the same family in every train fold
     3. not content alone: all-features also beats content-only of the same family in every train fold
     Drop-content and drop-similarity are recorded beside them as context.
@@ -437,8 +442,8 @@ def eligibility_checks(runs: list[dict], audit: dict | None) -> dict:
     if audit is None:
         audit_check = {"passed": False, "reason": "no train shortcut audit in the feature artifact"}
     else:
-        flagged = list(audit.get("flagged_content", []))
-        content = {item["feature"]: item for item in audit["features"] if item.get("content")}
+        flagged = [item["feature"] for item in audit["features"] if item.get("flagged") and item["feature"] in TEXT_DERIVED]
+        content = {item["feature"]: item for item in audit["features"] if item["feature"] in TEXT_DERIVED}
         audit_check = {
             "passed": not flagged,
             "flagged_content": flagged,
@@ -482,8 +487,8 @@ def eligibility_checks(runs: list[dict], audit: dict | None) -> dict:
         }
     return {
         "rule": (
-            "An all-features model is a selection candidate only if (1) the train shortcut audit flags no content "
-            "feature, (2) it beats the behavior-only model of the same family in every chronological train fold, "
+            "An all-features model is a selection candidate only if (1) the train shortcut audit flags no text-derived "
+            "feature (pair content or draft-text flags), (2) it beats the behavior-only model of the same family in every chronological train fold, "
             "and (3) it beats the content-only model of the same family in every train fold. Otherwise behavior-only "
             "selection stands. Validation is not used for these checks."
         ),

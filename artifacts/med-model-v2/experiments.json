@@ -1,6 +1,6 @@
 {
   "eligibility": {
-    "rule": "An all-features model is a selection candidate only if (1) the train shortcut audit flags no content feature, (2) it beats the behavior-only model of the same family in every chronological train fold, and (3) it beats the content-only model of the same family in every train fold. Otherwise behavior-only selection stands. Validation is not used for these checks.",
+    "rule": "An all-features model is a selection candidate only if (1) the train shortcut audit flags no text-derived feature (pair content or draft-text flags), (2) it beats the behavior-only model of the same family in every chronological train fold, and (3) it beats the content-only model of the same family in every train fold. Otherwise behavior-only selection stands. Validation is not used for these checks.",
     "audit": {
       "passed": true,
       "flagged_content": [],
@@ -11,12 +11,24 @@
       "content_auc": {
         "content_cosine": 0.06810832025117737,
         "content_similarity_observed": 0.45856227106227104,
-        "pair_text_message_count": 0.5246450375021803
+        "draft_raw_token_count": 0.5324206349206348,
+        "pair_text_message_count": 0.5246450375021803,
+        "draft_body_blank": 0.5151862026862026,
+        "draft_text_short": 0.5144993894993894,
+        "draft_text_oov": 0.4993131868131868,
+        "draft_subject_blank": 0.4993131868131868,
+        "draft_text_empty": 0.5
       },
       "content_separation": {
         "content_cosine": 0.9318916797488226,
         "content_similarity_observed": 0.541437728937729,
-        "pair_text_message_count": 0.5246450375021803
+        "draft_raw_token_count": 0.5324206349206348,
+        "pair_text_message_count": 0.5246450375021803,
+        "draft_body_blank": 0.5151862026862026,
+        "draft_text_short": 0.5144993894993894,
+        "draft_text_oov": 0.5006868131868132,
+        "draft_subject_blank": 0.5006868131868132,
+        "draft_text_empty": 0.5
       }
     },
     "families": {
@@ -326,7 +338,8 @@
           }
         }
       }
-    }
+    },
+    "recomputed": "2026-09-27: audit gate widened to every text-derived feature after review item RC-04; recomputed from the stored runs and feature audit without refitting. Eligibility outcomes are unchanged."
   },
   "c_grid": [
     0.001,

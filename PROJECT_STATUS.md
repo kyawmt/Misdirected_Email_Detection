@@ -12,8 +12,8 @@ This file is the handoff for the next session. Standing rules are in [AGENTS.md]
 | 2 — Data, labels, and splits | Complete | Fictional dataset `med-synth-v4`, generator `1.3.0`, seed `20260926`. 31 validation checks passed. |
 | 3 — Behavioral and text features | Complete (v4) | `med-features-v2` on `med-synth-v4` train: shared transform, frozen TF-IDF, lossless train/validation matrices, A6 train-only shortcut checks in the quality report. |
 | 4 — Baselines and model comparison | Complete (v4) | `med-model-v2`: always-allow, rules, logistic regression, one tree, ablations (incl. drop-content), C3 eligibility checks, S11 diagnostics. Selected `logistic_all_balanced`. No threshold. |
-| 5 — Evaluation and threshold policy | Complete (v4) | `med-policy-v2`: one warning cutoff on the risk score, blocking disabled, calibration not fit, scoring-path parity proven on all 4,000 selection drafts, one frozen test pass. |
-| 6 — Backend and scoring API | Complete (v4) | Contract `med-api-v1` serving the v4 bundle and snapshot `med-synth-v4`. AC05 measured once: met. |
+| 5 — Evaluation and threshold policy | Complete (v4) | `med-policy-v2`: one warning cutoff on the risk score, blocking disabled, calibration not fit, scoring-path parity proven on all 4,000 selection drafts, one frozen test pass. AC01 insufficient evidence (independence not established). |
+| 6 — Backend and scoring API | Complete (v4) | Contract `med-api-v1` serving the v4 bundle and snapshot `med-synth-v4`. Emits `CONTENT_RELATIONSHIP_MISMATCH` on content-sensitive warnings. AC05 measured once: met. |
 | 7 through 10 | Not started | No UI, monitoring, or deployment. |
 
 Phase 2 dataset revision `med-synth-v4` (generator `1.3.0`, seed `20260926`) replaces `med-synth-v2`. An intermediate `med-synth-v3` (generator `1.2.0`, commit `6ff7aa6`) was reviewed and superseded before anything was built on it; its test subsets were never evaluated and `data/med-synth-v3` was removed from the working tree (it stays in git history). What v4 changes relative to v2:
@@ -34,7 +34,7 @@ The cross-phase revision (`project_context/fixes_before_phase7.md`, Sections A, 
 | Active phase | None. Next: Phase 7 (simulated draft-review UI), when the user asks for it. |
 | Owner | Unassigned |
 
-Nothing is committed from Sections B and C yet; the user asked not to commit until they say so.
+Sections B and C are committed as `d760de7` on branch `v4-rerun-phases-3-6` (not yet merged into `main`). The fixes for the review of that commit (RB-01, RC-01 to RC-06 in `project_context/comments.md`) are in the working tree on the same branch and are not committed yet. The Phase 7 brief is `project_context/phase7.md`.
 
 ## Section B (code hygiene) — what changed
 
@@ -111,6 +111,9 @@ Verified on 2026-09-26 from the repository root with the project virtualenv (App
 | `python -m med_api report`, `python -m med_policy report` | Regenerated `docs/phase_6` and `docs/phase_5` from stored results |
 | `python -m med_data validate --data data/med-synth-v4` | 31 checks passed (Q01–Q31) in 54.6 s |
 | `pytest` (final, v4 bundle) | 100 passed, 0 failed in 525.10 s (8m45s) |
+| `pytest` (2026-09-27, after the review fixes RB-01, RC-01 to RC-06) | 104 passed, 0 failed in 522.22 s (8m42s) |
+| `python -m med_data validate` (2026-09-27) | 31 checks passed |
+| `python -m med_policy report`, `python -m med_api report`, Phase 4 docs from stored results (2026-09-27) | Regenerated; only `artifacts/med-model-v2/experiments.json` changed (eligibility block recomputed, outcomes unchanged). v2 baseline: 28/28 files unchanged |
 
 ### v4 results (current)
 
@@ -122,11 +125,11 @@ Verified on 2026-09-26 from the repository root with the project virtualenv (App
 | Validation operating point | 8/20 warned (recall 0.40, exact [0.191, 0.639]); 0/3,980 false; exact upper 0.93 per 1,000 (not independent: selection subset) |
 | Test operating point | 9/30 warned (recall 0.30, exact [0.147, 0.494]); 0/5,970 false; exact upper 0.62 per 1,000 |
 | Scenario recall at the cutoff | S01, S04, S11 0 warned in every validation and test subset; test product-like S02 2/6, S08 5/8, S09 2/2 |
-| AC01 | Met on this simulation (upper 0.62 ≤ 1) |
+| AC01 | Insufficient evidence. 0/5,970 is a descriptive pass on this corpus; the exact bound 0.62 per 1,000 assumes independent emails, and 5,682 of 6,000 test drafts come from one sender (review item RC-01) |
 | AC02 | Met for S09; partly met for S02, S08; not met for S01, S04, S11 |
 | AC03 / AC04 | Met / met (blocking disabled, 0 blocks) |
 | AC05 | Met: API client p95 57.04 ms < 300 ms, this machine only |
-| AC07 | Insufficient evidence: 0 wrong interventions on S03/S05/S06/S07, but legitimate first contacts score up to 0.99737 against `T_warn` 0.99968 |
+| AC07 | Insufficient evidence: 0 wrong interventions on S03/S05/S06/S07 (desired allows); every S11 mistaken first contact was missed (a detection miss, under AC02); legitimate first contacts score up to 0.99737 against `T_warn` 0.99968 |
 
 ### v2 historical baseline
 
@@ -145,9 +148,10 @@ Verified on 2026-09-26 from the repository root with the project virtualenv (App
 - **S01, S04, S11 are still missed.** At the zero-false-warning cutoff the policy warns only on added recipients (S02, S08) and cold senders (S09). Legitimate first contacts (S03, S06) score just below `T_warn`, so the cutoff sits above every lookalike, familiar-recipient topic mistake, and mistaken first contact. Any lower cutoff produces validation false warnings.
 - **Content is a strong signal.** Content cosine separation 0.932 is inside the 0.05–0.95 audit bounds but not far inside. S02 and S04 are off-topic by scenario definition. The C3 checks passed by clear margins for the logistic families; the tree's content-only margin was thin (+0.015) and it was not selected.
 - **C = 1000 is the top of the extended grid**; coefficients are not separate effects.
-- **AC01 is met on this simulation only**, with 0 of 5,970 false warnings. The margin between `T_warn` and the highest legitimate validation score is 2.3e-3 (0.99968 against 0.99737).
+- **AC01 is insufficient evidence.** 0 of 5,970 false warnings is a descriptive pass on this corpus. The exact bound (0.62 per 1,000) assumes independent emails; 95% of product-like drafts come from one sender, and a sender-clustered interval has no bound for a zero count. A confidence-supported claim needs an independence argument or a more independent evaluation, which would need a new frozen dataset version. The margin between `T_warn` and the highest legitimate validation score is 2.3e-3 (0.99968 against 0.99737).
 - **Unknown addresses** in a well-formed request stay `unavailable` (Phase 1 contract). Changing that is a contract decision.
-- **`CONTENT_RELATIONSHIP_MISMATCH` is not emitted.** The served model uses content; the API says so in a model-level explanation sentence. Adding a per-recipient content code would need its own rule.
+- **`CONTENT_RELATIONSHIP_MISMATCH`** is emitted on a flagged recipient when its observed content cosine is below the train mean (0.414, from the feature quality report) and raising only that value to the mean drops its risk below `T_warn`. On validation every warning meets that test. The check was added after the latency measurement and runs only for flagged recipients; the latency record was not remeasured.
 - **Five-minute timing:** 0.0% of legitimate and 1.9% of misdirected train rows by the pair-recency feature; Q31 (mail to the recipient from any sender) reports 1.37% and 1.90%.
 - **Prevalence** 0.5% is a simulation assumption; train is enriched to 10%.
+- **Published datasets are write-once.** `python -m med_data build` refuses a directory that already holds a dataset; reproduce into a new directory.
 - **Frozen test subsets** of `med-synth-v4` have now been evaluated once for `med-policy-v2`. Do not rerun `evaluate-test` or move the cutoff. A new policy needs a new version and a new frozen dataset version.

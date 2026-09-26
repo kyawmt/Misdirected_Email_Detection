@@ -41,8 +41,24 @@ BOOL_COLUMNS = {
 TIME_COLUMNS = {"directory_visible_from", "sent_at", "submitted_at"}
 
 
+class PublishedDatasetExists(FileExistsError):
+    """The output directory already holds a published dataset."""
+
+
 def write_dataset(dataset: Dataset, output_dir: str | Path, *, validate: bool = True) -> Path:
+    """Write the tables, quality report, and manifest to a new directory.
+
+    A directory that already has a dataset manifest is refused. A published
+    version's frozen test may already have been evaluated, so it is never
+    rewritten in place. Reproduce a build into a new directory and compare
+    manifests, or bump DATASET_VERSION when generation rules change.
+    """
     target = Path(output_dir)
+    if (target / MANIFEST_FILE).exists():
+        raise PublishedDatasetExists(
+            f"{target} already holds a published dataset. Write to a new directory "
+            "to reproduce it, or bump DATASET_VERSION for new generation rules."
+        )
     target.mkdir(parents=True, exist_ok=True)
     if validate:
         checks = assert_valid(dataset)

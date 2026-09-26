@@ -287,3 +287,37 @@ def _feature_frame(rows: int) -> pd.DataFrame:
     data["recipient_order"] = [0] * rows
     data["sender_history_available"] = np.ones(rows)
     return pd.DataFrame(data)
+
+
+def test_flagged_draft_text_feature_blocks_all_features_eligibility():
+    from med_models.experiments import TEXT_DERIVED, eligibility_checks
+
+    def run(name, folds):
+        return {
+            "name": name,
+            "cv": {"mean": float(np.mean(folds)), "folds": [{"fold": i + 1, "average_precision": v} for i, v in enumerate(folds)]},
+            "validation_product_like": {"email": {"average_precision": 0.5}},
+        }
+
+    runs = [
+        run("logistic_all_unweighted", [0.9, 0.9, 0.9]),
+        run("logistic_behavior_only_unweighted", [0.5, 0.5, 0.5]),
+        run("logistic_content_only_unweighted", [0.6, 0.6, 0.6]),
+    ]
+
+    def audit(flagged_feature):
+        features = [
+            {"feature": name, "auc": 0.5, "separation": 0.5, "flagged": name == flagged_feature, "content": False}
+            for name in FEATURE_COLUMNS
+        ]
+        return {"features": features, "flagged_content": [], "auc_bounds": [0.05, 0.95]}
+
+    assert "draft_raw_token_count" in TEXT_DERIVED and "content_cosine" in TEXT_DERIVED
+    clean = eligibility_checks(runs, audit(None))
+    assert clean["families"]["logistic_unweighted"]["eligible"] is True
+    flagged = eligibility_checks(runs, audit("draft_raw_token_count"))
+    assert flagged["audit"]["passed"] is False
+    assert flagged["audit"]["flagged_content"] == ["draft_raw_token_count"]
+    assert flagged["families"]["logistic_unweighted"]["eligible"] is False
+    behavior = eligibility_checks(runs, audit("pair_outbound_count"))
+    assert behavior["audit"]["passed"] is True

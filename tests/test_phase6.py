@@ -245,6 +245,57 @@ def test_no_block_and_the_model_note_matches_the_model(client, dataset, picks):
             assert any("Draft-text similarity was not used" in line for line in body["explanation"])
         else:
             assert any("Draft-text similarity" in line and "also an input" in line for line in body["explanation"])
+        for item in body["recipients"] or []:
+            if not item["flagged"]:
+                assert item["reason_codes"] == []
+
+
+def test_content_code_marks_content_sensitive_warnings(client, dataset, picks):
+    """RC-02: a flagged recipient carries CONTENT_RELATIONSHIP_MISMATCH exactly when
+    raising only its content cosine to the typical train value would drop it below T_warn."""
+    from med_api.context import content_reference
+    from med_api.service import content_sensitive
+    from med_features.build import read_features
+    from med_models.package import load_model
+
+    model = load_model(ROOT / DEFAULT_PATHS["model"])
+    reference = content_reference(FEATURES)
+    t_warn = json.loads(POLICY.read_text(encoding="utf-8"))["T_warn"]
+    features = pd.concat(
+        [read_features(FEATURES / f"features_{name}.csv") for name in ("validation_product_like", "validation_diagnostic")],
+        ignore_index=True,
+    )
+    body = client.post("/assess", json=request_from_draft(dataset, picks["warn"])).json()
+    assert body["decision"] == "warn"
+    frame = features.loc[features["draft_id"] == picks["warn"]]
+    contacts = dict(zip(dataset.contacts["email_address"].str.casefold(), dataset.contacts["contact_id"], strict=True))
+    seen = 0
+    for item in body["recipients"]:
+        codes = [code["code"] for code in item["reason_codes"]]
+        expected = item["flagged"] and content_sensitive(model, frame, contacts[item["address"]], reference, t_warn)
+        assert ("CONTENT_RELATIONSHIP_MISMATCH" in codes) == expected
+        seen += int(expected)
+    if "content_cosine" in model.feature_columns:
+        assert seen >= 1
+
+
+def test_content_sensitivity_rule_on_fixtures():
+    from med_api.service import content_sensitive
+
+    class Stub:
+        feature_columns = ["content_cosine"]
+
+        def score_frame(self, frame):
+            return 1.0 - frame["content_cosine"].to_numpy()
+
+    base = pd.DataFrame({"contact_id": ["a"], "content_similarity_observed": [1], "content_cosine": [0.05]})
+    assert content_sensitive(Stub(), base, "a", 0.4, 0.9) is True
+    assert content_sensitive(Stub(), base, "a", 0.4, 0.5) is False
+    assert content_sensitive(Stub(), base.assign(content_cosine=0.6), "a", 0.4, 0.9) is False
+    assert content_sensitive(Stub(), base.assign(content_similarity_observed=0), "a", 0.4, 0.9) is False
+    assert content_sensitive(Stub(), base, "a", None, 0.9) is False
+    Stub.feature_columns = ["pair_outbound_count"]
+    assert content_sensitive(Stub(), base, "a", 0.4, 0.9) is False
 
 
 def test_novelty_is_a_limitation_not_a_reason(client, dataset, picks, validation_scores):

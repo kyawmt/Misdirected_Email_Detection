@@ -172,3 +172,16 @@ def _involvements(dataset, contact_id: str, cutoff) -> int:
         ).sum()
     )
     return sent + received
+
+
+def test_build_refuses_to_overwrite_a_published_dataset(tmp_path):
+    from med_data.io import PublishedDatasetExists, write_dataset
+
+    target = tmp_path / "published"
+    target.mkdir()
+    (target / "dataset_manifest.json").write_text("{}", encoding="utf-8")
+    with pytest.raises(PublishedDatasetExists, match="already holds a published dataset"):
+        write_dataset(None, target)
+    assert (target / "dataset_manifest.json").read_text(encoding="utf-8") == "{}"
+    with pytest.raises(PublishedDatasetExists):
+        write_dataset(None, PUBLISHED)

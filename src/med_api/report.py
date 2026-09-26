@@ -138,7 +138,7 @@ def _contract(examples: dict) -> str:
             "",
             "## Codes",
             "",
-            "Codes are descriptive context from the feature row. They do not change the decision and are not read from model coefficients. `CONTENT_RELATIONSHIP_MISMATCH` is not emitted by this version. When the served model uses content cosine, a model-level explanation sentence says so; no per-recipient content code is derived from the score.",
+            "Context codes and limitations are read from the feature row. They do not change the decision and are not read from model coefficients. `CONTENT_RELATIONSHIP_MISMATCH` is a reason tied to the model: it is emitted on a flagged recipient only when its content cosine was observed, is below the typical train value (the mean observed cosine on train, from the feature quality report), and raising only that value to the typical one would drop the recipient's risk score below `T_warn`. The check rescores the frozen model on that one changed row; it never changes the decision.",
             "",
             "| Code | Kind | Emitted when | Text |",
             "| --- | --- | --- | --- |",
@@ -146,6 +146,7 @@ def _contract(examples: dict) -> str:
             f"| `LIMITED_TEXT` | evidence limitation, any recipient | draft text empty, short, or out of vocabulary | {CODE_TEXT['LIMITED_TEXT']} |",
             f"| `EXTERNAL_RECIPIENT` | context, flagged recipient only | `recipient_is_internal` is 0 | {CODE_TEXT['EXTERNAL_RECIPIENT']} |",
             f"| `LOOKALIKE_CONTACT_CONTEXT` | context, flagged recipient only | `near_name_count` is at least 1 | {CODE_TEXT['LOOKALIKE_CONTACT_CONTEXT']} |",
+            f"| `CONTENT_RELATIONSHIP_MISMATCH` | reason, flagged recipient only | observed content cosine below the typical train value, and a rescore with only that value raised to typical falls below `T_warn` | {CODE_TEXT['CONTENT_RELATIONSHIP_MISMATCH']} |",
             f"| `UNUSUAL_RECIPIENT_COMBINATION` | context, flagged recipient only | co-recipient support applies and the partner fraction is 0 | {CODE_TEXT['UNUSUAL_RECIPIENT_COMBINATION']} |",
             "",
             "## Feedback request",
@@ -249,7 +250,7 @@ def _flow(latency: dict | None, results: dict) -> str:
         f"| Hardware and OS | {env['platform']}, {env['machine']}, {env['cpu_count']} CPUs |",
         f"| Versions | {', '.join(f'{k} {v}' for k, v in latency['versions'].items())} |",
         "",
-        f"AC05 is recorded as **{latency['ac05']}** on the client-side p95 of {latency['client_p95_ms']:.2f} ms, on this machine only. The model and policy were not changed to improve it. The content-cosine centroid is built from one sparse slice of the history matrix per recipient, not one row read at a time; that change leaves every feature value identical.",
+        f"AC05 is recorded as **{latency['ac05']}** on the client-side p95 of {latency['client_p95_ms']:.2f} ms, on this machine only. The model and policy were not changed to improve it. The `CONTENT_RELATIONSHIP_MISMATCH` check was added after this measurement; it rescores one row per flagged recipient, so it adds work only to warned drafts (8 of 4,000 in this workload), and the record was not remeasured because the latency command never overwrites a record. The content-cosine centroid is built from one sparse slice of the history matrix per recipient, not one row read at a time; that change leaves every feature value identical.",
         "",
         "## Parity with the frozen validation scores",
         "",
@@ -279,7 +280,7 @@ def _limits(results: dict) -> list[str]:
     never = sorted(set(missed) - warned)
     budget = "within" if fi["interval_per_1000_exact"]["high"] <= fi["budget_per_1000"] else "above"
     return [
-        f"- The service serves the frozen cutoff. On the one `test_product_like` pass it warned on {email['true_positives']} of {email['positives']} misdirected emails with {fi['false_interventions']} false interventions on {fi['legitimate_emails']} legitimate emails; the exact upper 95% bound, {fi['interval_per_1000_exact']['high']:.2f} per 1,000, is {budget} the budget of {fi['budget_per_1000']:g}. That is a simulation result.",
+        f"- The service serves the frozen cutoff. On the one `test_product_like` pass it warned on {email['true_positives']} of {email['positives']} misdirected emails with {fi['false_interventions']} false interventions on {fi['legitimate_emails']:,} legitimate emails. The exact upper 95% bound, {fi['interval_per_1000_exact']['high']:.2f} per 1,000, is {budget} the budget of {fi['budget_per_1000']:g} only if emails were independent; most test drafts share one sender, so AC01 is recorded as insufficient evidence. That is a simulation result.",
         f"- Scenarios never warned in the frozen test subsets: {', '.join(never) or 'none'}. The API does not change that.",
     ]
 

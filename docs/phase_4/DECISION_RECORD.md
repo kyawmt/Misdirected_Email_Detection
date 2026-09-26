@@ -10,9 +10,9 @@ Behavior-only models are always eligible. An all-features model is eligible only
 
 ## Eligibility of all-features models
 
-An all-features model is a selection candidate only if (1) the train shortcut audit flags no content feature, (2) it beats the behavior-only model of the same family in every chronological train fold, and (3) it beats the content-only model of the same family in every train fold. Otherwise behavior-only selection stands. Validation is not used for these checks.
+An all-features model is a selection candidate only if (1) the train shortcut audit flags no text-derived feature (pair content or draft-text flags), (2) it beats the behavior-only model of the same family in every chronological train fold, and (3) it beats the content-only model of the same family in every train fold. Otherwise behavior-only selection stands. Validation is not used for these checks.
 
-Check 1, train shortcut audit (from the feature artifact): content features `content_cosine` AUC 0.068 (separation 0.932), `content_similarity_observed` AUC 0.459 (separation 0.541), `pair_text_message_count` AUC 0.525 (separation 0.525). Flag bounds are 0.05 and 0.95. No content feature is flagged, so the check passes.
+Check 1, train shortcut audit (from the feature artifact): text-derived features `content_cosine` AUC 0.068 (separation 0.932), `content_similarity_observed` AUC 0.459 (separation 0.541), `draft_raw_token_count` AUC 0.532 (separation 0.532), `pair_text_message_count` AUC 0.525 (separation 0.525), `draft_body_blank` AUC 0.515 (separation 0.515), `draft_text_short` AUC 0.514 (separation 0.514), `draft_text_oov` AUC 0.499 (separation 0.501), `draft_subject_blank` AUC 0.499 (separation 0.501), `draft_text_empty` AUC 0.500 (separation 0.500). Flag bounds are 0.05 and 0.95. No text-derived feature is flagged, so the check passes.
 
 Checks 2 and 3 compare email average precision fold by fold on the expanding chronological train folds, each model at its own tuned setting. A margin is all-features minus the other model on that fold.
 
@@ -42,7 +42,7 @@ The highest email average precision among eligible models on product-like valida
 
 ## Content features
 
-The selected model uses content features. It was a candidate only because its family passed the eligibility checks above; the behavior-only model of the same family is reported beside it. `logistic` email average precision on product-like validation is 0.494 [0.253, 0.710] without those content columns and 0.883 [0.754, 0.976] with all features. `tree` email average precision on product-like validation is 0.459 [0.230, 0.686] without those content columns and 0.276 [0.156, 0.419] with all features.
+The selected model uses content features. It was a candidate only because its family passed the eligibility checks above; the behavior-only model of the same family is reported beside it. Same family as the selected model: `logistic_behavior_only_balanced` has product-like validation email average precision 0.467 [0.223, 0.688] and `logistic_all_balanced` has 0.831 [0.676, 0.954]. `logistic_behavior_only_unweighted` has product-like validation email average precision 0.494 [0.253, 0.710] and `logistic_all_unweighted` has 0.883 [0.754, 0.976]. `tree_behavior_only` has product-like validation email average precision 0.459 [0.230, 0.686] and `tree_all` has 0.276 [0.156, 0.419].
 
 ## First contact
 

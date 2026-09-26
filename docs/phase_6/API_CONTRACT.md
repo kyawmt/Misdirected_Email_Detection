@@ -46,7 +46,7 @@ Addresses follow assumption A7: surrounding whitespace is trimmed, matching is c
 
 ## Codes
 
-Codes are descriptive context from the feature row. They do not change the decision and are not read from model coefficients. `CONTENT_RELATIONSHIP_MISMATCH` is not emitted by this version. When the served model uses content cosine, a model-level explanation sentence says so; no per-recipient content code is derived from the score.
+Context codes and limitations are read from the feature row. They do not change the decision and are not read from model coefficients. `CONTENT_RELATIONSHIP_MISMATCH` is a reason tied to the model: it is emitted on a flagged recipient only when its content cosine was observed, is below the typical train value (the mean observed cosine on train, from the feature quality report), and raising only that value to the typical one would drop the recipient's risk score below `T_warn`. The check rescores the frozen model on that one changed row; it never changes the decision.
 
 | Code | Kind | Emitted when | Text |
 | --- | --- | --- | --- |
@@ -54,6 +54,7 @@ Codes are descriptive context from the feature row. They do not change the decis
 | `LIMITED_TEXT` | evidence limitation, any recipient | draft text empty, short, or out of vocabulary | Little text is available for content assessment; an evidence limitation. |
 | `EXTERNAL_RECIPIENT` | context, flagged recipient only | `recipient_is_internal` is 0 | The address is outside the fictional organization; context, not proof of a mistake. |
 | `LOOKALIKE_CONTACT_CONTEXT` | context, flagged recipient only | `near_name_count` is at least 1 | A similar contact identity and other context warrant review; similarity alone is not a mistake finding. |
+| `CONTENT_RELATIONSHIP_MISMATCH` | reason, flagged recipient only | observed content cosine below the typical train value, and a rescore with only that value raised to typical falls below `T_warn` | This draft differs from prior topics exchanged with this recipient. |
 | `UNUSUAL_RECIPIENT_COMBINATION` | context, flagged recipient only | co-recipient support applies and the partner fraction is 0 | These addressees have little support as a group in the available prior communication. |
 
 ## Feedback request
@@ -134,6 +135,10 @@ These bodies come from live calls on fictional validation drafts, chosen by rule
         {
           "code": "UNUSUAL_RECIPIENT_COMBINATION",
           "text": "These addressees have little support as a group in the available prior communication."
+        },
+        {
+          "code": "CONTENT_RELATIONSHIP_MISMATCH",
+          "text": "This draft differs from prior topics exchanged with this recipient."
         }
       ],
       "evidence_limitations": []

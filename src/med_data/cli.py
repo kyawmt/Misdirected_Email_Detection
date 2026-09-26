@@ -13,7 +13,7 @@ from med_data.version import DATA_DIR, DATASET_VERSION
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="med-data", description="Build or validate the fictional email dataset.")
     sub = parser.add_subparsers(dest="command", required=True)
-    build = sub.add_parser("build", help="Generate the versioned dataset")
+    build = sub.add_parser("build", help="Generate the versioned dataset into a directory that has no dataset yet")
     build.add_argument("--output", default=DATA_DIR, type=Path)
     validate = sub.add_parser("validate", help="Check a generated dataset and its checksums")
     validate.add_argument("--data", default=DATA_DIR, type=Path)

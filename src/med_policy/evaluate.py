@@ -4,10 +4,13 @@ Every rate carries its numerator and denominator. Intervals are:
 
 - a family-cluster bootstrap (1,000 draws, seed 20260926) with the 2.5 and
   97.5 percentiles, and the number of draws kept
-- an exact Clopper–Pearson binomial interval, which treats emails as
-  independent. That holds on product-like subsets, where each family has one
-  draft. A zero count still has a positive upper bound this way; the
-  bootstrap of a zero count is always [0, 0].
+- an exact Clopper–Pearson binomial interval, which assumes independent
+  emails. One-draft families on product-like subsets remove thread copies,
+  but they do not make emails independent: most product-like drafts share one
+  sender and repeated generated routines. The exact bound is reported as a
+  conditional figure, not as confidence-supported evidence. A zero count
+  still has a positive upper bound this way; the bootstrap of a zero count is
+  always [0, 0].
 """
 
 from __future__ import annotations

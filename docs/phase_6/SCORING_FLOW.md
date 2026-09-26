@@ -27,7 +27,7 @@ At startup the app loads, once and without fitting anything:
 
 ## What the service does not change
 
-- The service serves the frozen cutoff. On the one `test_product_like` pass it warned on 9 of 30 misdirected emails with 0 false interventions on 5970 legitimate emails; the exact upper 95% bound, 0.62 per 1,000, is within the budget of 1. That is a simulation result.
+- The service serves the frozen cutoff. On the one `test_product_like` pass it warned on 9 of 30 misdirected emails with 0 false interventions on 5,970 legitimate emails. The exact upper 95% bound, 0.62 per 1,000, is within the budget of 1 only if emails were independent; most test drafts share one sender, so AC01 is recorded as insufficient evidence. That is a simulation result.
 - Scenarios never warned in the frozen test subsets: S01, S04, S11. The API does not change that.
 - A well-formed address that is not in the snapshot directory, such as a typo, is `unavailable`, not a warning. Changing that is a contract decision.
 - No rule warns because a recipient is new, external, a lookalike, or off-topic.
@@ -55,7 +55,7 @@ Workload: every validation_product_like draft, in one permutation with seed 2026
 | Hardware and OS | macOS-27.0-arm64-arm-64bit, arm64, 10 CPUs |
 | Versions | contract_version med-api-v1, model_version med-model-v2, feature_spec_version med-features-v2, policy_version med-policy-v2, snapshot_id med-synth-v4, python 3.11.14, fastapi 0.141.1, scikit_learn 1.9.1, numpy 2.4.6 |
 
-AC05 is recorded as **met** on the client-side p95 of 57.04 ms, on this machine only. The model and policy were not changed to improve it. The content-cosine centroid is built from one sparse slice of the history matrix per recipient, not one row read at a time; that change leaves every feature value identical.
+AC05 is recorded as **met** on the client-side p95 of 57.04 ms, on this machine only. The model and policy were not changed to improve it. The `CONTENT_RELATIONSHIP_MISMATCH` check was added after this measurement; it rescores one row per flagged recipient, so it adds work only to warned drafts (8 of 4,000 in this workload), and the record was not remeasured because the latency command never overwrites a record. The content-cosine centroid is built from one sparse slice of the history matrix per recipient, not one row read at a time; that change leaves every feature value identical.
 
 ## Parity with the frozen validation scores
 

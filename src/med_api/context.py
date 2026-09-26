@@ -7,6 +7,7 @@ bound to the history index once. The model and policy come through
 
 from __future__ import annotations
 
+import json
 import os
 import time
 from dataclasses import dataclass
@@ -55,6 +56,7 @@ class ScoringContext:
     internal_ids: frozenset[str]
     snapshot_id: str
     load_seconds: float
+    content_reference: float | None = None
 
     @property
     def versions(self) -> dict:
@@ -83,6 +85,7 @@ def load_context(paths: ApiPaths) -> ScoringContext:
         contacts["is_internal"].astype(bool) & (contacts["domain"].astype(str) == ORGANIZATION_DOMAIN), "contact_id"
     ]
     return ScoringContext(
+        content_reference=content_reference(paths.features),
         bundle=bundle,
         transformer=transformer,
         directory=directory,
@@ -92,3 +95,17 @@ def load_context(paths: ApiPaths) -> ScoringContext:
         snapshot_id=SNAPSHOT_ID,
         load_seconds=time.perf_counter() - started,
     )
+
+
+def content_reference(features_dir: Path) -> float | None:
+    """Mean observed content cosine on train rows, from the published feature quality report.
+
+    Label-free and fit on train only. It is the "typical content" value the
+    content reason code compares against. None when the report lacks it.
+    """
+    path = Path(features_dir) / "quality_report.json"
+    if not path.exists():
+        return None
+    stats = json.loads(path.read_text(encoding="utf-8"))["subsets"]["train"]["features"]["content_cosine"]
+    value = stats.get("mean")
+    return float(value) if value is not None else None

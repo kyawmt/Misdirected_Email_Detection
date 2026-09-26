@@ -15,6 +15,7 @@ import pandas as pd
 from med_policy.version import (
     ARTIFACT_ROOT,
     BUDGET_PER_1000,
+    DATA_DIR,
     DIAGNOSTIC_SUBSET,
     MODEL_DIR,
     SELECTION_SUBSET,
@@ -72,6 +73,7 @@ def _context(policy_dir: Path) -> dict:
     api_latency = ARTIFACT_ROOT / "med-api-latency" / ctx["policy"]["policy_version"] / "latency.json"
     ctx["api_latency"] = json.loads(api_latency.read_text(encoding="utf-8")) if api_latency.exists() else None
     ctx["api_latency_path"] = str(api_latency)
+    ctx["senders"] = _sender_concentration(Path(DATA_DIR))
     scores_path = policy_dir / "validation_scores.csv"
     ctx["validation_scores"] = pd.read_csv(scores_path, float_precision="round_trip") if scores_path.exists() else None
     ctx["blocks"] = dict(ctx["validation"]["subsets"])
@@ -79,6 +81,30 @@ def _context(policy_dir: Path) -> dict:
         ctx["blocks"].update(ctx["test"]["subsets"])
     ctx["status"] = _ac_status(ctx)
     return ctx
+
+
+def _sender_concentration(data_dir: Path) -> dict:
+    """Drafts per sender in each assessed subset. Structural counts only; no labels or scores."""
+    path = data_dir / "drafts.csv"
+    if not path.exists():
+        return {}
+    drafts = pd.read_csv(path, usecols=["subset", "sender_contact_id"], keep_default_na=False)
+    out = {}
+    for subset, group in drafts.groupby("subset"):
+        counts = group["sender_contact_id"].value_counts()
+        out[str(subset)] = {"drafts": int(len(group)), "senders": int(len(counts)), "largest_sender_drafts": int(counts.iloc[0])}
+    return out
+
+
+def _independence_note(ctx: dict, subset: str) -> str:
+    info = ctx.get("senders", {}).get(subset)
+    if not info:
+        return "The exact bound assumes independent emails, which this report cannot establish."
+    return (
+        f"The exact bound assumes independent emails. On `{subset}`, {info['largest_sender_drafts']:,} of {info['drafts']:,} drafts come from one sender "
+        f"({info['senders']} senders in all), and routine drafts repeat generated communication patterns, so errors can be correlated by sender. "
+        "One-draft families remove thread copies but do not establish independence, and a sender-clustered interval has no upper bound for a zero count."
+    )
 
 
 # ---------------------------------------------------------------- formatting
@@ -170,12 +196,16 @@ def _ac_status(ctx: dict) -> dict:
         if rate > BUDGET_PER_1000:
             status["AC01"] = ("not met", f"The point estimate {_f(rate, 2)} per 1,000 exceeds the budget.")
         elif upper <= BUDGET_PER_1000:
+            # The exact bound meets the budget only under an independence assumption this
+            # corpus does not support, so the confidence-supported claim is not made.
             status["AC01"] = (
-                "met",
-                f"On this simulation only: {fi['false_interventions']} false interventions on {fi['legitimate_emails']} legitimate "
-                f"`{TEST_PRODUCT}` emails, {_f(rate, 2)} per 1,000, with an exact upper 95% bound of {_f(upper, 2)} per 1,000, within "
-                f"the budget of {_f(BUDGET_PER_1000, 0)}. Warnings {fi['warnings']}, blocks {fi['blocks']}, coverage "
-                f"{_pct(point['coverage']['fraction'])}, assumed prevalence 0.5%. The validation bound is not independent evidence, "
+                "insufficient evidence",
+                f"Descriptive pass on this corpus: {fi['false_interventions']} false interventions on {fi['legitimate_emails']:,} legitimate "
+                f"`{TEST_PRODUCT}` emails ({_f(rate, 2)} per 1,000; warnings {fi['warnings']}, blocks {fi['blocks']}, coverage "
+                f"{_pct(point['coverage']['fraction'])}, assumed prevalence 0.5%). The point estimate is within the budget of "
+                f"{_f(BUDGET_PER_1000, 0)}, which is provisional. The exact upper 95% bound is {_f(upper, 2)} per 1,000. "
+                f"{_independence_note(ctx, TEST_PRODUCT)} The confidence-supported claim needs an independence argument "
+                "or a more independent evaluation, which would need a new frozen dataset version. The validation bound is not evidence either, "
                 "because validation chose the cutoff.",
             )
         else:
@@ -402,7 +432,7 @@ def _evaluation_report(ctx: dict) -> str:
         caveats.append(f"{_f(row['precision_at_fpr_upper'])} on `{subset}`")
     parts += [
         "",
-        f"Email precision of 1.000 on a policy row is forced by zero observed false warnings; it is not an estimate of precision in use. At the exact upper 95% false-positive rate and the assumed 0.5% prevalence, precision would be {' and '.join(caveats)}. See [uncertainty and prevalence](UNCERTAINTY_AND_PREVALENCE.md).",
+        f"Email precision of 1.000 on a policy row is forced by zero observed false warnings; it is not an estimate of precision in use. At the exact upper 95% false-positive rate (itself conditional on independent emails) and the assumed 0.5% prevalence, precision would be {' and '.join(caveats)}. See [uncertainty and prevalence](UNCERTAINTY_AND_PREVALENCE.md).",
         "",
         f"The confidence bound on `{SELECTION_SUBSET}` is not independent confirmation of the budget, because that subset selected the cutoff. Only the one `{TEST_PRODUCT}` pass can support or fail AC01.",
         "",
@@ -424,20 +454,20 @@ def _evaluation_report(ctx: dict) -> str:
     for subset in _subsets(ctx):
         point = ctx["blocks"][subset]["policy"]
         fi = point["interventions"]
-        independent = subset in (SELECTION_SUBSET, TEST_PRODUCT)
+        one_draft_families = subset in (SELECTION_SUBSET, TEST_PRODUCT)
         rows.append(
             [
                 f"`{subset}`",
-                _ci(fi["interval_per_1000_exact"], 2) if independent else "not valid (shared families)",
+                f"{_ci(fi['interval_per_1000_exact'], 2)} if emails were independent" if one_draft_families else "not valid (shared families)",
                 _bootstrap_fi(fi),
-                _ci(point["email"]["recall_interval_exact"]) if independent else "not valid (shared families)",
+                f"{_ci(point['email']['recall_interval_exact'])} if emails were independent" if one_draft_families else "not valid (shared families)",
                 f"{_ci(point['email']['recall_interval_bootstrap'])} ({point['email']['recall_interval_bootstrap']['n_kept']} draws kept)",
             ]
         )
     parts.append(_table(["Subset", "False interventions per 1,000, exact 95%", "Same, family bootstrap", "Email recall, exact 95%", "Email recall, family bootstrap"], rows))
     parts += [
         "",
-        "The family bootstrap of a zero count is always [0, 0]. It says nothing about an upper bound. The exact interval treats emails as independent, which holds on product-like subsets because each family has one draft. See [uncertainty and prevalence](UNCERTAINTY_AND_PREVALENCE.md).",
+        f"The family bootstrap of a zero count is always [0, 0]. It says nothing about an upper bound. The exact interval assumes independent emails. {_independence_note(ctx, TEST_PRODUCT)} Read the exact figures as conditional on that assumption. See [uncertainty and prevalence](UNCERTAINTY_AND_PREVALENCE.md).",
         "",
         "## Precision–recall curves",
         "",
@@ -520,16 +550,19 @@ def _latency_text(ctx: dict) -> str:
 
 
 def _ac07_text(ctx: dict) -> str:
-    parts = []
+    legit, s11 = [], []
     for subset in _subsets(ctx):
         warned, total = _legit_warned(ctx, subset)
+        legit.append(f"`{subset}` {warned} of {total}")
         s11_warned, s11_total = _scenario_counts(ctx, subset, "S11")
-        parts.append(f"`{subset}` {warned} of {total} S03/S05/S06/S07 emails warned, S11 {s11_warned} of {s11_total} warned")
+        s11.append(f"`{subset}` {s11_warned} of {s11_total} warned, {s11_total - s11_warned} missed")
     fc = ctx["blocks"][SELECTION_SUBSET]["first_contact"]
     return (
-        "**insufficient evidence**. Wrong interventions on the legitimate-novelty scenarios: "
-        + "; ".join(parts)
-        + f". Those allows are the desired outcome, but legitimate first contacts score close to the cutoff (highest {_f(fc['novel_intended_max_score'], 5)} on `{SELECTION_SUBSET}` against `T_warn` {_f(ctx['policy']['T_warn'], 5)}), "
+        "**insufficient evidence**. Wrong interventions on the legitimate novelty and topic-change scenarios (S03, S05, S06, S07), "
+        "which count as false positives: " + "; ".join(legit) + ". Those allows are the desired outcome. "
+        "Mistaken first contacts (S11) are the counterexample to a novelty-only rule, and every one was missed: " + "; ".join(s11)
+        + ". Those are detection misses, counted under AC02, not successes. "
+        f"Legitimate first contacts score close to the cutoff (highest {_f(fc['novel_intended_max_score'], 5)} on `{SELECTION_SUBSET}` against `T_warn` {_f(ctx['policy']['T_warn'], 5)}), "
         "and removing pair history from a familiar mistake raises its risk score. The report cannot show that novelty is weighed only with other signals rather than setting a score near the cutoff by itself."
     )
 
@@ -725,6 +758,17 @@ def _error_analysis(ctx: dict) -> str:
     return "\n".join(parts)
 
 
+def _independence_table(ctx: dict) -> str:
+    rows = []
+    for subset in _subsets(ctx):
+        info = ctx.get("senders", {}).get(subset)
+        if info:
+            rows.append([f"`{subset}`", f"{info['drafts']:,}", info["senders"], f"{info['largest_sender_drafts']:,}", _pct(info["largest_sender_drafts"] / info["drafts"])])
+    if not rows:
+        return "Sender counts are not available."
+    return _table(["Subset", "Drafts", "Senders", "Drafts from the largest sender", "Share"], rows)
+
+
 def _bound_reach(ctx: dict) -> str:
     pieces = []
     for subset in _product_subsets(ctx):
@@ -732,7 +776,7 @@ def _bound_reach(ctx: dict) -> str:
         reach = fi["zero_count_upper_per_1000"] <= BUDGET_PER_1000
         pieces.append(
             f"With {fi['legitimate_emails']} legitimate emails on `{subset}`, zero false warnings give an upper bound of {_f(fi['zero_count_upper_per_1000'], 2)} per 1,000, "
-            + ("within the budget." if reach else "above the budget, so no result on that subset could support the claim.")
+            + ("within the budget if emails were independent." if reach else "above the budget, so no result on that subset could support the claim.")
         )
     return " ".join(pieces)
 
@@ -744,7 +788,7 @@ def _uncertainty(ctx: dict) -> str:
         "## Interval methods",
         "",
         f"- **Family bootstrap.** {ctx['validation']['bootstrap']['n_resamples']} draws, seed {ctx['validation']['bootstrap']['seed']}, resampling `family_id` clusters of emails; the 2.5 and 97.5 percentiles are reported with the number of draws kept. Diagnostic families contain several drafts, so only this interval respects their dependence. A zero false-intervention count bootstraps to [0, 0] in every draw, which is not an upper bound, so the diagnostic false-intervention rate has no valid upper bound in this report. The diagnostic recall bootstrap is still reported.",
-        "- **Exact binomial (Clopper–Pearson).** Used for the false-intervention rate and recall on product-like subsets, where each family has one draft and emails are independent. It gives a positive upper bound for a zero count. The AC01 strong claim uses this upper bound.",
+        "- **Exact binomial (Clopper–Pearson).** Reported for the false-intervention rate and recall on product-like subsets, where each family has one draft. It assumes independent emails and gives a positive upper bound for a zero count. That assumption is not established here (see below), so the exact bound is a conditional figure, not confidence-supported evidence for AC01.",
         "",
         "## The sample-size limit on AC01",
         "",
@@ -753,14 +797,20 @@ def _uncertainty(ctx: dict) -> str:
     for subset in _product_subsets(ctx):
         fi = ctx["blocks"][subset]["policy"]["interventions"]
         rows.append([f"`{subset}`", fi["legitimate_emails"], _f(1000 / fi["legitimate_emails"], 3), fi["false_interventions"], _f(fi["per_1000_legitimate"], 2), _f(fi["interval_per_1000_exact"]["high"], 2), _f(fi["zero_count_upper_per_1000"], 2)])
-    parts.append(_table(["Subset", "Legitimate emails", "One false warning, per 1,000", "False warnings", "Rate per 1,000", "Exact upper 95%", "Upper 95% if zero"], rows))
+    parts.append(_table(["Subset", "Legitimate emails", "One false warning, per 1,000", "False warnings", "Rate per 1,000", "Exact upper 95% (if independent)", "Upper 95% if zero (if independent)"], rows))
     parts += [
         "",
-        f"The budget is {_f(BUDGET_PER_1000, 0)} false intervention per 1,000 legitimate emails. A point estimate within the budget is provisional; the strong AC01 claim needs the exact upper bound at or below the budget. {_bound_reach(ctx)} Only the `{TEST_PRODUCT}` pass counts for AC01, because `{SELECTION_SUBSET}` chose the cutoff.",
+        f"The budget is {_f(BUDGET_PER_1000, 0)} false intervention per 1,000 legitimate emails. A point estimate within the budget is provisional. The strong AC01 claim needs an upper confidence bound at or below the budget under justified sampling assumptions. {_bound_reach(ctx)} Only the `{TEST_PRODUCT}` pass counts for AC01, because `{SELECTION_SUBSET}` chose the cutoff.",
+        "",
+        "## Independence",
+        "",
+        _independence_table(ctx),
+        "",
+        f"{_independence_note(ctx, TEST_PRODUCT)} AC01 is therefore recorded as insufficient evidence: the observed rate is a descriptive pass on this corpus, not a confidence-supported budget claim.",
         "",
         "## Prevalence sensitivity",
         "",
-        "0.5% is a simulation assumption. Precision at the frozen cutoff is computed from the product-like true-positive rate and false-positive rate, at several assumed prevalences. When the observed false-positive rate is 0, point precision is 1.0 at every prevalence, which overstates it; the second column uses the exact upper false-positive rate instead. Neither column is chosen as the result.",
+        "0.5% is a simulation assumption. Precision at the frozen cutoff is computed from the product-like true-positive rate and false-positive rate, at several assumed prevalences. When the observed false-positive rate is 0, point precision is 1.0 at every prevalence, which overstates it; the second column uses the exact upper false-positive rate instead, which assumes independent emails (see [independence](#independence)). Neither column is chosen as the result.",
         "",
     ]
     for subset in _product_subsets(ctx):

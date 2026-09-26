@@ -37,6 +37,7 @@ CODE_TEXT = {
     "LIMITED_RELATIONSHIP_HISTORY": "Little or no prior communication is available; an evidence limitation, not a verdict.",
     "EXTERNAL_RECIPIENT": "The address is outside the fictional organization; context, not proof of a mistake.",
     "LIMITED_TEXT": "Little text is available for content assessment; an evidence limitation.",
+    "CONTENT_RELATIONSHIP_MISMATCH": "This draft differs from prior topics exchanged with this recipient.",
 }
 BEHAVIOR_NOTE = "Risk scores come from sender-recipient history, recency, co-recipient support, and contact similarity."
 NO_CONTENT_NOTE = "Draft-text similarity was not used by this model."
@@ -154,7 +155,8 @@ class AssessmentService:
         return 200, body
 
     def _assessed(self, request_id: str, request: NormalizedRequest, result: dict, context: ScoringContext, started: float) -> dict:
-        rows = result["feature_rows"].set_index("contact_id")
+        frame = result["feature_rows"]
+        rows = frame.set_index("contact_id")
         scores = {item["contact_id"]: item["risk_score"] for item in result["recipient_scores"]}
         flagged_ids = set(result["flagged_recipient_ids"])
         recipients = []
@@ -168,7 +170,7 @@ class AssessmentService:
                     "roles": list(person.roles),
                     "risk_score": float(scores[person.contact_id]),
                     "flagged": flagged,
-                    "reason_codes": _codes(_context_codes(row)) if flagged else [],
+                    "reason_codes": _codes(_context_codes(row) + _content_codes(context, frame, person.contact_id)) if flagged else [],
                     "evidence_limitations": _codes(_limitations(row)),
                 }
             )
@@ -328,6 +330,33 @@ def _context_codes(row) -> list[str]:
     if int(row["co_support_applicable"]) == 1 and np.isclose(float(row["co_partner_fraction"]), 0.0):
         codes.append("UNUSUAL_RECIPIENT_COMBINATION")
     return codes
+
+
+def content_sensitive(model, frame, contact_id: str, reference: float | None, t_warn: float) -> bool:
+    """True when this recipient's warning depends on low draft-text similarity.
+
+    The recipient must have an observed content cosine below the typical train
+    value. Its row is rescored with only `content_cosine` raised to that value;
+    if the rescored risk falls below `T_warn`, the low content similarity is
+    part of why this recipient was flagged. This reads the frozen model, not
+    its coefficients, and never changes the decision.
+    """
+    if reference is None or "content_cosine" not in model.feature_columns:
+        return False
+    row = frame.loc[frame["contact_id"] == contact_id]
+    if row.empty or int(row["content_similarity_observed"].iloc[0]) != 1:
+        return False
+    if float(row["content_cosine"].iloc[0]) >= reference:
+        return False
+    typical = row.copy()
+    typical["content_cosine"] = reference
+    return float(model.score_frame(typical)[0]) < t_warn
+
+
+def _content_codes(context: ScoringContext, frame, contact_id: str) -> list[str]:
+    if content_sensitive(context.bundle.model, frame, contact_id, context.content_reference, context.bundle.t_warn):
+        return ["CONTENT_RELATIONSHIP_MISMATCH"]
+    return []
 
 
 def _codes(codes: list[str]) -> list[dict]:

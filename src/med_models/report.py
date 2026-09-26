@@ -229,9 +229,9 @@ def _eligibility_section(payload: dict) -> str:
             for name, value in audit["content_auc"].items()
         )
         lines.append(
-            f"Check 1, train shortcut audit (from the feature artifact): content features {listed}. "
+            f"Check 1, train shortcut audit (from the feature artifact): text-derived features {listed}. "
             f"Flag bounds are {bounds[0]} and {bounds[1]}. "
-            + ("No content feature is flagged, so the check passes." if audit["passed"] else f"Flagged: {', '.join(audit['flagged_content'])}. The check fails.")
+            + ("No text-derived feature is flagged, so the check passes." if audit["passed"] else f"Flagged: {', '.join(audit['flagged_content'])}. The check fails.")
         )
     else:
         lines.append(f"Check 1, train shortcut audit: {audit.get('reason', 'not available')}. The check fails.")
@@ -537,19 +537,31 @@ def _content_paragraph(selected: dict, runs: list[dict]) -> str:
             "The selected model uses content features. It was a candidate only because its family passed the eligibility checks above; "
             "the behavior-only model of the same family is reported beside it."
         )
-    return uses + " " + _gap_sentence(runs)
+    return uses + " " + _gap_sentence(runs, selected)
 
 
-def _gap_sentence(runs: list[dict]) -> str:
+def _gap_sentence(runs: list[dict], selected: dict) -> str:
+    """Behavior-only against all-features, same family as the selected model first, every run named."""
+    families = []
+    if selected["kind"] == "logistic":
+        weight = (selected.get("config") or {}).get("class_weight", "unweighted")
+        families.append(("logistic", weight))
+        families.append(("logistic", "balanced" if weight == "unweighted" else "unweighted"))
+        families.append(("tree", None))
+    else:
+        families += [("logistic", "unweighted"), ("logistic", "balanced"), ("tree", None)]
     parts = []
-    for kind in ("logistic", "tree"):
-        behavior = _match(runs, kind, "behavior_only")
-        full = _match(runs, kind, "all")
+    for index, (kind, weight) in enumerate(families):
+        suffix = f"_{weight}" if weight else ""
+        behavior = _named(runs, f"{kind}_behavior_only{suffix}")
+        full = _named(runs, f"{kind}_all{suffix}")
         if behavior is None or full is None:
             continue
+        lead = "Same family as the selected model: " if index == 0 and selected["kind"] == kind else ""
         parts.append(
-            f"`{kind}` email average precision on product-like validation is {_fmt_ap(behavior['validation_product_like']['email'])} "
-            f"without those content columns and {_fmt_ap(full['validation_product_like']['email'])} with all features."
+            f"{lead}`{behavior['name']}` has product-like validation email average precision "
+            f"{_fmt_ap(behavior['validation_product_like']['email'])} and `{full['name']}` has "
+            f"{_fmt_ap(full['validation_product_like']['email'])}."
         )
     return " ".join(parts)
 
