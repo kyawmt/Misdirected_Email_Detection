@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 300" width="360" height="300" role="img" aria-label="Precision-recall curve, test_diagnostic, email level">
+<style>
+.axis{stroke:#666;stroke-width:1} .curve{fill:none;stroke:#2b6cb0;stroke-width:2} .mark{fill:#c05621}
+text{font-family:sans-serif;font-size:11px;fill:#333} .label{font-size:10px}
+</style>
+<rect width="100%" height="100%" fill="#fff"/>
+<line x1="44" y1="256" x2="316" y2="256" class="axis"/>
+<line x1="44" y1="44" x2="44" y2="256" class="axis"/>
+<text x="180.0" y="290" text-anchor="middle">Recall</text>
+<text x="12" y="150.0" text-anchor="middle" transform="rotate(-90 12 150.0)">Precision</text>
+<text x="44" y="270" text-anchor="middle">0</text><text x="316" y="270" text-anchor="middle">1</text>
+<text x="36" y="48" text-anchor="end">1</text><text x="36" y="260" text-anchor="end">0</text>
+<text x="180.0" y="18" text-anchor="middle">test_diagnostic, email level: AP 0.959 (35 pos / 79)</text>
+<path d="M44.0,44.0 L51.8,44.0 L59.5,44.0 L67.3,44.0 L75.1,44.0 L82.9,44.0 L90.6,44.0 L98.4,44.0 L106.2,44.0 L113.9,44.0 L121.7,44.0 L129.5,44.0 L137.3,44.0 L145.0,44.0 L152.8,44.0 L160.6,44.0 L168.3,44.0 L176.1,44.0 L183.9,44.0 L191.7,44.0 L199.4,44.0 L207.2,44.0 L215.0,44.0 L222.7,44.0 L230.5,44.0 L238.3,44.0 L238.3,52.2 L238.3,59.7 L238.3,66.7 L246.1,65.9 L253.8,65.2 L253.8,71.4 L261.6,70.5 L269.4,69.7 L277.1,68.9 L284.9,68.2 L292.7,67.6 L292.7,72.6 L292.7,77.5 L292.7,82.1 L292.7,86.4 L300.5,85.4 L308.2,84.4 L308.2,88.4 L308.2,92.2 L308.2,95.8 L308.2,99.3 L316.0,98.1 L316.0,101.4 L316.0,104.6 L316.0,107.6 L316.0,110.5 L316.0,113.3 L316.0,116.0 L316.0,118.6 L316.0,121.1 L316.0,123.5 L316.0,125.8 L316.0,128.1 L316.0,130.2 L316.0,132.3 L316.0,134.4 L316.0,136.3 L316.0,138.2 L316.0,140.1 L316.0,141.8 L316.0,143.6 L316.0,145.3 L316.0,146.9 L316.0,148.5 L316.0,150.0 L316.0,151.5 L316.0,152.9 L316.0,154.4 L316.0,155.7 L316.0,157.1 L316.0,158.4 L316.0,159.6 L316.0,160.9 L316.0,162.1" class="curve"/>
+<circle cx="238.3" cy="44.0" r="5" class="mark"/><text x="232.3" y="62.0" class="label" text-anchor="end">T_warn</text>
+</svg>

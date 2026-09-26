@@ -1,0 +1,43 @@
+{
+  "timing_boundary": "assess_draft: transform_draft on the loaded history index, loaded model, policy decision",
+  "excluded": "request parsing, HTTP, query construction, dataset loading",
+  "subset": "validation_product_like",
+  "warmup_calls": 20,
+  "measured_calls": 1000,
+  "concurrency": 1,
+  "statuses": {
+    "assessed": 1000
+  },
+  "p50_ms": 24.63289548177272,
+  "p95_ms": 333.34544647077564,
+  "max_ms": 432.94058402534574,
+  "cold_start_seconds": 1.196700458007399,
+  "cold_start_includes": "read dataset, load transformer, load policy and model with checksum checks, build directory and history index, vectorize history",
+  "request_mix": {
+    "recipients_per_draft": {
+      "1": 526,
+      "2": 64,
+      "3": 69,
+      "4": 302,
+      "5": 38,
+      "6": 1
+    },
+    "characters_p50": 201.0,
+    "characters_max": 243
+  },
+  "versions": {
+    "model_version": "med-model-v1",
+    "feature_spec_version": "med-features-v1",
+    "policy_version": "med-policy-v1",
+    "dataset_version": "med-synth-v2",
+    "numpy": "2.4.6",
+    "scikit_learn": "1.9.1"
+  },
+  "environment": {
+    "platform": "macOS-27.0-arm64-arm-64bit",
+    "machine": "arm64",
+    "processor": "arm",
+    "cpu_count": 10,
+    "python": "3.11.14"
+  }
+}

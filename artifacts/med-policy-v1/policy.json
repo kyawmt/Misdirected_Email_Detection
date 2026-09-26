@@ -1,0 +1,80 @@
+{
+  "policy_version": "med-policy-v1",
+  "model_version": "med-model-v1",
+  "model_run_name": "logistic_behavior_only_unweighted",
+  "feature_spec_version": "med-features-v1",
+  "dataset_version": "med-synth-v2",
+  "T_warn": 0.13455666515724893,
+  "blocking_enabled": false,
+  "T_block": null,
+  "scores_are": "risk_scores",
+  "calibration": "not_fit",
+  "calibration_reason": "validation_product_like has 5 misdirected emails, too few to fit or to split for a calibrator. validation_diagnostic is not the operating mix and train fit the model. A reliability table on validation_diagnostic is a shape check only.",
+  "decision_rule": {
+    "email_risk": "maximum recipient risk score",
+    "allow": "email_risk < T_warn",
+    "warn": "email_risk >= T_warn (equality warns)",
+    "block": "disabled",
+    "flagged_recipients": "every recipient with risk score >= T_warn"
+  },
+  "selection": {
+    "subset": "validation_product_like",
+    "level": "email",
+    "rule": "Candidates are the distinct email risk scores on the subset plus one cutoff above every score. Keep candidates with 0 false interventions, maximize email recall, break ties with the highest cutoff.",
+    "n_candidates": 1000,
+    "zero_false_intervention_candidates": 5,
+    "chosen": {
+      "cutoff": 0.13455666515724893,
+      "true_positives": 4,
+      "false_interventions": 0,
+      "recall": 0.8,
+      "warnings": 4
+    },
+    "tied_candidates": [
+      {
+        "cutoff": 0.13455666515724893,
+        "true_positives": 4,
+        "false_interventions": 0,
+        "recall": 0.8,
+        "warnings": 4
+      }
+    ],
+    "highest_legitimate_email_risk": 0.13204565857061076,
+    "recall_is_zero": false
+  },
+  "budget": {
+    "intervention": "a warn or a simulated block, counted once per email",
+    "rate": "false interventions per 1,000 legitimate emails",
+    "denominator": "all legitimate emails in the evaluation subset",
+    "recall_denominator": "all misdirected emails in the evaluation subset; an unassessed positive is not a detection",
+    "budget_per_1000": 1.0
+  },
+  "validation_confusion": {
+    "email": {
+      "n": 1000,
+      "positives": 5,
+      "legitimate": 995,
+      "true_positives": 4,
+      "false_positives": 0,
+      "false_negatives": 1,
+      "true_negatives": 995
+    },
+    "recipient": {
+      "n": 2265,
+      "positives": 6,
+      "true_positives": 5,
+      "false_positives": 0,
+      "false_negatives": 1,
+      "true_negatives": 2259
+    },
+    "warnings": 4,
+    "blocks": 0
+  },
+  "checksums": {
+    "model.joblib": "a7c79c91e0ba19ed18b166884229bef23d6c8e73cb4e530b54ce9788c1c7822c",
+    "artifact_manifest.json": "4103b22d8da5a53b8608a22d1dda829c0bc3a2f8f97cc4fd36321b883892328f"
+  },
+  "test_subsets_used": false,
+  "statement": "Selected on validation_product_like only. test_product_like and test_diagnostic were not read.",
+  "created_at": "2026-09-26T09:05:15Z"
+}
