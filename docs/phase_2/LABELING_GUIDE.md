@@ -20,15 +20,16 @@ The generator stipulates the bit while it builds the draft. `label_source` is `s
 | Routine project mail with Bcc | true for the Bcc contact and for everyone else | Ordinary project updates copy a teammate in Bcc. The Bcc role is not a positive label. |
 | S03 first direct contact | true | No earlier sent mail involves that contact. Novelty is not a positive label. |
 | S06 first contact at a new external domain | true | The domain has no earlier sent mail. A new domain is not a positive label. |
-| S07 kickoff to a facilities contact | true | The contact has earlier facilities mail and no earlier kickoff. A topic change is not a positive label. |
+| S07 topic change with established contact | true | The contact has earlier history and no earlier message on this topic. A topic change is not a positive label. |
 | S09 cold start | true | The sender has no earlier sent mail. Missing history is not a positive label. |
 | S09 little text, legitimate | true | Subject or body is empty. Emptiness is not the label. |
 | S09 little text, unintended | false for the swapped contact | The generator still swapped a recipient. Empty text does not decide the bit. |
+| S11 mistaken first contact | false for the uncontacted directory recipient | Autocomplete selected an internal directory contact whom the sender has never emailed. Directory visibility is not intent. |
 | Clean twin | true for every addressed recipient | Same text and recipients as the sent source, paired with a corrupted draft for review. |
 
 Sent history itself is not a labeled training table. Every sent message was addressed to the recipients the generator meant. Later phases may use that mail as behavior. They should not treat it as a second set of supervised email labels.
 
-`withheld_contact_id` records a person the generator removed in a replacement mistake (S01 and S04). That person is not an addressed recipient of the mistaken draft, so they do not get a negative row. The detection task does not score people who were left off the message.
+`withheld_contact_id` records a person the generator removed in a replacement mistake (S01, S04, and S11). That person is not an addressed recipient of the mistaken draft, so they do not get a negative row. The detection task does not score people who were left off the message.
 
 ## Hard negatives
 

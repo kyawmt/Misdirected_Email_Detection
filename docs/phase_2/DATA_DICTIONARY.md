@@ -1,6 +1,6 @@
 # Phase 2 — Data dictionary
 
-Status: `med-synth-v2` schema. The tables describe fictional people and fictional mail. A later scoring step may read only the columns marked model-visible. Every other column is an audit field used to build labels, splits, or leakage checks.
+Status: `med-synth-v3` schema. The tables describe fictional people and fictional mail. A later scoring step may read only the columns marked model-visible. Every other column is an audit field used to build labels, splits, or leakage checks.
 
 Empty strings mean "absent" for optional ids and for `asserted_intended`. Timestamps are UTC instants written as `YYYY-MM-DDTHH:MM:SSZ`. Booleans are `true` or `false`.
 
@@ -17,7 +17,7 @@ One row per fictional person or external party. Addresses use reserved `.example
 | `is_internal` | yes | Belongs to the fictional organization. |
 | `department` | yes | Directory department. Context for a person, not a label. |
 | `directory_visible_from` | yes | First time the directory lists this contact. |
-| `dataset_version` | no | `med-synth-v2` on every row. |
+| `dataset_version` | no | `med-synth-v3` on every row. |
 
 ## messages
 
@@ -65,7 +65,7 @@ Assessment candidates. A non-counterfactual draft matches one sent message. A co
 | `body_hash` | no | Same hash rule as messages. |
 | `split` | no | Chronological split of `sent_at`. |
 | `subset` | no | `train`, `validation_product_like`, `validation_diagnostic`, `test_product_like`, or `test_diagnostic`. |
-| `scenario_id` | no | `S01`–`S09` or `routine`. Provenance only. |
+| `scenario_id` | no | `S01`–`S11` or `routine`. Provenance only. |
 | `scenario_variant` | no | Variant inside the scenario, including `clean_twin`. |
 | `generator_topic` | no | Generator topic of the draft text. |
 | `withheld_contact_id` | no | Contact the generator removed when it built a replacement mistake. Empty when nobody was removed. Missing an intended recipient is not itself a positive label. |
@@ -152,4 +152,4 @@ Inputs that a future scorer should refuse. They are not drafts, not labeled, and
 
 ## Files
 
-The published build is `data/med-synth-v2/`. `dataset_manifest.json` records the seed, row counts, freeze policy, and SHA-256 checksum of each table and of `quality_report.json`. Each `rows` value is the number of parsed CSV records, excluding the header. Newlines inside a quoted body do not add records. Split, subset, timestamp, family, scenario fields, and the frozen flag in `split_manifest` are copies of the draft row and are checked against it.
+The published build is `data/med-synth-v3/`. `dataset_manifest.json` records the seed, row counts, freeze policy, and SHA-256 checksum of each table and of `quality_report.json`. Each `rows` value is the number of parsed CSV records, excluding the header. Newlines inside a quoted body do not add records. Split, subset, timestamp, family, scenario fields, and the frozen flag in `split_manifest` are copies of the draft row and are checked against it.

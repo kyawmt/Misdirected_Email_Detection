@@ -20,17 +20,17 @@ PUBLISHED = ROOT / "data" / DATASET_VERSION
 
 def test_published_contract_passes_validation(dataset):
     checks = assert_valid(dataset)
-    assert len(checks) == 30
+    assert len(checks) == 31
     assert dataset.seed == SEED
-    assert {check.check_id for check in checks} >= {"Q29", "Q30"}
+    assert {check.check_id for check in checks} >= {"Q29", "Q30", "Q31"}
 
 
 def test_product_like_prevalence_and_enrichment(dataset):
     manifest = dataset.split_manifest
     expected = {
-        "train": (100, 1000),
-        "validation_product_like": (5, 1000),
-        "test_product_like": (10, 2000),
+        "train": (300, 3000),
+        "validation_product_like": (20, 4000),
+        "test_product_like": (30, 6000),
     }
     for subset, (misdirected, total) in expected.items():
         group = manifest.loc[manifest["subset"] == subset]
@@ -46,19 +46,18 @@ def test_walkthrough_history_respects_relationships(dataset):
     s01 = walk.loc[("S01", "lookalike_replacement")]
     history = visible_history(dataset, s01["draft_id"])
     assert (history["sent_at"] < s01["sent_at"]).all()
-    assert "c_alex_chen" not in set(
-        history.loc[history["generator_topic"] == "staffing", "message_id"].map(
-            lambda message_id: _recipients(dataset, message_id)
-        ).explode()
-    )
+    assert (history["family_id"] != s01["family_id"]).all()
     chan_staffing = history.loc[history["generator_topic"] == "staffing"]
     chan_ids = set(chan_staffing["message_id"].map(lambda message_id: _recipients(dataset, message_id)).explode())
     assert "c_alex_chan" in chan_ids
+    assert _involvements(dataset, "c_alex_chen", s01["sent_at"]) > 0
 
     s03 = walk.loc[("S03", "legitimate_first_contact")]
     assert _involvements(dataset, "c_jordan", s03["sent_at"]) == 0
     s06 = walk.loc[("S06", "legitimate_new_domain")]
     assert _involvements(dataset, "c_rina", s06["sent_at"]) == 0
+    s11 = walk.loc[("S11", "mistaken_first_contact")]
+    assert _involvements(dataset, "c_blake", s11["sent_at"]) == 0
 
 
 def test_scoring_view_hides_labels(dataset):

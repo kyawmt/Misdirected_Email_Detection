@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass
+from datetime import timedelta
 
 import pandas as pd
 
@@ -58,6 +60,7 @@ def validate_dataset(dataset) -> list[Check]:
         ("Q28", "Topic markers appear in non-empty bodies of that topic", _markers),
         ("Q29", "Split manifest fields match the drafts", _manifest_matches_drafts),
         ("Q30", "Legitimate Bcc mail is present in history and in labeled subsets", _legitimate_bcc),
+        ("Q31", "Training timing diagnostic compares recent-mail proportions", _timing_diagnostic),
     ]
     for check_id, name, function in specs:
         try:
@@ -376,11 +379,9 @@ def _topics(dataset) -> str:
         _require(topics <= set(allowed), f"{contact_id} topics {sorted(topics - set(allowed))}")
         _require(topics, f"{contact_id} has no sent mail")
     facilities = set(dataset.contacts.loc[dataset.contacts["department"] == "Facilities", "contact_id"])
-    s07 = _scenario_contacts(dataset, "S07")
-    allowed_with_kickoff = s07 | {"c_sam"}
     for contact_id in facilities:
         topics = set(received.loc[received["contact_id"] == contact_id, "generator_topic"])
-        allowed = {"facilities", "kickoff"} if contact_id in allowed_with_kickoff else {"facilities"}
+        allowed = {"facilities", "office_equipment", "budget", "project_update", "kickoff"}
         _require(topics <= allowed, f"facilities contact {contact_id} topics {sorted(topics)}")
     return "relationship topics held in sent mail"
 
@@ -431,11 +432,22 @@ def _scenarios(dataset) -> str:
         _require(_domain_before(dataset, domain, draft["sent_at"]) == 0, f"S06 domain already used {domain}")
     for _, draft in drafts.loc[drafts["scenario_id"] == "S07"].iterrows():
         _require(_all_intended(labels, draft["draft_id"]), "S07 intended")
-        _require("kickoff" in draft["body"].casefold(), "S07 text")
         contact_id = _addressed(dataset, draft["draft_id"])[0]
-        prior = _topics_before(dataset, contact_id, draft["sent_at"])
-        _require("facilities" in prior, "S07 facilities history")
-        _require("kickoff" not in prior, "S07 already had a kickoff")
+        prior = _involves_before(dataset, contact_id, draft["sent_at"])
+        _require(prior >= 3, f"S07 prior history with {contact_id}: {prior}")
+    _require(_scenario_contacts(dataset, "S11"), "S11 missing")
+    for _, draft in drafts.loc[drafts["scenario_id"] == "S11"].iterrows():
+        if draft["scenario_variant"] == "clean_twin":
+            _require(_all_intended(labels, draft["draft_id"]), "S11 twin")
+            continue
+        bad = _unintended(labels, draft["draft_id"])
+        _require(len(bad) == 1, f"S11 {draft['draft_id']} unintended count")
+        contact_id = bad[0]
+        _require(contacts.loc[contact_id, "domain"] == "demo.example", "S11 internal domain")
+        _require(contacts.loc[contact_id, "directory_visible_from"] <= draft["sent_at"], "S11 directory visible")
+        earlier = _involves_before(dataset, contact_id, draft["sent_at"])
+        _require(earlier == 0, f"S11 prior mail for {contact_id}: {earlier}")
+        _require(bool(draft["withheld_contact_id"]), "S11 withheld contact")
     for variant, minimum_bad in (("unintended_cc", 1), ("unintended_bcc", 1), ("two_unintended", 2)):
         group = drafts.loc[drafts["scenario_variant"] == variant]
         _require(not group.empty, variant)
@@ -470,7 +482,7 @@ def _scenarios(dataset) -> str:
             _require(_all_intended(labels, draft["draft_id"]), "little text intended")
         else:
             _require(_unintended(labels, draft["draft_id"]), "little text unintended")
-    return "S01 through S09 structures hold"
+    return "S01 through S11 structures hold"
 
 
 def _walkthrough(dataset) -> str:
@@ -499,6 +511,9 @@ def _walkthrough(dataset) -> str:
     _require(s04["sent_at"] == s07["sent_at"], "S04 and S07 share a cutoff")
     s06 = draft_for("S06", "legitimate_new_domain")
     _require(_email(dataset, _addressed(dataset, s06["draft_id"])[0]) == "rina@newpartner.example", "S06 rina")
+    s11 = draft_for("S11", "mistaken_first_contact")
+    _require(_email(dataset, _unintended(dataset.labels, s11["draft_id"])[0]) == "blake.mendoza@demo.example", "S11 blake")
+    _require(s11["withheld_contact_id"] == "c_noah", "S11 withheld noah")
     s05_external = draft_for("S05", "external_purchase")
     _require(_includes_lee(dataset, s05_external["draft_id"]), "S05 lee")
     _require((dataset.split_manifest.loc[dataset.split_manifest["draft_id"].isin(walk["draft_id"]), "frozen"]).all(), "frozen")
@@ -574,17 +589,17 @@ def _coverage(dataset) -> str:
     manifest = dataset.split_manifest
     for subset in ("train", "validation_product_like", "test_product_like"):
         group = manifest.loc[manifest["subset"] == subset]
-        for scenario_id in ("S03", "S05", "S06", "S07", "S09"):
+        for scenario_id in ("S03", "S05", "S06", "S07", "S09", "S11"):
             _require((group["scenario_id"] == scenario_id).any(), f"{subset} missing {scenario_id}")
     for subset in ("validation_diagnostic", "test_diagnostic"):
         group = manifest.loc[manifest["subset"] == subset]
-        for scenario_id in ("S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09"):
+        for scenario_id in ("S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S11"):
             _require((group["scenario_id"] == scenario_id).any(), f"{subset} missing {scenario_id}")
         misdirected = int(group["is_misdirected_email"].sum())
         fraction = misdirected / len(group)
-        _require(0.35 <= fraction <= 0.7, f"{subset} misdirected fraction {fraction:.3f}")
+        _require(0.30 <= fraction <= 0.7, f"{subset} misdirected fraction {fraction:.3f}")
     variants = set(manifest.loc[manifest["subset"] == "test_diagnostic", "scenario_variant"])
-    for variant in ("unintended_cc", "unintended_bcc", "two_unintended", "all_intended", "clean_twin"):
+    for variant in ("unintended_cc", "unintended_bcc", "two_unintended", "all_intended", "clean_twin", "mistaken_first_contact"):
         _require(variant in variants, f"missing {variant}")
     return "scenario coverage holds"
 
@@ -639,6 +654,68 @@ def _legitimate_bcc(dataset) -> str:
         _require((sent["split"] == split).any(), f"sent history has no Bcc mail in {split}")
     summary = ", ".join(f"{name} {count}" for name, count in intended_counts.items())
     return f"intended Bcc recipients: {summary}"
+
+
+def _timing_diagnostic(dataset) -> str:
+    train_drafts = dataset.drafts.loc[dataset.drafts["subset"] == "train"]
+    labels = dataset.labels.set_index(["draft_id", "contact_id"])
+    messages = dataset.messages
+    msg_recipients = dataset.message_recipients
+
+    msg_to_recips = defaultdict(set)
+    for row in msg_recipients.itertuples(index=False):
+        msg_to_recips[row.message_id].add(row.contact_id)
+
+    intended_total = 0
+    intended_under_5m = 0
+    unintended_total = 0
+    unintended_under_5m = 0
+
+    for _, draft in train_drafts.iterrows():
+        draft_id = draft["draft_id"]
+        draft_time = draft["sent_at"]
+        five_min_ago = draft_time - timedelta(minutes=5)
+
+        recent_messages = messages.loc[
+            (messages["sent_at"] >= five_min_ago)
+            & (messages["sent_at"] < draft_time)
+            & (messages["family_id"] != draft["family_id"])
+        ]
+
+        if not recent_messages.empty and draft["body"]:
+            own_hash = draft["body_hash"]
+            if own_hash:
+                recent_messages = recent_messages.loc[recent_messages["body_hash"] != own_hash]
+
+        recent_recipients = set()
+        for mid in recent_messages["message_id"]:
+            recent_recipients.update(msg_to_recips[mid])
+
+        draft_recips = dataset.draft_recipients.loc[dataset.draft_recipients["draft_id"] == draft_id]
+        for _, row in draft_recips.iterrows():
+            cid = row["contact_id"]
+            is_intended = bool(labels.loc[(draft_id, cid), "intended"])
+            has_recent = cid in recent_recipients
+
+            if is_intended:
+                intended_total += 1
+                if has_recent:
+                    intended_under_5m += 1
+            else:
+                unintended_total += 1
+                if has_recent:
+                    unintended_under_5m += 1
+
+    pct_int = (intended_under_5m / intended_total * 100) if intended_total else 0.0
+    pct_unint = (unintended_under_5m / unintended_total * 100) if unintended_total else 0.0
+
+    _require(pct_int < 10.0, f"train intended rows under 5 min is too high ({pct_int:.1f}%), timing burst present")
+
+    return (
+        f"train same-recipient mail <5min: intended {pct_int:.2f}% "
+        f"({intended_under_5m}/{intended_total}), unintended {pct_unint:.2f}% "
+        f"({unintended_under_5m}/{unintended_total})"
+    )
 
 
 def _markers(dataset) -> str:

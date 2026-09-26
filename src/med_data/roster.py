@@ -24,7 +24,17 @@ PARTNER_BRANDS = (
     "northwind", "harborlight", "brightlane", "cedarline", "dovetail",
     "eastfield", "fairhaven", "goldacre", "highmeadow", "ionbridge",
     "juniperlane", "keelson", "larkspur", "maplecourt", "nimbusgate",
-    "oakbarrel",
+    "oakbarrel", "pinemount", "quarryrock", "riverbend", "silverstone",
+    "timberline", "uplandgate", "valleyforge", "westbrook", "crestview",
+    "driftwood", "emberhill", "foxglove", "granitepeak", "hazelwood",
+    "ironwood", "jadevalley", "kingfisher", "limestone", "meadowbrook",
+    "nightingale", "oceanpoint", "palmettogrove", "redwoodlane", "seabreeze",
+    "tidepool", "umbraview", "vineyardridge", "willowcreek", "zenithcrest",
+    "acornridge", "beaconhill", "cloverdale", "diamondpeak", "elmwood",
+    "fernridge", "glenwood", "havenwood", "ivygrove", "jaspermine",
+    "knollcrest", "laurelwood", "mossypath", "newhaven", "orchardhill",
+    "peachtreepath", "quietwaters", "rosewood", "stoneridge", "thornwood",
+    "urbanview", "verdantgrove", "windward", "yellowpine", "zephyrpoint",
 )
 
 
@@ -143,64 +153,97 @@ LEE = "c_lee"
 JORDAN = _contact("c_jordan", "Jordan Hale", "jordan@demo.example", "Program Delivery", DIRECTORY_OPEN)
 RINA = _contact("c_rina", "Rina Costa", "rina@newpartner.example", "External Partner", DIRECTORY_OPEN)
 ELLIOT = _contact("c_elliot", "Elliot Berg", "elliot.berg@demo.example", "Operations", DIRECTORY_OPEN)
+BLAKE = _contact("c_blake", "Blake Mendoza", "blake.mendoza@demo.example", "Legal", DIRECTORY_OPEN)
 
 DIAGNOSTIC_MIS = {
-    "s01": 4,
-    "s02": 4,
-    "s04": 4,
-    "s08_cc": 4,
-    "s08_bcc": 4,
-    "s08_two": 4,
-    "s09_little_bad": 4,
+    "s01": 10,
+    "s02": 10,
+    "s04": 10,
+    "s11": 10,
+    "s08_cc": 10,
+    "s08_bcc": 10,
+    "s08_two": 10,
+    "s09_little_bad": 10,
 }
 DIAGNOSTIC_LEG = {
-    "s08_all": 1,
-    "s03": 1,
-    "s06": 1,
-    "s07": 1,
-    "s05_internal": 1,
-    "s05_external": 1,
-    "s09_cold": 1,
-    "s09_little_ok": 1,
+    "s08_all": 10,
+    "s03": 10,
+    "s06": 10,
+    "s07": 10,
+    "s05_internal": 10,
+    "s05_external": 10,
+    "s09_cold": 10,
+    "s09_little_ok": 10,
 }
 
 PLANS: dict[str, SplitPlan] = {
     "train": SplitPlan(
-        product_total=1000,
+        product_total=3000,
         product_subset="train",
         diagnostic_subset=None,
         misdirected={
-            "s01": 24,
-            "s02": 24,
-            "s04": 20,
-            "s08_cc": 10,
-            "s08_bcc": 8,
-            "s08_two": 8,
-            "s09_little_bad": 6,
+            "s01": 70,
+            "s02": 70,
+            "s04": 60,
+            "s11": 30,
+            "s08_cc": 25,
+            "s08_bcc": 20,
+            "s08_two": 15,
+            "s09_little_bad": 10,
         },
         hard_negative={
-            "s03": 4,
-            "s06": 4,
-            "s07": 4,
-            "s09_cold": 4,
-            "s09_little_ok": 4,
+            "s03": 10,
+            "s06": 10,
+            "s07": 36,
+            "s09_cold": 10,
+            "s09_little_ok": 10,
         },
     ),
     "validation": SplitPlan(
-        product_total=1000,
+        product_total=4000,
         product_subset="validation_product_like",
         diagnostic_subset="validation_diagnostic",
-        misdirected={"s01": 1, "s02": 1, "s04": 1, "s08_cc": 1, "s08_two": 1},
-        hard_negative={"s03": 3, "s06": 3, "s07": 3, "s09_cold": 2, "s09_little_ok": 2},
+        misdirected={
+            "s01": 4,
+            "s02": 4,
+            "s04": 4,
+            "s11": 2,
+            "s08_cc": 2,
+            "s08_bcc": 1,
+            "s08_two": 2,
+            "s09_little_bad": 1,
+        },
+        hard_negative={
+            "s03": 10,
+            "s06": 10,
+            "s07": 10,
+            "s09_cold": 5,
+            "s09_little_ok": 5,
+        },
         diagnostic_misdirected=dict(DIAGNOSTIC_MIS),
         diagnostic_legitimate=dict(DIAGNOSTIC_LEG),
     ),
     "test": SplitPlan(
-        product_total=2000,
+        product_total=6000,
         product_subset="test_product_like",
         diagnostic_subset="test_diagnostic",
-        misdirected={"s01": 3, "s02": 3, "s04": 2, "s08_cc": 1, "s08_two": 1},
-        hard_negative={"s03": 4, "s06": 4, "s07": 4, "s09_cold": 3, "s09_little_ok": 3},
+        misdirected={
+            "s01": 6,
+            "s02": 6,
+            "s04": 5,
+            "s11": 3,
+            "s08_cc": 3,
+            "s08_bcc": 2,
+            "s08_two": 3,
+            "s09_little_bad": 2,
+        },
+        hard_negative={
+            "s03": 15,
+            "s06": 15,
+            "s07": 15,
+            "s09_cold": 10,
+            "s09_little_ok": 10,
+        },
         diagnostic_misdirected=dict(DIAGNOSTIC_MIS),
         diagnostic_legitimate=dict(DIAGNOSTIC_LEG),
         walkthrough={
@@ -219,6 +262,7 @@ PLANS: dict[str, SplitPlan] = {
             "s09_cold": 1,
             "s09_little_ok": 1,
             "s09_little_bad": 1,
+            "s11": 1,
         },
     ),
 }
@@ -239,22 +283,24 @@ KIND_META = {
     "s09_cold": ("S09", "cold_start_legitimate"),
     "s09_little_ok": ("S09", "little_text_legitimate"),
     "s09_little_bad": ("S09", "little_text_unintended"),
+    "s11": ("S11", "mistaken_first_contact"),
 }
 
 # Sent-mail topic allow-list for contacts whose history must stay clean.
-# Absence from this map means the contact is unrestricted.
+# Absence from this map means the contact is unrestricted. In v3, cross-functional
+# topics are shared realistically across relationships.
 RESTRICTED_TOPICS = {
-    "c_alex_chan": frozenset({"staffing"}),
-    "c_alex_chen": frozenset({"office_equipment"}),
-    "c_jamie_lee": frozenset({"staffing"}),
-    "c_jamie_li": frozenset({"office_equipment"}),
-    "c_morgan_shaw": frozenset({"staffing"}),
-    "c_morgan_zhao": frozenset({"office_equipment"}),
-    "c_lee": frozenset({"purchase_scheduling"}),
-    "c_pat": frozenset({"purchase_scheduling"}),
-    "c_ren": frozenset({"purchase_scheduling"}),
-    "c_hana": frozenset({"facilities"}),
-    "c_sam": frozenset({"facilities", "kickoff"}),
+    "c_alex_chan": frozenset({"staffing", "office_equipment", "project_update", "budget"}),
+    "c_alex_chen": frozenset({"office_equipment", "staffing", "project_update", "budget"}),
+    "c_jamie_lee": frozenset({"staffing", "office_equipment", "project_update", "budget"}),
+    "c_jamie_li": frozenset({"office_equipment", "staffing", "project_update", "budget"}),
+    "c_morgan_shaw": frozenset({"staffing", "office_equipment", "project_update", "budget"}),
+    "c_morgan_zhao": frozenset({"office_equipment", "staffing", "project_update", "budget"}),
+    "c_lee": frozenset({"purchase_scheduling", "office_equipment", "facilities"}),
+    "c_pat": frozenset({"purchase_scheduling", "office_equipment", "facilities"}),
+    "c_ren": frozenset({"purchase_scheduling", "office_equipment", "facilities"}),
+    "c_hana": frozenset({"facilities", "office_equipment", "budget", "project_update", "kickoff"}),
+    "c_sam": frozenset({"facilities", "office_equipment", "budget", "project_update", "kickoff"}),
 }
 
 

@@ -1,6 +1,6 @@
 # Phase 2 — Data quality and leakage checklist
 
-The executable checks live in `src/med_data/validate.py`. `python -m med_data validate` runs them against `data/med-synth-v2` and compares file checksums with `dataset_manifest.json`. Checksums cover file bytes. Row counts are parsed CSV records, not physical lines. A generated `quality_report.json` records each check id, name, and result. The report below is the contract those checks enforce.
+The executable checks live in `src/med_data/validate.py`. `python -m med_data validate` runs them against `data/med-synth-v3` and compares file checksums with `dataset_manifest.json`. Checksums cover file bytes. Row counts are parsed CSV records, not physical lines. A generated `quality_report.json` records each check id, name, and result. The report below is the contract those checks enforce.
 
 ## Quality checks
 
@@ -14,7 +14,7 @@ The executable checks live in `src/med_data/validate.py`. `python -m med_data va
 | Q06 | Warmup ends before train, train before validation, and validation before test. Warmup has no drafts. |
 | Q07 | Every draft recipient has one label. Labels are `synthetic_stipulated` and `certain`. The manifest misdirected flag matches the labels. |
 | Q08 | Each draft has 1–20 unique recipients, and roles are `to`, `cc`, or `bcc`. |
-| Q09 | Product-like counts are exactly 100/1000 train, 5/1000 validation, and 10/2000 test. |
+| Q09 | Product-like counts are exactly 300/3000 train, 20/4000 validation, and 30/6000 test. |
 | Q10 | A family has one split and one subset. A product-like family has one draft. |
 | Q11 | A non-empty body hash appears in only one split. |
 | Q12 | A thread id appears in only one split. |
@@ -23,19 +23,20 @@ The executable checks live in `src/med_data/validate.py`. `python -m med_data va
 | Q15 | No sent message in the draft's family, and no copy of its non-empty text, is strictly earlier than the draft. |
 | Q16 | Nobody is addressed before `directory_visible_from`. |
 | Q17 | Sent mail obeys the topic allow-lists for lookalike pairs, vendors, and facilities contacts. |
-| Q18 | S01–S09 drafts match the structural rules in the labeling guide, including first-contact, new-domain, and cold-start history. |
-| Q19 | The walkthrough drafts are in frozen `test_diagnostic` and use the canonical addresses. S04 and S07 for Sam share a cutoff. |
+| Q18 | S01–S11 drafts match the structural rules in the labeling guide, including first-contact, new-domain, topic-change, cold-start, and mistaken first contact history. |
+| Q19 | The walkthrough drafts are in frozen `test_diagnostic` and use the canonical addresses, including S11 (`blake.mendoza@demo.example`). S04 and S07 for Sam share a cutoff. |
 | Q20 | Feedback contains an uncertain pending row and a rejected row, and no accepted row. |
 | Q21 | A scoring view of a train draft contains none of the denylisted names. |
 | Q22 | `frozen` is true exactly on `test_product_like` and `test_diagnostic`. |
-| Q23 | `dataset_version` is `med-synth-v2` and the seed is `20260926`. |
+| Q23 | `dataset_version` is `med-synth-v3` and the seed is `20260926`. |
 | Q24 | An empty subject or body occurs only on S09 little-text variants, and those variants are empty in one of the two fields. |
 | Q25 | Invalid fixtures are separate from drafts and expect `unable_to_assess`. |
-| Q26 | Product-like sets contain the legitimate hard negatives. Diagnostic sets contain S01–S09, the S08 role variants, clean twins, and a misdirected fraction between 0.35 and 0.70. |
+| Q26 | Product-like sets contain the legitimate hard negatives. Diagnostic sets contain S01–S11, the S08 role variants, clean twins, and a misdirected fraction between 0.30 and 0.70. |
 | Q27 | Sent timestamps are unique. |
 | Q28 | Non-empty bodies carry the marker phrase of their generator topic. |
 | Q29 | Every manifest row matches its draft on family, split, subset, timestamp, scenario fields, walkthrough flag, and dataset version. `frozen` is true only for the two test subsets. |
 | Q30 | Warmup, train, validation, and test sent mail include Bcc. Train, both validation subsets, and test product-like each include at least one intended Bcc recipient. Train still includes unintended Bcc recipients. |
+| Q31 | Training timing diagnostic compares recent-mail proportions: verifies that the share of intended training recipient rows with same-recipient mail under 5 minutes earlier is < 10% (under balanced interleaved scheduling, observed ~1.40% intended and ~0.63% unintended). |
 
 ## Leakage rules
 
@@ -60,13 +61,14 @@ Warmup mail is visible to later drafts. That is history, not label leakage. The 
 
 ## Known limits of this dataset
 
-- Identities, mail, and labels are fictional. Quality checks show that the generator followed its own rules. They do not measure detection accuracy.
-- Template language repeats across time. A later model can memorize phrases that travel with a topic. The hash check blocks exact copies across splits; it does not block a shared writing style. Adding legitimate Bcc mail does not remove that repetition.
-- Restricted relationships keep separate topics. On the training feature rows, content cosine then separates stipulated mistakes from ordinary repeat mail almost completely: misdirected rows sit at or below about 0.06, while routine and ordinary project rows sit higher, except for cold starts and first contacts. That separation restates the generator's topic partition. It is not evidence about real mail. A later model comparison has to include a behavior-only model.
-- In the training matrix, every recipient the sender had never emailed is legitimate (first contact, new domain, or little text). No misdirected training row is a first contact, so novelty can be learned as a sign of safety. A mistaken first contact is not in this version.
+- Identities, mail, and labels are fictional. Quality checks show that the generator followed its own rules. They do not measure detection accuracy in real deployments.
+- Template language repeats across time. A later model can memorize phrases that travel with a topic. The hash check blocks exact copies across splits; it does not block a shared writing style.
+- In `med-synth-v3`, topics are shared across multiple relationships and teammates, reducing artificial content shortcuts while retaining semantic signal.
+- In `med-synth-v3`, balanced scheduling prevents fixed-minute timing bursts from distinguishing labels, with same-recipient mail under 5 minutes held to ~1.4% intended and ~0.6% unintended.
+- In `med-synth-v3`, scenario S11 ensures mistaken first contacts are represented alongside legitimate first contacts (S03, S06), preventing models from learning "uncontacted = safe".
 - Replies are one sentence and do not quote earlier text. Threads are a message plus that reply, not a long conversation.
-- Product-like test contains 10 misdirected emails. A later recall estimate on those 10 rows will be coarse. The diagnostic set is the place to inspect scenario behavior, and its rate is not the product prevalence. Legitimate Bcc coverage does not increase that positive count.
-- Training enrichment will inflate precision if a later report uses the train base rate as if it were the deployment mix.
+- Product-like test contains 30 misdirected emails and 5,970 legitimate emails (0.5% prevalence). The larger sample size supports rigorous exact binomial confidence bounds for the 1 per 1,000 warning budget.
+- Training enrichment (10%) will inflate precision if a later report uses the train base rate as if it were the deployment mix.
 - Department and directory dates are available in the scoring view because they are directory facts. They are not proof of intent.
 - Invalid fixtures describe refusal cases. Nothing in this phase scores them.
 

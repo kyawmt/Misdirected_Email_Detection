@@ -25,6 +25,7 @@ from med_data.calendar import (
     iter_weeks,
 )
 from med_data.roster import (
+    BLAKE,
     DIRECTORY_OPEN,
     ELLIOT,
     FIRST_NAMES,
@@ -146,12 +147,14 @@ class _Builder:
         self.gen_i = 0
         self.brand_i = 0
         self.s04_people: list[str] = []
+        self.s11_directory_pool: list[str] = []
         self.s07_by_split: dict[str, list[str]] = {}
         self.facilities_people: list[str] = []
 
     def build(self) -> Dataset:
         self._load_core_contacts()
         self._create_facilities_pool()
+        self._create_directory_pool()
         self._emit_routine()
         for split in ASSESSMENT_SPLITS:
             self._emit_split_scenarios(split)
@@ -191,7 +194,7 @@ class _Builder:
         return contact
 
     def _create_facilities_pool(self) -> None:
-        for _ in range(4):
+        for _ in range(8):
             contact = self._invent(
                 hint="fac",
                 department="Facilities",
@@ -199,7 +202,9 @@ class _Builder:
                 visible=DIRECTORY_OPEN,
             )
             self.s04_people.append(contact.contact_id)
-            self.restricted[contact.contact_id] = frozenset({"facilities"})
+            self.restricted[contact.contact_id] = frozenset(
+                {"facilities", "office_equipment", "budget", "project_update", "kickoff"}
+            )
         for split in ASSESSMENT_SPLITS:
             people = []
             count = PLANS[split].hard_negative.get("s07", 0) + PLANS[split].diagnostic_legitimate.get("s07", 0)
@@ -211,54 +216,126 @@ class _Builder:
                     visible=DIRECTORY_OPEN,
                 )
                 people.append(contact.contact_id)
-                self.restricted[contact.contact_id] = frozenset({"facilities", "kickoff"})
+                self.restricted[contact.contact_id] = frozenset(
+                    {"facilities", "office_equipment", "budget", "project_update", "kickoff"}
+                )
             self.s07_by_split[split] = people
         self.facilities_people = [SAM, "c_hana", *self.s04_people]
         for people in self.s07_by_split.values():
             self.facilities_people.extend(people)
 
+    def _create_directory_pool(self) -> None:
+        departments = [
+            "Legal", "Compliance", "Research", "IT Support",
+            "Audit", "Design", "Communications", "Security",
+        ]
+        for i in range(80):
+            dept = departments[i % len(departments)]
+            contact = self._invent(
+                hint="dir",
+                department=dept,
+                domain="demo.example",
+                visible=DIRECTORY_OPEN,
+            )
+            self.s11_directory_pool.append(contact.contact_id)
+
     def _lanes(self) -> list[Lane]:
         lanes = [
-            Lane(MAYA, PROJECT_TO, PROJECT_CC, (), "project_update", (0, 1, 2, 3, 4), repeats=8),
-            # Intended Bcc on ordinary project mail. Without this, Bcc appears only on mistakes.
-            Lane(MAYA, PROJECT_TO, PROJECT_CC, PROJECT_BCC, "project_update", (1, 3), repeats=2),
-            Lane(MAYA, ("c_chris", NOAH, "c_elena"), ("c_marcus",), (), "budget", (1, 3), repeats=2),
-            Lane(MAYA, (PRYA,), (QUINN,), (), "compensation", (0, 2, 4), repeats=2),
-            Lane("c_noah", ("c_elena", "c_taylor", "c_lena"), (), (), "project_update", (0, 2, 4), repeats=2),
+            Lane(MAYA, PROJECT_TO, PROJECT_CC, (), "project_update", (0, 1, 2, 3, 4), repeats=6),
+            Lane(MAYA, PROJECT_TO, PROJECT_CC, PROJECT_BCC, "project_update", (0, 2, 4), repeats=2),
+            Lane(MAYA, ("c_chris", NOAH, "c_elena"), ("c_marcus",), (), "budget", (0, 2, 4), repeats=3),
+            Lane(MAYA, (PRYA,), (QUINN,), (), "compensation", (1, 3), repeats=2),
+            Lane(MAYA, (PRYA,), (), (), "staffing", (0, 2, 4), repeats=2),
+            Lane("c_noah", ("c_elena", "c_taylor", "c_lena"), (), (), "project_update", (0, 2, 4), repeats=3),
             Lane("c_elena", (NOAH, "c_taylor"), ("c_chris",), (), "project_update", (1, 3), repeats=2),
-            Lane("c_taylor", (NOAH,), (), (), "project_update", (2,), repeats=2),
-            Lane("c_alex_chan", ("c_avery", "c_devon"), (), (), "staffing", (1, 4), repeats=1),
-            Lane("c_alex_chen", (MAYA,), (), (), "office_equipment", (4,), repeats=1),
-            Lane(PRYA, (QUINN,), (), (), "compensation", (3,), repeats=1),
-            Lane("c_chris", ("c_marcus",), (), (), "budget", (0, 3), repeats=1),
-            Lane(SAM, ("c_hana",), (), (), "facilities", (4,), repeats=1),
+            Lane("c_taylor", (NOAH,), (), (), "project_update", (2, 4), repeats=2),
+            Lane("c_alex_chan", ("c_avery", "c_devon"), (), (), "staffing", (1, 3), repeats=2),
+            Lane("c_alex_chen", (MAYA,), (), (), "office_equipment", (0, 4), repeats=2),
+            Lane(PRYA, (QUINN,), (), (), "compensation", (1, 3), repeats=2),
+            Lane("c_chris", ("c_marcus",), (), (), "budget", (0, 3), repeats=2),
+            Lane(SAM, ("c_hana",), (), (), "facilities", (1, 4), repeats=2),
+            Lane(MAYA, ("c_avery", "c_devon"), (), (), "staffing", (0, 3), repeats=2),
+            Lane(MAYA, (QUINN,), (), (), "compensation", (2,), repeats=2),
+            Lane(MAYA, ("c_marcus",), (), (), "budget", (1, 4), repeats=2),
+            Lane(MAYA, ("c_elena",), (), (), "project_update", (1, 3), repeats=3),
+            Lane(MAYA, ("c_taylor",), (), (), "project_update", (0, 2), repeats=3),
+            Lane(MAYA, ("c_lena",), (), (), "project_update", (2, 4), repeats=3),
+            Lane(MAYA, ("c_chris",), (), (), "budget", (0, 3), repeats=3),
+            Lane(MAYA, (NOAH,), (), (), "project_update", (0, 1, 3, 4), repeats=3),
         ]
-        for intended, _lookalike in LOOKALIKE_PAIRS:
-            lanes.append(Lane(MAYA, (intended,), (), (), "staffing", (0, 2, 4), repeats=2))
-        for _intended, lookalike in LOOKALIKE_PAIRS:
-            lanes.append(Lane(MAYA, (lookalike,), (), (), "office_equipment", (1, 3), repeats=2))
+        for intended, lookalike in LOOKALIKE_PAIRS:
+            lanes.append(Lane(MAYA, (intended,), (), (), "staffing", (0, 2, 4), repeats=3))
+            lanes.append(Lane(MAYA, (intended,), (), (), "office_equipment", (1, 3), repeats=2))
+            lanes.append(Lane(MAYA, (intended,), (), (), "project_update", (0, 3), repeats=2))
+            lanes.append(Lane(MAYA, (lookalike,), (), (), "office_equipment", (0, 2, 4), repeats=3))
+            lanes.append(Lane(MAYA, (lookalike,), (), (), "staffing", (1, 3), repeats=2))
+            lanes.append(Lane(MAYA, (lookalike,), (), (), "project_update", (1, 4), repeats=2))
+            lanes.append(Lane(MAYA, (intended, lookalike), (), (), "budget", (2,), repeats=2))
         for vendor in VENDORS:
-            lanes.append(Lane(MAYA, (vendor,), (), (), "purchase_scheduling", (0, 2, 4), repeats=2))
+            lanes.append(Lane(MAYA, (vendor,), (), (), "purchase_scheduling", (0, 2, 4), repeats=3))
+            lanes.append(Lane(MAYA, (vendor,), (), (), "office_equipment", (1, 3), repeats=2))
+            lanes.append(Lane(MAYA, (vendor,), (), (), "facilities", (2,), repeats=1))
         for index, person in enumerate(self.facilities_people):
-            lanes.append(Lane(MAYA, (person,), (), (), "facilities", (index % 5,), repeats=1))
+            lanes.append(Lane(MAYA, (person,), (), (), "facilities", (index % 5,), repeats=2))
+            lanes.append(Lane(MAYA, (person,), (), (), "office_equipment", ((index + 1) % 5,), repeats=1))
+            lanes.append(Lane(MAYA, (person,), (), (), "budget", ((index + 2) % 5,), repeats=1))
+            lanes.append(Lane(MAYA, (person,), (), (), "project_update", ((index + 3) % 5,), repeats=1))
         return lanes
 
     def _emit_routine(self) -> None:
         lanes = self._lanes()
         for week in iter_weeks():
-            for lane_index, lane in enumerate(lanes):
-                for day in lane.days:
-                    for copy_idx in range(lane.repeats):
-                        moment = week + timedelta(days=day, minutes=9 * 60 + lane_index * 10 + copy_idx)
-                        self._emit_composed(
-                            sender=lane.sender,
-                            to=lane.to,
-                            cc=lane.cc,
-                            bcc=lane.bcc,
-                            when=moment,
-                            topic=lane.topic,
-                            selectable=True,
-                        )
+            for day in range(5):
+                active_lanes = [lane for lane in lanes if day in lane.days]
+                if not active_lanes:
+                    continue
+                all_sends = []
+                for lane_idx, lane in enumerate(active_lanes):
+                    K = lane.repeats
+                    for k in range(K):
+                        target = (k + 0.5) / K
+                        all_sends.append({
+                            "lane": lane,
+                            "target": target,
+                            "recips": set(lane.to) | set(lane.cc) | set(lane.bcc),
+                            "id": (lane_idx, k),
+                        })
+                n = len(all_sends)
+                if n == 0:
+                    continue
+                remaining = list(all_sends)
+                scheduled = []
+                last_step: dict[str, int] = defaultdict(lambda: -999)
+                for step in range(n):
+                    f = (step + 0.5) / n
+                    best_cand = None
+                    best_score = 1e9
+                    for cand in remaining:
+                        min_gap = min(step - last_step[r] for r in cand["recips"])
+                        penalty = (1000.0 / min_gap) if min_gap < 4 else 0.0
+                        score = abs(cand["target"] - f) + penalty
+                        if score < best_score:
+                            best_score = score
+                            best_cand = cand
+                    scheduled.append(best_cand["lane"])
+                    remaining.remove(best_cand)
+                    for r in best_cand["recips"]:
+                        last_step[r] = step
+
+                # Working hours 08:30 to 17:30 = 9 hours = 32,400 seconds = 16,200 even seconds
+                step_even = 16200 / n
+                for idx, lane in enumerate(scheduled):
+                    even_second = 2 * int(idx * step_even)
+                    moment = week + timedelta(days=day, hours=8, minutes=30, seconds=even_second)
+                    self._emit_composed(
+                        sender=lane.sender,
+                        to=lane.to,
+                        cc=lane.cc,
+                        bcc=lane.bcc,
+                        when=moment,
+                        topic=lane.topic,
+                        selectable=True,
+                    )
 
     def _next_message_id(self) -> str:
         self.msg_i += 1
@@ -494,22 +571,27 @@ class _Builder:
         return chosen
 
     def _special_times(self, split: str, count: int, hour: int, minute_base: int = 0) -> list[datetime]:
+        if count == 0:
+            return []
         weeks = weeks_in(split)
         if split == "test":
             weeks = weeks[:-1]
-        if len(weeks) > count + 1:
+        if len(weeks) > 1 and len(weeks) > count:
             weeks = weeks[1:]
-        chosen = spread_take(weeks, count)
-        return [
-            week + timedelta(days=2, hours=hour, minutes=minute_base + index)
-            for index, week in enumerate(chosen)
-        ]
+        times = []
+        for index in range(count):
+            week_idx = int(index * len(weeks) / count)
+            day = (index * 2 + 1) % 5
+            minute = (minute_base + index * 3) % 55
+            times.append(weeks[week_idx] + timedelta(days=day, hours=hour, minutes=minute, seconds=45))
+        return times
 
     def _emit_split_scenarios(self, split: str) -> None:
         plan = PLANS[split]
         self._emit_clone_kind(split, plan, "s01", self._s01_sources(split, plan), self._s01_variant)
         self._emit_clone_kind(split, plan, "s02", self._s02_sources(split, plan), self._s02_variant)
         self._emit_clone_kind(split, plan, "s04", self._s04_sources(split, plan), self._s04_variant)
+        self._emit_s11(split, plan)
         self._emit_s08(split, plan)
         self._emit_little_bad(split, plan)
         self._emit_pool_legitimate(split, plan)
@@ -519,6 +601,40 @@ class _Builder:
         self._emit_cold_starts(split, plan)
         self._emit_little_ok(split, plan)
         self._emit_routine_drafts(split, plan)
+
+    def _emit_s11(self, split: str, plan: SplitPlan) -> None:
+        product_n, diagnostic_n = self._counts(plan, "s11")
+        total = product_n + diagnostic_n
+        if total == 0:
+            return
+        sources = self._take(
+            split,
+            "project_update",
+            MAYA,
+            total,
+            lambda message: not any(_has(message, vendor) for vendor in VENDORS),
+        )
+        for index, source in enumerate(sources):
+            subset = plan.product_subset if index < product_n else plan.diagnostic_subset
+            twin = index >= product_n
+            directory_person = self.s11_directory_pool[index % len(self.s11_directory_pool)]
+            intended_target = source["recipients"][0]["contact_id"]
+            rows = [{"contact_id": directory_person, "role": "to", "recipient_order": 0}]
+            labeled = self._label_rows(
+                rows,
+                set(),
+                "Stipulated mistaken first contact. Autocomplete selected an uncontacted directory recipient.",
+                "",
+            )
+            self._draft_from_source(
+                source,
+                subset=subset,
+                kind="s11",
+                labeled=labeled,
+                withheld=intended_target,
+                twin=twin,
+                topic="project_update",
+            )
 
     def _counts(self, plan: SplitPlan, kind: str) -> tuple[int, int]:
         return plan.misdirected.get(kind, 0), plan.diagnostic_misdirected.get(kind, 0)
@@ -901,16 +1017,20 @@ class _Builder:
     def _emit_s07(self, split, plan) -> None:
         people = self.s07_by_split[split]
         product_n = plan.hard_negative.get("s07", 0)
-        if len(people) != product_n + plan.diagnostic_legitimate.get("s07", 0):
+        diag_n = plan.diagnostic_legitimate.get("s07", 0)
+        total = product_n + diag_n
+        if len(people) != total:
             raise RuntimeError("S07 roster does not match the quota")
-        times = self._special_times(split, len(people), hour=20)
+        times = self._special_times(split, total, hour=15, minute_base=20)
+        topics = ["kickoff", "office_equipment", "budget", "project_update", "facilities"]
         for index, (person, moment) in enumerate(zip(people, times)):
             subset = plan.product_subset if index < product_n else plan.diagnostic_subset
+            topic = topics[index % len(topics)]
             message = self._emit_composed(
                 sender=MAYA,
                 to=(person,),
                 when=moment,
-                topic="kickoff",
+                topic=topic,
                 selectable=False,
             )
             self._draft_as_sent(
@@ -918,7 +1038,7 @@ class _Builder:
                 subset=subset,
                 scenario_id="S07",
                 variant="legitimate_topic_change",
-                topic="kickoff",
+                topic=topic,
                 stipulation="Stipulated intended topic change with an established contact.",
             )
 
@@ -1052,7 +1172,10 @@ class _Builder:
 
     def _take_unused(self, eligible: list[dict], count: int, predicate) -> list[dict]:
         matched = [message for message in eligible if message["message_id"] not in self.used and predicate(message)]
-        return spread_take(matched, count)
+        chosen = spread_take(matched, count)
+        for message in chosen:
+            self.used.add(message["message_id"])
+        return chosen
 
     def _emit_walkthrough(self) -> None:
         week = weeks_in("test")[-1]
@@ -1133,6 +1256,22 @@ class _Builder:
             "S06",
             "legitimate_new_domain",
             "Stipulated intended first contact at a new external domain.",
+        )
+        blake = replace(BLAKE, directory_visible_from=DIRECTORY_OPEN)
+        self._add_contact(blake)
+        self._walk_counterfactual(
+            when=week + timedelta(days=2, hours=17, minutes=20),
+            sender=MAYA,
+            to=(blake.contact_id,),
+            cc=(),
+            bcc=(),
+            topic="project_update",
+            scenario_id="S11",
+            variant="mistaken_first_contact",
+            withheld=NOAH,
+            bad_ids={blake.contact_id},
+            bad_text="Stipulated mistaken first contact. Autocomplete selected an uncontacted directory recipient.",
+            good_text="",
         )
         shared = week + timedelta(days=3, hours=17)
         self._walk_counterfactual(
