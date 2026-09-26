@@ -46,7 +46,14 @@ class FittedText:
         version = payload.get("feature_spec_version")
         if version != FEATURE_SPEC_VERSION:
             raise FeatureError(f"Transformer version {version} does not match {FEATURE_SPEC_VERSION}")
-        if payload.get("config") != text_config():
+        current = text_config()
+        saved = payload.get("config")
+        if saved != current:
+            if isinstance(saved, dict) and saved.get("sklearn_version") != current["sklearn_version"]:
+                raise FeatureError(
+                    "Fitted transformer was built with scikit-learn "
+                    f"{saved.get('sklearn_version')}, current environment is {current['sklearn_version']}"
+                )
             raise FeatureError("Fitted transformer config does not match the current preprocessor")
         fitted = cls(payload["vectorizer"], payload["config"], payload["fit_scope"])
         if not hasattr(fitted.vectorizer, "vocabulary_"):

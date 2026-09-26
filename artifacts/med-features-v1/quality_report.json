@@ -29,6 +29,8 @@
   ],
   "limitations": [
     "No classifier was trained. No risk score, threshold, precision, recall, or false-warning rate is claimed.",
+    "Content cosine separates the training classes almost completely because restricted relationships keep separate topics. A later model comparison must include a behavior-only model. A content-only result on this generator is not evidence about real mail.",
+    "No misdirected training row is a recipient the sender had never emailed. All 16 novel training rows are legitimate (S03, S06, S09). Novelty can be learned as a sign of safety. This version has no mistaken first contact.",
     "IDF is frozen on sent mail before the validation window. It is not re-estimated at each earlier training draft. Historical counts and text centroids still stop at that draft's cutoff.",
     "Template sentences repeat across weeks. Stripping reference, ticket, and date slots removes unique generator tokens. It does not remove shared topic wording.",
     "Group-topic profiles are not implemented. A recipient with no direct pair history has no content centroid even if a broader group has discussed the topic.",

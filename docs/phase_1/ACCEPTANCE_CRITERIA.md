@@ -42,7 +42,7 @@ Compute rates over all submitted cases and show assessed-only breakdowns where u
 
 ## Research consistency
 
-The research reference IDs below link to the full citations in the [Research Basis](../../PROJECT_PLAN.md#research-basis).
+The research reference IDs below link to the full citations in the [research basis](../../README.md#research-basis-and-techniques).
 
 - R1's injected-recipient ranking task supports a separate diagnostic ranking metric; it does not replace AC01/AC02 on a mix of legitimate and misdirected emails.
 - R2 motivates first-contact analysis and explicit false-positive reporting; its recipient-level experimental rates do not establish this product's email-level budget.

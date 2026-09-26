@@ -49,6 +49,21 @@ ZEBRA = "zebra quilt pattern"
 FAMILY = "fam_draft"
 
 
+def test_load_rejects_a_changed_preprocessor_regex(tmp_path):
+    import joblib
+
+    from med_features.text_model import FittedText
+
+    fitted = fit_text_transformer(["staffing headcount update", "staffing headcount update"])
+    path = tmp_path / "text_transformer.joblib"
+    fitted.save(path)
+    payload = joblib.load(path)
+    payload["config"] = {**payload["config"], "id_regex": r"changed"}
+    joblib.dump(payload, path)
+    with pytest.raises(FeatureError, match="config"):
+        FittedText.load(path)
+
+
 def test_tokenizer_drops_generator_slots():
     text = "Ref: m000123 Ack m000124 Ticket T-00007 on 2024-09-15. Please review headcount."
     tokens = unigrams(text)

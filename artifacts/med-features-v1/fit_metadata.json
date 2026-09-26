@@ -79,8 +79,11 @@
   ],
   "preprocessing": {
     "analyzer": "unigrams_and_adjacent_bigrams",
+    "date_regex": "\\b\\d{4}-\\d{2}-\\d{2}\\b",
+    "id_regex": "\\b[md]\\d{6}\\b",
     "min_df": 2,
     "norm": "l2",
+    "sklearn_version": "1.9.1",
     "smooth_idf": true,
     "stop_words": [
       "a",
@@ -158,13 +161,9 @@
       "you",
       "your"
     ],
-    "stripped_patterns": [
-      "message_or_draft_id_[md]dddddd",
-      "ticket_t-digits",
-      "iso_date",
-      "tokens_ref_and_ack"
-    ],
-    "sublinear_tf": false
+    "sublinear_tf": false,
+    "ticket_regex": "\\bt-\\d+\\b",
+    "token_regex": "[a-z0-9]+"
   },
   "row_counts": {
     "train": 2320,

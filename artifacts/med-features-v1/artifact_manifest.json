@@ -18,16 +18,16 @@
       "sha256": "f66814b993f23eeba818aa54e0113a3a9d73d9a946729195794d0cfff57a70f4"
     },
     "fit_metadata.json": {
-      "bytes": 4231,
-      "sha256": "8f702951b85a48f21568c392cfaab87cac05a333dba5267566c10789435c9a26"
+      "bytes": 4271,
+      "sha256": "dab7d8b2ddbb54b935cd0a34fb5140e6c6bacf3bb8832ae5ff5d80ec79d518f3"
     },
     "quality_report.json": {
-      "bytes": 58250,
-      "sha256": "4ee9ed34955bf154a4d056abcd9ae0ad39b961f775afd669afbdc5ba36744c57"
+      "bytes": 58737,
+      "sha256": "3481272aeb1ddc72d6461f46d157a7bebefd7c2c102f4201c4523eff38cd56c4"
     },
     "text_transformer.joblib": {
-      "bytes": 16620,
-      "sha256": "98721935c7c4e08e3c71e6a19683c48738753ddfc64b23ce82e6b2676420a0dd"
+      "bytes": 16646,
+      "sha256": "153d7eecddaf64243d50c31e8616b9345492dec051388ba4deca35512eb67cab"
     }
   }
 }

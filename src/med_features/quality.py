@@ -355,7 +355,7 @@ def _table_notes() -> list[str]:
     return [
         "Training S03 (4 drafts) is novel to the sender and not novel by domain. Training S06 (4 drafts) is novel on both. Neither scenario has an observed content cosine, because there is no pair text.",
         "Training S01 name similarity averages about 0.83, above the 0.8 near-name threshold. The maximum in the matrix is 0.8889, one edit on a 9-character name. Training S05 averages about 0.37.",
-        "Training S04 and S07 both have low observed content cosine (about 0.02 and 0.09). Training S05 averages about 0.77. A low cosine shows up on the mismatched topic and on the legitimate topic change.",
+        "Training S04 and S07 both have low observed content cosine (about 0.02 and 0.09). Training S05 averages about 0.77. Every misdirected training row is at or below about 0.06. The only legitimate training rows in that band are cold starts and first contacts (S03, S06, S09). S07's four rows sit just above the misdirected rows, so they do not stop a content-only rule from treating a topic change as the label.",
         "Product-like validation has 6 unintended recipient rows. The intended-versus-unintended means are descriptive on that handful of rows.",
         "Validation diagnostic S04 does not repeat the training S04 cosine. Those rows mix variants. Use the per-scenario sample size before treating a mean as a stable description.",
     ]
@@ -364,6 +364,8 @@ def _table_notes() -> list[str]:
 def _limitations() -> list[str]:
     return [
         "No classifier was trained. No risk score, threshold, precision, recall, or false-warning rate is claimed.",
+        "Content cosine separates the training classes almost completely because restricted relationships keep separate topics. A later model comparison must include a behavior-only model. A content-only result on this generator is not evidence about real mail.",
+        "No misdirected training row is a recipient the sender had never emailed. All 16 novel training rows are legitimate (S03, S06, S09). Novelty can be learned as a sign of safety. This version has no mistaken first contact.",
         "IDF is frozen on sent mail before the validation window. It is not re-estimated at each earlier training draft. Historical counts and text centroids still stop at that draft's cutoff.",
         "Template sentences repeat across weeks. Stripping reference, ticket, and date slots removes unique generator tokens. It does not remove shared topic wording.",
         "Group-topic profiles are not implemented. A recipient with no direct pair history has no content centroid even if a broader group has discussed the topic.",

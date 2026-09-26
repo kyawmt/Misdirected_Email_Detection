@@ -4,7 +4,7 @@ Status: requirements defined; no implementation or measured results. Date: 2026-
 
 ## Problem and user
 
-An employee may accidentally address an outbound email to someone they did not intend. The demo helps a fictional sender review potentially mistaken recipients before a simulated send, while minimizing interruptions to legitimate communication. An interviewer is the primary demo audience; the sender is the product persona. Reducing false alerts also reflects the job description's concern for customer SOC workload.
+An employee may accidentally address an outbound email to someone they did not intend. The demo helps a fictional sender review potentially mistaken recipients before a simulated send, while minimizing interruptions to legitimate communication. A reviewer of the demo is the primary audience; the sender is the product persona. Reducing false alerts keeps the demonstration focused on interruptions a sender would actually notice.
 
 ## Experience and decisions
 
@@ -29,9 +29,9 @@ Target at most **one false intervention per 1,000 legitimate emails**; count bot
 
 ## Research and role alignment
 
-Adopt message–recipient assessment from R1 and pre-send feedback from R4. R2 motivates legitimate first-contact scenarios; R3 supports behavioral context. Maximum aggregation, abstention behavior, limits, and operating budgets are project decisions, not paper guarantees. References and evidence limitations remain in the [Research Basis](../../PROJECT_PLAN.md#research-basis).
+Adopt message–recipient assessment from R1 and pre-send feedback from R4. R2 motivates legitimate first-contact scenarios; R3 supports behavioral context. Maximum aggregation, abstention behavior, limits, and operating budgets are project decisions, not paper guarantees. References and evidence limitations are in the [research basis](../../README.md#research-basis-and-techniques).
 
-This scope addresses applied ML, combining signals, efficacy tradeoffs, real-time reliability, and written communication in the [job description](../../abnormal_ai_mle_job_description.md). Data generation, feature construction, modeling, API/UI implementation, monitoring, and deployment remain later work.
+This scope covers applied ML, combining signals, efficacy tradeoffs, real-time reliability, and written communication. Modeling, the scoring API, the review UI, monitoring, and deployment remain later work.
 
 ## Phase 1 deliverables
 

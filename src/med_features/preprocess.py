@@ -131,7 +131,14 @@ def analyze(text: str) -> list[str]:
 
 
 def text_config() -> dict:
-    """Serializable preprocessor settings stored with the fitted transformer."""
+    """Serializable preprocessor settings stored with the fitted transformer.
+
+    Regex sources and the scikit-learn version are part of the contract.
+    Loading a transformer checks this whole map, so a pattern edit or a
+    different scikit-learn build does not apply silently.
+    """
+    import sklearn
+
     return {
         "analyzer": "unigrams_and_adjacent_bigrams",
         "min_df": MIN_DF,
@@ -139,10 +146,9 @@ def text_config() -> dict:
         "smooth_idf": True,
         "sublinear_tf": False,
         "stop_words": sorted(STOP_WORDS),
-        "stripped_patterns": [
-            "message_or_draft_id_[md]dddddd",
-            "ticket_t-digits",
-            "iso_date",
-            "tokens_ref_and_ack",
-        ],
+        "id_regex": _MESSAGE_ID.pattern,
+        "ticket_regex": _TICKET.pattern,
+        "date_regex": _ISO_DATE.pattern,
+        "token_regex": _TOKEN.pattern,
+        "sklearn_version": sklearn.__version__,
     }

@@ -18,7 +18,7 @@ Status: conceptual product contract, version 0.1. No endpoint, executable schema
 
 **Assumption A8 — Context boundary:** The caller chooses a fictional snapshot reference rather than uploading arbitrary mail history on each assessment. The scorer must resolve only history with event times strictly earlier than the draft timestamp; exclude the draft itself and future events. If that temporal view cannot be established, the request is unassessable. Snapshot/version and effective cutoff must be reported. This is an availability contract; storage, historical data schemas, and feature definitions are deferred.
 
-The scoring input must not include scenario IDs, intended-recipient answers, labels, corruption metadata, or future corrections. Fictional examples shown to an interviewer may have a separate narrative with those answers; the scorer cannot use it. Organization/domain configuration is versioned context, not inferred from an untrusted label in the draft.
+The scoring input must not include scenario IDs, intended-recipient answers, labels, corruption metadata, or future corrections. Fictional examples shown in a walkthrough may have a separate narrative with those answers; the scorer cannot use it. Organization/domain configuration is versioned context, not inferred from an untrusted label in the draft.
 
 ## Successful assessment output
 
@@ -74,5 +74,5 @@ Edits require a fresh assessment; results apply only to the draft content and re
 
 ## Research boundary
 
-Per-recipient assessment and composition-time feedback follow R1/R4. Numeric scale, maximum aggregation, fields, limits, errors, and version metadata are our product/engineering extensions. Full references and limitations are in the [Research Basis](../../PROJECT_PLAN.md#research-basis). Endpoint routing, persistence, preprocessing algorithms, and API implementation are intentionally left to later phases.
+Per-recipient assessment and composition-time feedback follow R1/R4. Numeric scale, maximum aggregation, fields, limits, errors, and version metadata are our product/engineering extensions. Full references and limitations are in the [research basis](../../README.md#research-basis-and-techniques). Endpoint routing, persistence, preprocessing algorithms, and API implementation are intentionally left to later phases.
 

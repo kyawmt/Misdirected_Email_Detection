@@ -62,6 +62,8 @@ Warmup mail is visible to later drafts. That is history, not label leakage. The 
 
 - Identities, mail, and labels are fictional. Quality checks show that the generator followed its own rules. They do not measure detection accuracy.
 - Template language repeats across time. A later model can memorize phrases that travel with a topic. The hash check blocks exact copies across splits; it does not block a shared writing style. Adding legitimate Bcc mail does not remove that repetition.
+- Restricted relationships keep separate topics. On the training feature rows, content cosine then separates stipulated mistakes from ordinary repeat mail almost completely: misdirected rows sit at or below about 0.06, while routine and ordinary project rows sit higher, except for cold starts and first contacts. That separation restates the generator's topic partition. It is not evidence about real mail. A later model comparison has to include a behavior-only model.
+- In the training matrix, every recipient the sender had never emailed is legitimate (first contact, new domain, or little text). No misdirected training row is a first contact, so novelty can be learned as a sign of safety. A mistaken first contact is not in this version.
 - Replies are one sentence and do not quote earlier text. Threads are a message plus that reply, not a long conversation.
 - Product-like test contains 10 misdirected emails. A later recall estimate on those 10 rows will be coarse. The diagnostic set is the place to inspect scenario behavior, and its rate is not the product prevalence. Legitimate Bcc coverage does not increase that positive count.
 - Training enrichment will inflate precision if a later report uses the train base rate as if it were the deployment mix.

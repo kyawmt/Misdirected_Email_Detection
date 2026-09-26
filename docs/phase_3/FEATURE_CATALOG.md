@@ -129,4 +129,10 @@ Department is a visible directory field and is not a v1 feature.
 
 ## What this catalog does not claim
 
-Paper results, including injected-recipient ranking scores, are not performance claims for this dataset. No risk score, threshold, precision, recall, or latency number is produced here. The descriptive distributions are in the [feature quality report](FEATURE_QUALITY_REPORT.md). Profile lookup and the batch/single-draft contract are in [profile and transform](PROFILE_AND_TRANSFORM.md). Parity checks are in [training and serving parity](TRAINING_SERVING_PARITY.md).
+Paper results, including injected-recipient ranking scores, are not performance claims for this dataset. No risk score, threshold, precision, recall, or latency number is produced here.
+
+Content cosine is not a safe stand-in for the label on this dataset. Restricted relationships are given separate topics, so a draft sent to the usual correspondent looks like earlier mail and a draft sent to someone else's correspondent does not. On the training rows, misdirected recipients fall at or below about 0.06 cosine, and the only legitimate rows in that range are cold starts and first contacts. The four legitimate topic-change rows sit just above the misdirected rows and do not block that split. A later comparison must report a behavior-only model. A strong content-only result would restate the generator.
+
+The same training rows contain no misdirected first contact. All 16 recipients the sender had never emailed are legitimate. Novelty must not be read as proof of safety.
+
+The descriptive distributions are in the [feature quality report](FEATURE_QUALITY_REPORT.md). Profile lookup and the batch/single-draft contract are in [profile and transform](PROFILE_AND_TRANSFORM.md). Parity checks are in [training and serving parity](TRAINING_SERVING_PARITY.md).

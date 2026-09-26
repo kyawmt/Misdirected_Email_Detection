@@ -34,7 +34,7 @@ The first five scenarios form the core walkthrough. Desired outcomes express pro
 
 ## Research traceability and limits
 
-R1 motivates message–recipient incompatibility and added-recipient mistakes; replacement variants are our adaptation. R2 motivates S03's legitimate first contact. R3 motivates communication-group consistency, and R4 motivates the pre-send review. S06–S10 are our product guardrails and boundary cases. These connections use the evidence already summarized in the [Research Basis](../../PROJECT_PLAN.md#research-basis); the narratives do not reproduce a paper benchmark.
+R1 motivates message–recipient incompatibility and added-recipient mistakes; replacement variants are our adaptation. R2 motivates S03's legitimate first contact. R3 motivates communication-group consistency, and R4 motivates the pre-send review. S06–S10 are our product guardrails and boundary cases. These connections use the evidence already summarized in the [research basis](../../README.md#research-basis-and-techniques); the narratives do not reproduce a paper benchmark.
 
 Scenario frequency, exact histories, labels for generated variants, and dataset size are deferred to Phase 2. Numeric scores, threshold values, and achieved outcomes are deferred to modeling and evaluation. This document selects no implementation or data-generation method.
 

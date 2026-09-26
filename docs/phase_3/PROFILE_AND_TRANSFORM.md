@@ -14,6 +14,8 @@ The query has no role, label, scenario, split, subset, withheld contact, or gene
 
 Unknown contacts, a draft with no recipients, and a repeated recipient raise `FeatureError`. This phase does not turn that error into an API response. A later scoring service should treat it as unable to assess, not as an allow.
 
+Repeated addresses are merged before this transform runs. The product input rule says to trim whitespace, match fictional addresses without case sensitivity, and merge the same address across To, Cc, and Bcc while keeping every role. That merge belongs to the request normalizer in the later scoring service. `transform_draft` then receives one entry per unique contact. Calling it with the same contact twice is a contract error, not a second recipient.
+
 ## Two ways to supply history
 
 The history index is built from sent messages, message recipients, and the contact directory. It stores pair postings and domain postings in time order. For a query it keeps messages with `sent_at` strictly earlier than the cutoff, then drops the family id and the blocked body hashes. A message at the exact cutoff is excluded. A message one second earlier is eligible.

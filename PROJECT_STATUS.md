@@ -85,17 +85,19 @@ Verified on 2026-09-26 from the repository root with the project virtualenv:
 
 | Command | Result |
 | --- | --- |
-| `pytest` | 29 passed in 133.15s |
+| `pytest` | 31 passed in 136.47s |
 | `python -m med_data validate --data data/med-synth-v2` | 30 checks passed |
 | `python -m med_features build --data data/med-synth-v2 --output artifacts/med-features-v1 --quality-markdown docs/phase_3/FEATURE_QUALITY_REPORT.md` | Wrote `med-features-v1` |
 
-The 29 tests cover the Phase 2 data contract and the Phase 3 feature contract: hand-checked counts, cutoff and family and copied-body exclusions, train-only vocabulary fitting, contact self-exclusion, cold starts, empty and out-of-vocabulary text, metadata isolation, batch/single-draft parity, artifact reload, and refusal of frozen subsets. `pytest` also checks that the published transformer and one training draft match `artifacts/med-features-v1`.
+The 31 tests cover the Phase 2 data contract, the Phase 3 feature contract, and a scan of public docs for private terms and broken relative links. Feature checks include hand-checked counts, cutoff and family and copied-body exclusions, train-only vocabulary fitting, contact self-exclusion, cold starts, empty and out-of-vocabulary text, metadata isolation, batch/single-draft parity, artifact reload, a rejected preprocessor change, and refusal of frozen subsets. `pytest` also checks that the published transformer and one training draft match `artifacts/med-features-v1`.
 
-No detection, calibration, threshold, or latency metric has been measured. Acceptance criteria AC01–AC09 remain unimplemented as product behavior. AC10's documentation boundary is in force for public files.
+No detection, calibration, threshold, or latency metric has been measured. Acceptance criteria AC01–AC09 remain unimplemented as product behavior. AC10's documentation boundary is in force for public files. `tests/test_public_docs.py` scans `README.md` and `docs/` for private terms and for relative links that do not resolve.
 
 ## Known gaps
 
 - Template sentences repeat across weeks. Unique `Ref` tokens stop exact body copies across splits. They do not stop a model from memorizing topic phrasing.
+- Content cosine on the training rows separates stipulated mistakes from ordinary repeat mail almost completely, because restricted relationships keep separate topics. Misdirected rows are at or below about 0.06 cosine. The legitimate rows in that band are cold starts and first contacts. The four S07 topic-change rows sit just above the misdirected rows. Phase 4 must report a behavior-only model. A content-only score would restate the generator.
+- No misdirected training row is a first contact. All 16 novel training recipients are legitimate (S03, S06, S09). Novelty can be learned as a sign of safety. A mistaken first contact is not in `med-synth-v2`.
 - The product-like test has 10 misdirected emails. Recall on that set will be coarse. Use `test_diagnostic` to inspect scenarios, and do not quote its rate as the 0.5% prevalence result.
 - Real-world prevalence is unknown. 0.5% is a simulation assumption. Reporting precision at the 10% training mix would overstate the operating point.
 - Replies are one sentence and do not quote the parent. Threads are a message plus that reply.
@@ -113,7 +115,7 @@ When the user asks for Phase 4, and only then:
 
 1. Read the Phase 4 section of `project_context/PROJECT_PLAN.md` and the feature catalog.
 2. Train on `train` using `FEATURE_COLUMNS` only. Do not train on key columns, split, subset, scenario, label, family, or role.
-3. Compare an always-allow baseline, a simple rules baseline, logistic regression, and one small tree. Keep the recorded comparison small.
+3. Compare an always-allow baseline, a simple rules baseline, logistic regression, and one small tree. Include a behavior-only model that drops content features. Do not treat a content-only result as the outcome. Keep the recorded comparison small.
 4. Use validation for model selection. Leave `test_product_like` and `test_diagnostic` untouched.
 5. Do not select thresholds or cite paper metrics as results for this dataset.
 
