@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-09-26.
+Last updated: 2026-09-27.
 
 This file is the handoff for the next session. Standing rules are in [AGENTS.md](AGENTS.md).
 
@@ -14,7 +14,8 @@ This file is the handoff for the next session. Standing rules are in [AGENTS.md]
 | 4 — Baselines and model comparison | Complete (v4) | `med-model-v2`: always-allow, rules, logistic regression, one tree, ablations (incl. drop-content), C3 eligibility checks, S11 diagnostics. Selected `logistic_all_balanced`. No threshold. |
 | 5 — Evaluation and threshold policy | Complete (v4) | `med-policy-v2`: one warning cutoff on the risk score, blocking disabled, calibration not fit, scoring-path parity proven on all 4,000 selection drafts, one frozen test pass. AC01 insufficient evidence (independence not established). |
 | 6 — Backend and scoring API | Complete (v4) | Contract `med-api-v1` serving the v4 bundle and snapshot `med-synth-v4`. Emits `CONTENT_RELATIONSHIP_MISMATCH` on content-sensitive warnings. AC05 measured once: met. |
-| 7 through 10 | Not started | No UI, monitoring, or deployment. |
+| 7 — Simulated draft-review UI | Complete (v4) | Streamlit client `src/med_ui/` of `med-api-v1`, package version 0.7.0 with a `ui` extra. Curated validation examples chosen by rule, stale-result hiding, feedback, what-if exploration on stored validation scores. Walkthrough generated from the live API. No API, model, policy, or artifact change. |
+| 8 through 10 | Not started | No monitoring or deployment. |
 
 Phase 2 dataset revision `med-synth-v4` (generator `1.3.0`, seed `20260926`) replaces `med-synth-v2`. An intermediate `med-synth-v3` (generator `1.2.0`, commit `6ff7aa6`) was reviewed and superseded before anything was built on it; its test subsets were never evaluated and `data/med-synth-v3` was removed from the working tree (it stays in git history). What v4 changes relative to v2:
 - Each topic has one template whose wording overlaps a neighbouring topic, so text similarity is a partial signal.
@@ -31,10 +32,36 @@ The cross-phase revision (`project_context/fixes_before_phase7.md`, Sections A, 
 
 | Item | Owner |
 | --- | --- |
-| Active phase | None. Next: Phase 7 (simulated draft-review UI), when the user asks for it. |
+| Active phase | None. Next: Phase 8 (monitoring, reviewed feedback, rollback notes), when the user asks for it. |
 | Owner | Unassigned |
 
-Sections B and C are committed as `d760de7`, and the fixes for the review of that commit (RB-01, RC-01 to RC-06 in `project_context/comments.md`) as `b8092e7`. Both were merged into `main` by fast-forward on 2026-09-27 and are not pushed. The Phase 7 brief is `project_context/phase7.md`.
+Sections B and C are committed as `d760de7`, and the fixes for the review of that commit (RB-01, RC-01 to RC-06 in `project_context/comments.md`) as `b8092e7`. Both are on `main` (with the handoff commit `2e62761`). Phase 7 work is on branch `phase-7-ui`, created from `main` at `2e62761` (which contains all of `v4-rerun-phases-3-6`), and is committed on that branch as the commit titled "Implement Phase 7: simulated draft-review UI" (not merged into `main`, not pushed). The Phase 7 brief is `project_context/phase7.md`.
+
+## Phase 7 — what was built
+
+- **Package** `src/med_ui/`: `config.py` (all UI settings and the example rules; versions and paths from `med_api.version` / `med_policy.version`), `client.py` (HTTP only: `GET /ready`, `POST /assess`, `POST /feedback`; refuses any non-Phase-1 request field), `presentation.py` and `exploration.py` (pure display functions), `examples.py` (directory and curated examples), `walkthrough.py` (doc generator), `app.py` (Streamlit script), `cli.py` (`python -m med_ui` serve, `python -m med_ui walkthrough`). No `med_ui` module imports `med_policy.decision`, `med_models`, `med_features.transform`, or the API app/service (AST check plus a subprocess `sys.modules` check).
+- **Screen:** readiness banner (disables assessment when `/ready` fails or reports another contract/snapshot), compose form (directory filtered to contacts visible at the timestamp, typed addresses allowed), curated-example selector with an "About this example" panel (story, stipulated intent, desired outcome, recorded validation outcome, rule), result (API decision labeled simulated, email risk score, `T_warn`, per-recipient table and cards with the API's codes and texts, explanation, provenance), stale-result hiding on any edit, feedback buttons, collapsed threshold exploration on `validation_scores.csv`. `?example=<key>&assess=1` deep links load and assess an example.
+- **Curated examples** (all `validation_product_like`, chosen by rule from the stored validation decisions): routine S05 median allowed (`d003390`); S02 warned, fewest recipients then highest score (`d003027`); S03/S06 allowed, highest score (`d003216`); S01 allowed, highest (`d003002`); S04 allowed, highest (`d003049`); S11 allowed, highest (`d003074`); S07 allowed, highest (`d003251`); S09 cold start median allowed (`d003272`). Failure demos derive from the routine example by rule. The drafts table is filtered to validation subsets as soon as it is read; a frozen-subset draft id raises `FrozenSubsetError`. No `is_walkthrough` draft is loaded.
+- **Docs:** `docs/phase_7/UI_GUIDE.md`, `docs/phase_7/WALKTHROUGH.md` (generated by `python -m med_ui walkthrough` against the running API; a test regenerates it through the FastAPI test client and requires an exact match), screenshots for steps 1, 2, 4 in `docs/phase_7/screenshots/` (headless Chrome over the DevTools protocol). README points at them.
+- **Tests:** `tests/test_phase7.py`, 17 tests, including two Streamlit `AppTest` runs of the real script (no browser). `tests/conftest.py` now pins pandas to Python string storage (see the pyarrow note below).
+
+### Walkthrough, measured on 2026-09-27 (live API, v4 bundle)
+
+| Step | Example | Desired | Measured |
+| --- | --- | --- | --- |
+| 1 | S05 routine | allow | allow, 8.216e-12 |
+| 2a | S02 added vendor | warn on the added recipient | warn, 0.9997260; `ren@logistics.example` flagged: EXTERNAL_RECIPIENT, UNUSUAL_RECIPIENT_COMBINATION, CONTENT_RELATIONSHIP_MISMATCH |
+| 2b | same, flagged recipient removed | new request; may still warn | allow, 0.0023813 |
+| 3a | S03 first contact | allow, limitation shown | allow, 0.9973707 (2.31e-03 below `T_warn`), LIMITED_RELATIONSHIP_HISTORY |
+| 3b / 3c | S07 topic change / S09 cold start | allow / allow with limitation | allow 0.5193083 / allow 7.126e-35 with LIMITED_RELATIONSHIP_HISTORY |
+| 4a–c | S01 / S04 / S11 | warn | allow 0.9818357 / 0.9943188 / 0.9814677 — known misses (0 warned in every validation and test subset) |
+| 5 | exploration | simulation, distinct from policy | at `T_warn` 8/20 mistakes, 0/3,980 false; at 0.9973707 8/20 and 1 false; at 0.9949507 9/20 and 1 false; at 0.9943188 10/20 and 1 false |
+| 6a / 6b | unknown address / malformed address | non-assessed, no score | `unavailable` / `invalid_input`, no decision or score |
+| 7 | feedback on 2a | not a label until reviewed | HTTP 200 `recorded`; same draft reassessed: warn, same score |
+
+### pyarrow and runtime
+
+The `ui` extra installs Streamlit, which requires pyarrow. With pyarrow importable, pandas 3.0.6 stores strings in Arrow by default. Results are unchanged (full `pytest` passed under Arrow strings: 121 passed in 1018.53 s; `med_data validate` 31 checks passed in 159.8 s), but the pipeline is about three times slower (`validate` 49.1 s with pyarrow blocked). `tests/conftest.py` sets `mode.string_storage = "python"`, restoring the test runtime. The CLIs are not pinned; the UI guide suggests a separate virtual environment for the UI. Phase 9 packaging should decide whether to pin the storage in the packages or split environments.
 
 ## Section B (code hygiene) — what changed
 
@@ -98,7 +125,7 @@ Historical v2 baseline (preserved on disk, verified unchanged by SHA-256 at the 
 
 ## Verified results
 
-Verified on 2026-09-26 from the repository root with the project virtualenv (Apple M1 Pro, 10 CPUs, macOS, Python 3.11.14, scikit-learn 1.9.1, NumPy 2.4.6), in this order:
+Verified on 2026-09-26 and 2026-09-27 from the repository root with the project virtualenv (Apple M1 Pro, 10 CPUs, macOS, Python 3.11.14, scikit-learn 1.9.1, NumPy 2.4.6), in this order:
 
 | Command | Result |
 | --- | --- |
@@ -114,6 +141,11 @@ Verified on 2026-09-26 from the repository root with the project virtualenv (App
 | `pytest` (2026-09-27, after the review fixes RB-01, RC-01 to RC-06) | 104 passed, 0 failed in 522.22 s (8m42s) |
 | `python -m med_data validate` (2026-09-27) | 31 checks passed |
 | `python -m med_policy report`, `python -m med_api report`, Phase 4 docs from stored results (2026-09-27) | Regenerated; only `artifacts/med-model-v2/experiments.json` changed (eligibility block recomputed, outcomes unchanged). v2 baseline: 28/28 files unchanged |
+| `pytest` (2026-09-27, Phase 7, with pyarrow from the `ui` extra, before the conftest pin) | 121 passed, 0 failed in 1018.53 s |
+| `python -m med_data validate --data data/med-synth-v4` (2026-09-27, Phase 7, pyarrow installed) | 31 checks passed, 159.8 s (49.1 s with pyarrow blocked) |
+| `python -m med_api serve` + `python -m med_ui walkthrough` (2026-09-27) | Wrote `docs/phase_7/WALKTHROUGH.md` from the live API (`/ready`: med-api-v1, med-model-v2, med-features-v2, med-policy-v2, med-synth-v4, `T_warn` 0.9996767050340489, blocking false) |
+| `python -m med_ui` against the live API (2026-09-27) | All 8 curated examples loaded and assessed in headless Chrome (1 warn, 7 allow, matching the walkthrough); edit-to-stale and reassess checked in the browser; screenshots for steps 1, 2, 4 written |
+| `pytest` (2026-09-27, Phase 7 final, conftest pin) | 121 passed, 0 failed in 479.16 s (7m59s) |
 
 ### v4 results (current)
 
@@ -145,6 +177,7 @@ Verified on 2026-09-26 from the repository root with the project virtualenv (App
 
 ## Known gaps and handoff
 
+- **Phase 7 UI** shows the API's result and adds nothing: no reason codes, no scoring. It makes the S01, S04, and S11 misses visible; it does not reduce them. What Phase 8 should monitor: per-bundle assessment volume, `unable_to_assess` counts by category and message (unknown addresses in particular, since typos are `unavailable`), warning rate against the validation rate (8 of 4,000), email risk scores near `T_warn` (the legitimate first-contact margin is 2.3e-3), `LIMITED_RELATIONSHIP_HISTORY` and `LIMITED_TEXT` rates, API latency, and feedback volume and label mix (feedback on warned drafts only is biased; sampled allowed drafts need review too). Feedback lands in `var/feedback.jsonl` (gitignored); it is not a label until reviewed.
 - **S01, S04, S11 are still missed.** At the zero-false-warning cutoff the policy warns only on added recipients (S02, S08) and cold senders (S09). Legitimate first contacts (S03, S06) score just below `T_warn`, so the cutoff sits above every lookalike, familiar-recipient topic mistake, and mistaken first contact. Any lower cutoff produces validation false warnings.
 - **Content is a strong signal.** Content cosine separation 0.932 is inside the 0.05–0.95 audit bounds but not far inside. S02 and S04 are off-topic by scenario definition. The C3 checks passed by clear margins for the logistic families; the tree's content-only margin was thin (+0.015) and it was not selected.
 - **C = 1000 is the top of the extended grid**; coefficients are not separate effects.

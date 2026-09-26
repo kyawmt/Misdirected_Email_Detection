@@ -2,7 +2,7 @@
 
 A machine learning project exploring how to identify potentially unintended email recipients before a message is sent. The goal is to reduce accidental data loss while keeping interruptions to legitimate communication low.
 
-**Status: Phase 6 complete on the v4 bundle.** Requirements, the fictional dataset `med-synth-v4`, the feature specification `med-features-v2`, and the logistic risk scorer `med-model-v2` (all features, content cosine included) are in place. Warning policy `med-policy-v2` sets one warning cutoff on the risk score, chosen on product-like validation only, with blocking disabled and no calibration. The frozen v4 test subsets were scored once under that policy: 9 of 30 product-like mistakes warned with 0 false warnings on 5,970 legitimate emails. That is a descriptive pass on this corpus, not a confidence-supported budget claim: the exact bound of 0.62 per 1,000 assumes independent emails, and 95% of the test drafts come from one sender. A FastAPI service (`med-api-v1` contract) serves that bundle; its measured p95 latency is 57.04 ms against a 300 ms target. Lookalike replacements, familiar-recipient topic mistakes, and mistaken first contacts are still missed. The review UI has not started.
+**Status: Phase 7 complete on the v4 bundle.** Requirements, the fictional dataset `med-synth-v4`, the feature specification `med-features-v2`, and the logistic risk scorer `med-model-v2` (all features, content cosine included) are in place. Warning policy `med-policy-v2` sets one warning cutoff on the risk score, chosen on product-like validation only, with blocking disabled and no calibration. The frozen v4 test subsets were scored once under that policy: 9 of 30 product-like mistakes warned with 0 false warnings on 5,970 legitimate emails. That is a descriptive pass on this corpus, not a confidence-supported budget claim: the exact bound of 0.62 per 1,000 assumes independent emails, and 95% of the test drafts come from one sender. A FastAPI service (`med-api-v1` contract) serves that bundle; its measured p95 latency is 57.04 ms against a 300 ms target. A simulated Streamlit review screen calls that API and shows its decisions, risk scores, codes, and explanations; it makes the limitations visible and does not change them. Lookalike replacements, familiar-recipient topic mistakes, and mistaken first contacts are still missed.
 
 ## Intended behavior
 
@@ -41,7 +41,7 @@ flowchart LR
 
 Historical profiles must respect each draft's cutoff time. Training and serving will share feature definitions to reduce inconsistencies. Feedback will not trigger automatic retraining.
 
-Dataset construction uses **Python**, **pandas**, and **NumPy**. Feature preparation and the model comparison use **scikit-learn**. The scoring API uses **FastAPI**. The review UI is planned around **Streamlit** and is not implemented. Model outputs are risk scores, not probabilities. The warning cutoff lives in `med-policy-v2`, not in the model.
+Dataset construction uses **Python**, **pandas**, and **NumPy**. Feature preparation and the model comparison use **scikit-learn**. The scoring API uses **FastAPI**. The simulated review UI uses **Streamlit** and talks to the API over HTTP. Model outputs are risk scores, not probabilities. The warning cutoff lives in `med-policy-v2`, not in the model.
 
 ## Research basis and techniques
 
@@ -102,10 +102,14 @@ Misdirected_Email_Detection/
 │   │   ├── UNCERTAINTY_AND_PREVALENCE.md
 │   │   ├── MODEL_CARD.md
 │   │   └── figures/
-│   └── phase_6/
-│       ├── API_CONTRACT.md
-│       ├── SCORING_FLOW.md
-│       └── ERROR_BEHAVIOR.md
+│   ├── phase_6/
+│   │   ├── API_CONTRACT.md
+│   │   ├── SCORING_FLOW.md
+│   │   └── ERROR_BEHAVIOR.md
+│   └── phase_7/
+│       ├── UI_GUIDE.md
+│       ├── WALKTHROUGH.md
+│       └── screenshots/
 ├── artifacts/med-features-v2/ # fitted text transformer and train/validation matrices (v4)
 ├── artifacts/med-model-v2/    # selected scorer and experiment record (v4)
 ├── artifacts/med-policy-v2/   # warning policy, validation scores, one-shot test result (v4)
@@ -116,6 +120,7 @@ Misdirected_Email_Detection/
 ├── src/med_models/            # baselines, ablations, and the selected scorer
 ├── src/med_policy/            # threshold selection, decision function, evaluation, reports
 ├── src/med_api/               # FastAPI scoring service, request normalizer, feedback
+├── src/med_ui/                # Streamlit review screen, API client, walkthrough generator
 └── tests/
 ```
 
@@ -157,7 +162,16 @@ python -m med_data build --output /tmp/med-synth-rebuild
 
 The published build is `med-synth-v4` (generator `1.3.0`). Product-like mail uses a **simulation assumption of 0.5% misdirected emails**. The training subset is enriched to 10% and is not an operating point. `test_product_like` and `test_diagnostic` are frozen for this version. The feature build does not write those subsets.
 
-Read the [API contract](docs/phase_6/API_CONTRACT.md), [scoring flow](docs/phase_6/SCORING_FLOW.md), and [error behavior](docs/phase_6/ERROR_BEHAVIOR.md) for the service. Read the [evaluation report](docs/phase_5/EVALUATION_REPORT.md), [threshold policy](docs/phase_5/THRESHOLD_POLICY.md), [error analysis](docs/phase_5/ERROR_ANALYSIS.md), [uncertainty and prevalence](docs/phase_5/UNCERTAINTY_AND_PREVALENCE.md), and [model card](docs/phase_5/MODEL_CARD.md) for the policy and its one test pass. Read the [decision record](docs/phase_4/DECISION_RECORD.md), [experiment table](docs/phase_4/EXPERIMENT_TABLE.md), [comparison](docs/phase_4/COMPARISON.md), and [ablations](docs/phase_4/ABLATIONS.md) for the recorded runs. The [feature catalog](docs/phase_3/FEATURE_CATALOG.md), [profile and transform contract](docs/phase_3/PROFILE_AND_TRANSFORM.md), [feature quality report](docs/phase_3/FEATURE_QUALITY_REPORT.md), and [training/serving parity notes](docs/phase_3/TRAINING_SERVING_PARITY.md) describe the signals. The [data dictionary](docs/phase_2/DATA_DICTIONARY.md), [labeling guide](docs/phase_2/LABELING_GUIDE.md), [dataset specification](docs/phase_2/DATASET_SPECIFICATION.md), and [quality and leakage checklist](docs/phase_2/DATA_QUALITY_AND_LEAKAGE.md) describe the tables. The [scenarios](docs/phase_1/SCENARIOS.md), [input/output specification](docs/phase_1/INPUT_OUTPUT_SPECIFICATION.md), and [acceptance criteria](docs/phase_1/ACCEPTANCE_CRITERIA.md) still describe the product contract. Application startup comes in a later phase.
+Start the simulated review screen (install the `ui` extra first) while the API is running. It opens on `http://localhost:8501`:
+
+```bash
+pip install -e ".[ui]"
+python -m med_ui
+```
+
+The screen composes fictional drafts from the `med-synth-v4` directory, loads curated validation examples chosen by rule, shows the API's decision, risk scores, codes, and explanation sentences, hides a result as stale as soon as the draft changes, sends reviewer feedback to `POST /feedback`, and has a collapsed what-if view over the stored validation scores that never changes the decision. `python -m med_ui walkthrough` regenerates [the walkthrough](docs/phase_7/WALKTHROUGH.md) from the running API. The screen shows limits it does not remove: lookalike replacements (S01), familiar-recipient topic mistakes (S04), and mistaken first contacts (S11) are allowed; a well-formed address outside the directory snapshot is unable to assess, not a warning; scores are risk scores, not probabilities; and blocking is disabled.
+
+Read the [API contract](docs/phase_6/API_CONTRACT.md), [scoring flow](docs/phase_6/SCORING_FLOW.md), and [error behavior](docs/phase_6/ERROR_BEHAVIOR.md) for the service. Read the [evaluation report](docs/phase_5/EVALUATION_REPORT.md), [threshold policy](docs/phase_5/THRESHOLD_POLICY.md), [error analysis](docs/phase_5/ERROR_ANALYSIS.md), [uncertainty and prevalence](docs/phase_5/UNCERTAINTY_AND_PREVALENCE.md), and [model card](docs/phase_5/MODEL_CARD.md) for the policy and its one test pass. Read the [decision record](docs/phase_4/DECISION_RECORD.md), [experiment table](docs/phase_4/EXPERIMENT_TABLE.md), [comparison](docs/phase_4/COMPARISON.md), and [ablations](docs/phase_4/ABLATIONS.md) for the recorded runs. The [feature catalog](docs/phase_3/FEATURE_CATALOG.md), [profile and transform contract](docs/phase_3/PROFILE_AND_TRANSFORM.md), [feature quality report](docs/phase_3/FEATURE_QUALITY_REPORT.md), and [training/serving parity notes](docs/phase_3/TRAINING_SERVING_PARITY.md) describe the signals. The [data dictionary](docs/phase_2/DATA_DICTIONARY.md), [labeling guide](docs/phase_2/LABELING_GUIDE.md), [dataset specification](docs/phase_2/DATASET_SPECIFICATION.md), and [quality and leakage checklist](docs/phase_2/DATA_QUALITY_AND_LEAKAGE.md) describe the tables. The [scenarios](docs/phase_1/SCENARIOS.md), [input/output specification](docs/phase_1/INPUT_OUTPUT_SPECIFICATION.md), and [acceptance criteria](docs/phase_1/ACCEPTANCE_CRITERIA.md) still describe the product contract. Read the [UI guide](docs/phase_7/UI_GUIDE.md) and the [walkthrough](docs/phase_7/WALKTHROUGH.md) for the review screen. Packaging and deployment come in a later phase.
 
 ## Development roadmap
 
@@ -169,7 +183,7 @@ Read the [API contract](docs/phase_6/API_CONTRACT.md), [scoring flow](docs/phase
 | 4 | Baselines, model comparison, and feature ablations | Complete — `med-model-v2` |
 | 5 | Evaluation, calibration if needed, and threshold selection | Complete — `med-policy-v2` |
 | 6 | Scoring API, validation, explanations, and failure handling | Complete — `med-api-v1` contract serving the v4 bundle |
-| 7 | Interactive draft review and simulated decisions | Planned |
+| 7 | Interactive draft review and simulated decisions | Complete — Streamlit client of `med-api-v1` |
 | 8 | Monitoring, reviewed feedback, drift investigation, and safe iteration | Planned |
 | 9 | Regression tests, reproducible packaging, deployment, and rollback | Planned |
 | 10 | Architecture documentation, results, model card, and usage guide | Planned; initial README available |
