@@ -1,6 +1,6 @@
 # Phase 2 — Data quality and leakage checklist
 
-The executable checks live in `src/med_data/validate.py`. `python -m med_data validate` runs them against `data/med-synth-v1` and compares file checksums with `dataset_manifest.json`. A generated `quality_report.json` records each check id, name, and result. The report below is the contract those checks enforce.
+The executable checks live in `src/med_data/validate.py`. `python -m med_data validate` runs them against `data/med-synth-v2` and compares file checksums with `dataset_manifest.json`. Checksums cover file bytes. Row counts are parsed CSV records, not physical lines. A generated `quality_report.json` records each check id, name, and result. The report below is the contract those checks enforce.
 
 ## Quality checks
 
@@ -28,12 +28,14 @@ The executable checks live in `src/med_data/validate.py`. `python -m med_data va
 | Q20 | Feedback contains an uncertain pending row and a rejected row, and no accepted row. |
 | Q21 | A scoring view of a train draft contains none of the denylisted names. |
 | Q22 | `frozen` is true exactly on `test_product_like` and `test_diagnostic`. |
-| Q23 | `dataset_version` is `med-synth-v1` and the seed is `20260926`. |
+| Q23 | `dataset_version` is `med-synth-v2` and the seed is `20260926`. |
 | Q24 | An empty subject or body occurs only on S09 little-text variants, and those variants are empty in one of the two fields. |
 | Q25 | Invalid fixtures are separate from drafts and expect `unable_to_assess`. |
 | Q26 | Product-like sets contain the legitimate hard negatives. Diagnostic sets contain S01–S09, the S08 role variants, clean twins, and a misdirected fraction between 0.35 and 0.70. |
 | Q27 | Sent timestamps are unique. |
 | Q28 | Non-empty bodies carry the marker phrase of their generator topic. |
+| Q29 | Every manifest row matches its draft on family, split, subset, timestamp, scenario fields, walkthrough flag, and dataset version. `frozen` is true only for the two test subsets. |
+| Q30 | Warmup, train, validation, and test sent mail include Bcc. Train, both validation subsets, and test product-like each include at least one intended Bcc recipient. Train still includes unintended Bcc recipients. |
 
 ## Leakage rules
 
@@ -59,9 +61,9 @@ Warmup mail is visible to later drafts. That is history, not label leakage. The 
 ## Known limits of this dataset
 
 - Identities, mail, and labels are fictional. Quality checks show that the generator followed its own rules. They do not measure detection accuracy.
-- Template language repeats across time. A later model can memorize phrases that travel with a topic. The hash check blocks exact copies across splits; it does not block a shared writing style.
+- Template language repeats across time. A later model can memorize phrases that travel with a topic. The hash check blocks exact copies across splits; it does not block a shared writing style. Adding legitimate Bcc mail does not remove that repetition.
 - Replies are one sentence and do not quote earlier text. Threads are a message plus that reply, not a long conversation.
-- Product-like test contains 10 misdirected emails. A later recall estimate on those 10 rows will be coarse. The diagnostic set is the place to inspect scenario behavior, and its rate is not the product prevalence.
+- Product-like test contains 10 misdirected emails. A later recall estimate on those 10 rows will be coarse. The diagnostic set is the place to inspect scenario behavior, and its rate is not the product prevalence. Legitimate Bcc coverage does not increase that positive count.
 - Training enrichment will inflate precision if a later report uses the train base rate as if it were the deployment mix.
 - Department and directory dates are available in the scoring view because they are directory facts. They are not proof of intent.
 - Invalid fixtures describe refusal cases. Nothing in this phase scores them.

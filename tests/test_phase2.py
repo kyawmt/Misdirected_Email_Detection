@@ -1,10 +1,13 @@
 """Phase 2 data contract: labels, splits, leakage, and reproducibility."""
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 from med_data.history import visible_history
-from med_data.io import read_dataset, write_dataset
+from med_data.io import _row_count, read_dataset, write_dataset
 from med_data.prevalence import precision_from_rates
 from med_data.schema import MODEL_INPUT_DENYLIST, TABLES
 from med_data.validate import assert_valid
@@ -17,8 +20,9 @@ PUBLISHED = ROOT / "data" / DATASET_VERSION
 
 def test_published_contract_passes_validation(dataset):
     checks = assert_valid(dataset)
-    assert len(checks) >= 28
+    assert len(checks) == 30
     assert dataset.seed == SEED
+    assert {check.check_id for check in checks} >= {"Q29", "Q30"}
 
 
 def test_product_like_prevalence_and_enrichment(dataset):
@@ -105,6 +109,40 @@ def test_roundtrip_and_published_checksums(dataset, tmp_path):
     published = json.loads((PUBLISHED / "dataset_manifest.json").read_text(encoding="utf-8"))
     assert manifest["files"] == published["files"]
     assert manifest["seed"] == SEED
+    assert manifest["files"]["messages.csv"]["rows"] == len(dataset.messages)
+    assert manifest["files"]["drafts.csv"]["rows"] == len(dataset.drafts)
+
+
+def test_csv_record_count_ignores_embedded_newlines(tmp_path):
+    path = tmp_path / "multiline.csv"
+    path.write_text('id,body\n"m1","alpha\nbeta\ngamma"\n"m2","ok"\n', encoding="utf-8")
+    assert _row_count(path) == 2
+    physical_rows = sum(1 for _ in path.open(encoding="utf-8")) - 1
+    assert physical_rows == 4
+
+
+def test_swapped_manifest_assignment_is_rejected(dataset):
+    manifest = dataset.split_manifest.copy()
+    train_index = manifest.index[manifest["subset"].eq("train")][0]
+    test_index = manifest.index[manifest["subset"].eq("test_product_like")][0]
+    for column in ("split", "subset", "frozen"):
+        train_value = manifest.at[train_index, column]
+        manifest.at[train_index, column] = manifest.at[test_index, column]
+        manifest.at[test_index, column] = train_value
+    broken = replace(dataset, split_manifest=manifest)
+    with pytest.raises(AssertionError, match="manifest"):
+        assert_valid(broken)
+
+
+def test_manifest_timestamp_and_family_must_match_draft(dataset):
+    manifest = dataset.split_manifest.copy()
+    train_index = manifest.index[manifest["subset"].eq("train")][0]
+    test_index = manifest.index[manifest["subset"].eq("test_product_like")][0]
+    manifest.at[train_index, "family_id"] = manifest.at[test_index, "family_id"]
+    manifest.at[train_index, "sent_at"] = manifest.at[test_index, "sent_at"]
+    broken = replace(dataset, split_manifest=manifest)
+    with pytest.raises(AssertionError, match="manifest"):
+        assert_valid(broken)
 
 
 def test_data_dictionary_lists_every_column():

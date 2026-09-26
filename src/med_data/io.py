@@ -108,12 +108,8 @@ def verify_files(input_dir: str | Path) -> None:
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
         if digest != expected["sha256"]:
             raise AssertionError(f"Checksum mismatch for {filename}")
-        frame_rows = expected["rows"]
-        if filename.endswith(".csv"):
-            with path.open(encoding="utf-8") as handle:
-                rows = sum(1 for _ in handle) - 1
-            if rows != frame_rows:
-                raise AssertionError(f"Row count mismatch for {filename}")
+        if filename.endswith(".csv") and _row_count(path) != expected["rows"]:
+            raise AssertionError(f"Row count mismatch for {filename}")
 
 
 def _manifest(dataset: Dataset, directory: Path) -> dict:
@@ -157,10 +153,16 @@ def _manifest(dataset: Dataset, directory: Path) -> dict:
 
 
 def _row_count(path: Path) -> int:
+    """Count parsed CSV records, excluding the header.
+
+    Message bodies contain newlines inside quoted fields, so a physical line
+    count is larger than the number of records.
+    """
     if path.suffix == ".json":
         return 0
-    with path.open(encoding="utf-8") as handle:
-        return max(sum(1 for _ in handle) - 1, 0)
+    with path.open(encoding="utf-8", newline="") as handle:
+        count = sum(1 for _ in csv.reader(handle))
+    return max(count - 1, 0)
 
 
 def _write_frame(frame: pd.DataFrame, path: Path, columns: list[str]) -> None:

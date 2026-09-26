@@ -1,6 +1,6 @@
 {
-  "dataset_version": "med-synth-v1",
-  "generator_version": "1.0.0",
+  "dataset_version": "med-synth-v2",
+  "generator_version": "1.1.0",
   "seed": 20260926,
   "prevalence_assumption": {
     "product_like_rate": "0.005",
@@ -38,7 +38,7 @@
     }
   },
   "row_counts": {
-    "messages": 28414,
+    "messages": 29246,
     "drafts": 4143,
     "subsets": {
       "test_diagnostic": {
@@ -68,8 +68,8 @@
       }
     },
     "seed": 20260926,
-    "generator_version": "1.0.0",
-    "dataset_version": "med-synth-v1"
+    "generator_version": "1.1.0",
+    "dataset_version": "med-synth-v2"
   },
   "model_input_denylist": [
     "asserted_intended",
@@ -107,43 +107,43 @@
   ],
   "files": {
     "contacts.csv": {
-      "sha256": "d4d57e46c45b5fea5e3afaf5b0d7d789c3b3ce23f67a397cbff1c81660123436",
+      "sha256": "6cf49ae230dca5019ebf9b88cc7060cc717dea3986947263901848c5e8fa14ac",
       "rows": 79
     },
     "messages.csv": {
-      "sha256": "48c34e33fff5c1162515dc53190614536bd854eff6484e21a6aede4a998615fb",
-      "rows": 142022
+      "sha256": "a604a2c9f3bf117e1cbf3e2cb9eb5ee53161fbdb46e567b87100ecf06e472c28",
+      "rows": 29246
     },
     "message_recipients.csv": {
-      "sha256": "9bc01045c01b586c08c67b627e28daf06ad108fd12db39d428bc4a534ffeecf0",
-      "rows": 45073
+      "sha256": "ab70c75886a6c1ac442e6a9acf1d61d873af55ad041a3150a17d408fa9a8f710",
+      "rows": 47569
     },
     "drafts.csv": {
-      "sha256": "d164d0dc0dbf435b6b855f46e26ff7fcdf8d01447b681d962248c06a05bb7366",
-      "rows": 28839
+      "sha256": "899ddecbbe4fdbb8bdb1a6a26011f53bfa7c56ab77650d8097177641f78c57f2",
+      "rows": 4143
     },
     "draft_recipients.csv": {
-      "sha256": "8856334cd61d4f8932bf30e8332f8f59797d3d0b3e0d24725f65335e37226033",
-      "rows": 9195
+      "sha256": "bc03d638cbd84ccaa9abbfd8c2648b4104de11a637af8af13d20378e493d3bd4",
+      "rows": 9505
     },
     "labels.csv": {
-      "sha256": "40717037e7793d0eaef5f053e41417c7d24f61484819a281826d9790819d97a9",
-      "rows": 9195
+      "sha256": "62f6d812402e2acb3f444216000fccf0dd45908e0fbdd6670b8767acbb21cd1b",
+      "rows": 9505
     },
     "reviewer_feedback.csv": {
-      "sha256": "e30de46365f6c33edc2beb518bdff57c3a3c2d98b48e31bcaac6cbd388585a38",
+      "sha256": "6fa4d00f9a1879b3a4eb872c710b8fcc424d9ab4bdd76bcf07583e253b54ab91",
       "rows": 3
     },
     "split_manifest.csv": {
-      "sha256": "8a97e628cc29c4061ce8616afd4a53c4738702424481b9c0651ed35053228a35",
+      "sha256": "c9ab50043c53163fa1846e48c27617aeba289a93eeb5d178f05d97ae77ff4d9c",
       "rows": 4143
     },
     "invalid_fixtures.csv": {
-      "sha256": "480b563cf6f64e99726da69b503709b92cebe04f7e9e7044cb3c34a29dfc1532",
+      "sha256": "c4194538d33ed4c86cb479b9e9d78f9103f14890f07b686d277fffdce941a188",
       "rows": 4
     },
     "quality_report.json": {
-      "sha256": "36e03d4ee947be3959f17466e311c8a66f7bf58be8c1fe866b7e8ff83c8f5c19",
+      "sha256": "afdcf134a102a0444d72e7292b2bff3d33facd7b67c773686715681d59e8adbd",
       "rows": 0
     }
   }

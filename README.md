@@ -71,7 +71,7 @@ Misdirected_Email_Detection/
 ├── README.md
 ├── pyproject.toml
 ├── data/
-│   └── med-synth-v1/          # fictional tables, manifest, quality report
+│   └── med-synth-v2/          # fictional tables, manifest, quality report
 ├── docs/
 │   ├── phase_1/
 │   │   ├── PRODUCT_BRIEF.md
@@ -96,16 +96,16 @@ python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 pytest
-python -m med_data validate --data data/med-synth-v1
+python -m med_data validate --data data/med-synth-v2
 ```
 
-`pytest` rebuilds the dataset from seed `20260926` and checks it against the published files. `validate` reloads `data/med-synth-v1`, verifies SHA-256 checksums, and runs the quality checklist. To write the tables again:
+`pytest` rebuilds the dataset from seed `20260926` and checks it against the published files. `validate` reloads `data/med-synth-v2`, verifies SHA-256 checksums and parsed record counts, and runs the quality checklist. To write the tables again:
 
 ```bash
-python -m med_data build --output data/med-synth-v1
+python -m med_data build --output data/med-synth-v2
 ```
 
-The published build is `med-synth-v1` (generator `1.0.0`). Product-like mail uses a **simulation assumption of 0.5% misdirected emails**. The training subset is enriched to 10% and is not an operating point. `test_product_like` and `test_diagnostic` are frozen.
+The published build is `med-synth-v2` (generator `1.1.0`). Product-like mail uses a **simulation assumption of 0.5% misdirected emails**. The training subset is enriched to 10% and is not an operating point. `test_product_like` and `test_diagnostic` are frozen for this version.
 
 Read the [data dictionary](docs/phase_2/DATA_DICTIONARY.md), [labeling guide](docs/phase_2/LABELING_GUIDE.md), [dataset specification](docs/phase_2/DATASET_SPECIFICATION.md), and [quality and leakage checklist](docs/phase_2/DATA_QUALITY_AND_LEAKAGE.md) for the tables and the rules that keep future mail and scenario answers out of a scoring view. The [scenarios](docs/phase_1/SCENARIOS.md), [input/output specification](docs/phase_1/INPUT_OUTPUT_SPECIFICATION.md), and [acceptance criteria](docs/phase_1/ACCEPTANCE_CRITERIA.md) still describe the product contract. Training and application startup come in later phases.
 
@@ -114,7 +114,7 @@ Read the [data dictionary](docs/phase_2/DATA_DICTIONARY.md), [labeling guide](do
 | Phase | Scope | Status |
 | --- | --- | --- |
 | 1 | Product definition, scenarios, contracts, and measurable requirements | Complete — documentation |
-| 2 | Fictional histories, synthetic mistakes, labeling, and chronological splits | Complete — `med-synth-v1` |
+| 2 | Fictional histories, synthetic mistakes, labeling, and chronological splits | Complete — `med-synth-v2` |
 | 3 | Behavioral and text features with consistent historical lookup | Planned |
 | 4 | Baselines, model comparison, and feature ablations | Planned |
 | 5 | Evaluation, calibration if needed, and threshold selection | Planned |
@@ -126,7 +126,7 @@ Read the [data dictionary](docs/phase_2/DATA_DICTIONARY.md), [labeling guide](do
 
 ## Limitations and data disclaimer
 
-The project uses **fictional identities and synthetic email**. `med-synth-v1` is a generated record with stipulated labels, not a sample of real mail. Results on that data, once any exist, will show behavior under the generator's assumptions and will not establish real-world detection accuracy. The 0.5% product-like prevalence is a simulation assumption; the 10% training mix is enrichment for later fitting. Diagnostic challenge rows are dependent within a `family_id` and are not a substitute for the product-like test. No model has been trained, so no precision, recall, or false-intervention rate has been measured.
+The project uses **fictional identities and synthetic email**. `med-synth-v2` is a generated record with stipulated labels, not a sample of real mail. Results on that data, once any exist, will show behavior under the generator's assumptions and will not establish real-world detection accuracy. The 0.5% product-like prevalence is a simulation assumption; the 10% training mix is enrichment for later fitting. Diagnostic challenge rows are dependent within a `family_id` and are not a substitute for the product-like test. Template language repeats across time, and the product-like test contains 10 misdirected emails, so later recall on that set will be coarse. No model has been trained, so no precision, recall, or false-intervention rate has been measured.
 
 The initial scope is English plain-text drafts with 1–20 unique recipients in a fictional environment. Mailbox integration, actual sending or blocking, attachment inspection, enterprise authentication, and production-scale operation are outside scope. Missing intended recipients without an unintended addressee are also outside the detection task.
 

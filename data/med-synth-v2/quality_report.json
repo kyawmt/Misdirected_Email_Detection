@@ -1,6 +1,6 @@
 {
-  "dataset_version": "med-synth-v1",
-  "generator_version": "1.0.0",
+  "dataset_version": "med-synth-v2",
+  "generator_version": "1.1.0",
   "passed": true,
   "checks": [
     {
@@ -43,7 +43,7 @@
       "id": "Q07",
       "name": "Labels are complete synthetic stipulations",
       "passed": true,
-      "detail": "9195 recipient labels"
+      "detail": "9505 recipient labels"
     },
     {
       "id": "Q08",
@@ -67,13 +67,13 @@
       "id": "Q11",
       "name": "Non-empty message text does not cross splits",
       "passed": true,
-      "detail": "28412 non-empty hashes"
+      "detail": "29244 non-empty hashes"
     },
     {
       "id": "Q12",
       "name": "Threads do not cross splits",
       "passed": true,
-      "detail": "14213 threads"
+      "detail": "14629 threads"
     },
     {
       "id": "Q13",
@@ -139,7 +139,7 @@
       "id": "Q23",
       "name": "Every row carries the dataset version",
       "passed": true,
-      "detail": "med-synth-v1"
+      "detail": "med-synth-v2"
     },
     {
       "id": "Q24",
@@ -163,13 +163,25 @@
       "id": "Q27",
       "name": "Sent message timestamps are unique",
       "passed": true,
-      "detail": "28414 unique sent timestamps"
+      "detail": "29246 unique sent timestamps"
     },
     {
       "id": "Q28",
       "name": "Topic markers appear in non-empty bodies of that topic",
       "passed": true,
       "detail": "topic markers present"
+    },
+    {
+      "id": "Q29",
+      "name": "Split manifest fields match the drafts",
+      "passed": true,
+      "detail": "4143 manifest rows match drafts"
+    },
+    {
+      "id": "Q30",
+      "name": "Legitimate Bcc mail is present in history and in labeled subsets",
+      "passed": true,
+      "detail": "intended Bcc recipients: train 34, validation_product_like 36, validation_diagnostic 1, test_product_like 54"
     }
   ]
 }

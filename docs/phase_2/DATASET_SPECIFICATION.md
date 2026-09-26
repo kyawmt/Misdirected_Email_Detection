@@ -1,15 +1,17 @@
 # Phase 2 — Dataset specification
 
-Version: `med-synth-v1`. Generator: `1.0.0`. Seed: `20260926`.
+Version: `med-synth-v2`. Generator: `1.1.0`. Seed: `20260926`.
 
-The published tables are in `data/med-synth-v1/`. Regenerating with this seed and generator version reproduces those files, including checksums in `dataset_manifest.json`. Changing the seed, the quotas, or the generation rules requires a new dataset version. The frozen test subsets belong to this version only.
+The published tables are in `data/med-synth-v2/`. Regenerating with this seed and generator version reproduces those files, including checksums in `dataset_manifest.json`. Changing the seed, the quotas, or the generation rules requires a new dataset version. The frozen test subsets belong to this version only.
+
+`med-synth-v2` replaces `med-synth-v1` because generation changed: ordinary project mail now includes an intended Bcc recipient in history and in the labeled subsets. Prevalence quotas are unchanged (100/1000 enriched train, 5/1000 validation product-like, 10/2000 test product-like). The v1 test files are not a frozen evaluation set for this generator. `test_product_like` and `test_diagnostic` in v2 are the frozen subsets.
 
 ```bash
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-python -m med_data build --output data/med-synth-v1
-python -m med_data validate --data data/med-synth-v1
+python -m med_data build --output data/med-synth-v2
+python -m med_data validate --data data/med-synth-v2
 pytest
 ```
 
@@ -34,6 +36,7 @@ The canonical walkthrough drafts use the addresses from the scenario list and li
 | S05 | internal project group, and `lee@vendor.example` on purchase scheduling |
 | S06 new domain | `rina@newpartner.example` |
 | S08 | one all-intended group, plus Cc, Bcc, and two-unintended variants in one family |
+| Routine Bcc | project updates Bcc `lena@demo.example`, who is intended |
 | S09 | `elliot.berg@demo.example` with no earlier mail, plus empty-text drafts |
 
 Parallel lookalike pairs, vendors, facilities contacts, and one-shot collaborators supply the same situations in train and validation without reusing Jordan, Rina, or Elliot before their test drafts.
@@ -94,8 +97,12 @@ A result computed on the balanced diagnostic subset cannot be quoted as performa
 
 Train, both validation subsets, and both test subsets include legitimate first contacts, new domains, topic changes, cold starts, and little-text mail. Misdirected lookalike, added-external, topic-mismatch, multi-recipient, and little-text cases are in train and in both diagnostic subsets. The product-like test includes 10 misdirected drafts spread across lookalike, added-external, topic-mismatch, and multi-recipient cases, on top of 1,990 legitimate drafts.
 
+Sent mail from warmup through test includes project updates with an intended Bcc recipient. Those messages also appear as legitimate drafts in train, validation product-like, validation diagnostic, and test product-like. S08 Bcc additions remain unintended. Each of those drafts stays in the family and split of its source message.
+
+Template wording still repeats across weeks. Exact bodies stay unique because each one carries its own reference token, and a non-empty body is not copied into another split. The product-like test still has only 10 misdirected emails, so a later recall number on that set will be coarse. The diagnostic set is for scenario inspection. Its misdirected fraction is not the 0.5% product-like prevalence.
+
 S10 (malformed input, no recipients, unknown history reference, too many recipients) is represented only by `invalid_fixtures.csv`. Those rows expect `unable_to_assess`. They are not labels and not model-training rows.
 
 ## Reproducibility
 
-`numpy.random.default_rng(20260926)` chooses template variants. Contact lists, lanes, quotas, and timestamps are fixed. Two builds write byte-identical CSV and JSON. The manifest stores SHA-256 checksums so a hand edit is detectable with `python -m med_data validate`.
+`numpy.random.default_rng(20260926)` chooses template variants. Contact lists, lanes, quotas, and timestamps are fixed. Two builds write byte-identical CSV and JSON. The manifest stores SHA-256 checksums and parsed record counts so a hand edit is detectable with `python -m med_data validate`. A quoted newline inside a body is part of that record, not an extra row.

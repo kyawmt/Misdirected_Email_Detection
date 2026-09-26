@@ -4,8 +4,8 @@ Bump DATASET_VERSION when the seed, quotas, or generation rules change.
 The frozen test subsets belong to one dataset version.
 """
 
-DATASET_VERSION = "med-synth-v1"
-GENERATOR_VERSION = "1.0.0"
+DATASET_VERSION = "med-synth-v2"
+GENERATOR_VERSION = "1.1.0"
 SEED = 20260926
 
 # Product-like mail uses this misdirection rate. It is a simulation assumption,

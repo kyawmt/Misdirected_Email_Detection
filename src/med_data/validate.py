@@ -56,6 +56,8 @@ def validate_dataset(dataset) -> list[Check]:
         ("Q26", "Hard negatives and diagnostic scenarios are present", _coverage),
         ("Q27", "Sent message timestamps are unique", _unique_times),
         ("Q28", "Topic markers appear in non-empty bodies of that topic", _markers),
+        ("Q29", "Split manifest fields match the drafts", _manifest_matches_drafts),
+        ("Q30", "Legitimate Bcc mail is present in history and in labeled subsets", _legitimate_bcc),
     ]
     for check_id, name, function in specs:
         try:
@@ -590,6 +592,53 @@ def _coverage(dataset) -> str:
 def _unique_times(dataset) -> str:
     _require(dataset.messages["sent_at"].is_unique, "duplicate message timestamp")
     return f"{len(dataset.messages)} unique sent timestamps"
+
+
+def _manifest_matches_drafts(dataset) -> str:
+    manifest = dataset.split_manifest.set_index("draft_id").sort_index()
+    drafts = dataset.drafts.set_index("draft_id").sort_index()
+    _require(manifest.index.equals(drafts.index), "manifest draft ids do not match drafts")
+    compared = (
+        "family_id",
+        "split",
+        "subset",
+        "sent_at",
+        "scenario_id",
+        "scenario_variant",
+        "is_walkthrough",
+        "dataset_version",
+    )
+    for column in compared:
+        mismatch = ~manifest[column].eq(drafts[column])
+        ids = manifest.index[mismatch].tolist()[:5]
+        _require(not mismatch.any(), f"manifest {column} does not match drafts: {ids}")
+    frozen_mismatch = ~manifest["frozen"].eq(manifest["subset"].isin(FROZEN_SUBSETS))
+    ids = manifest.index[frozen_mismatch].tolist()[:5]
+    _require(not frozen_mismatch.any(), f"manifest frozen flag does not match subset: {ids}")
+    return f"{len(manifest)} manifest rows match drafts"
+
+
+def _legitimate_bcc(dataset) -> str:
+    labeled = dataset.draft_recipients.merge(
+        dataset.labels[["draft_id", "contact_id", "intended"]],
+        on=["draft_id", "contact_id"],
+    )
+    labeled = labeled.merge(dataset.drafts[["draft_id", "subset"]], on="draft_id")
+    bcc = labeled.loc[labeled["role"] == "bcc"]
+    intended_counts = {}
+    for subset in ("train", "validation_product_like", "validation_diagnostic", "test_product_like"):
+        rows = bcc.loc[bcc["subset"] == subset]
+        intended = int(rows["intended"].sum())
+        intended_counts[subset] = intended
+        _require(intended > 0, f"{subset} has no intended Bcc recipient")
+    train_rows = bcc.loc[bcc["subset"] == "train"]
+    _require((~train_rows["intended"]).any(), "train has no unintended Bcc recipient")
+    sent = dataset.message_recipients.loc[dataset.message_recipients["role"] == "bcc"]
+    sent = sent.merge(dataset.messages[["message_id", "split"]], on="message_id")
+    for split in ("warmup", "train", "validation", "test"):
+        _require((sent["split"] == split).any(), f"sent history has no Bcc mail in {split}")
+    summary = ", ".join(f"{name} {count}" for name, count in intended_counts.items())
+    return f"intended Bcc recipients: {summary}"
 
 
 def _markers(dataset) -> str:

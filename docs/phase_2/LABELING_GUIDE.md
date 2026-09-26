@@ -15,8 +15,9 @@ The generator stipulates the bit while it builds the draft. `label_source` is `s
 | S01 lookalike replacement | false for the contact who replaced the intended person; true for anyone else still addressed | The generator swapped in a similar contact. The similar name is not what makes the bit false. The swap is. |
 | S02 added external recipient | false for the added vendor; true for the original internal recipients | The vendor was added to a budget draft. Being external is not the label. |
 | S04 compensation text sent to a facilities contact | false for that contact | The generator addressed a familiar person with content stipulated for a people partner. |
-| S08 extra Cc or Bcc recipient | false for each added contact; true for the original group | A draft may have one or two unintended recipients. The other recipients stay intended. |
+| S08 extra Cc or Bcc recipient | false for each added contact; true for the original group, including an existing Bcc | A draft may have one or two unintended recipients. The other recipients stay intended. |
 | S08 all-intended group | true for every role | Mixed To, Cc, and Bcc is not a mistake. |
+| Routine project mail with Bcc | true for the Bcc contact and for everyone else | Ordinary project updates copy a teammate in Bcc. The Bcc role is not a positive label. |
 | S03 first direct contact | true | No earlier sent mail involves that contact. Novelty is not a positive label. |
 | S06 first contact at a new external domain | true | The domain has no earlier sent mail. A new domain is not a positive label. |
 | S07 kickoff to a facilities contact | true | The contact has earlier facilities mail and no earlier kickoff. A topic change is not a positive label. |
@@ -41,6 +42,8 @@ Hard negatives are legitimate drafts that are easy to confuse with mistakes:
 - ordinary internal and external mail (S05 and `routine`)
 
 They sit inside the product-like subsets as well as the diagnostic subsets. Their labels stay `intended = true`. An intervention on one of them would be a false intervention under the product definition.
+
+The same rule applies to Bcc. Warmup onward includes project updates that Bcc a program teammate who was meant to receive them. Train, validation product-like, validation diagnostic, and test product-like each contain at least one such intended Bcc recipient. S08 still adds unintended Bcc recipients. A later model that treats every Bcc address as a mistake is using a shortcut that this dataset contradicts.
 
 ## Positive class and aggregation
 

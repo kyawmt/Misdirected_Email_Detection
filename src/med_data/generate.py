@@ -117,6 +117,15 @@ def _has_role(message: dict, role: str) -> bool:
     return any(row["role"] == role for row in message["recipients"])
 
 
+def _project_group_with_bcc(message: dict) -> bool:
+    forbidden = (*VENDORS, *(pair[1] for pair in LOOKALIKE_PAIRS))
+    return (
+        _has_role(message, "cc")
+        and _has_role(message, "bcc")
+        and not any(_has(message, contact) for contact in forbidden)
+    )
+
+
 class _Builder:
     def __init__(self, seed: int):
         self.seed = seed
@@ -211,6 +220,8 @@ class _Builder:
     def _lanes(self) -> list[Lane]:
         lanes = [
             Lane(MAYA, PROJECT_TO, PROJECT_CC, (), "project_update", (0, 1, 2, 3, 4), repeats=8),
+            # Intended Bcc on ordinary project mail. Without this, Bcc appears only on mistakes.
+            Lane(MAYA, PROJECT_TO, PROJECT_CC, PROJECT_BCC, "project_update", (1, 3), repeats=2),
             Lane(MAYA, ("c_chris", NOAH, "c_elena"), ("c_marcus",), (), "budget", (1, 3), repeats=2),
             Lane(MAYA, (PRYA,), (QUINN,), (), "compensation", (0, 2, 4), repeats=2),
             Lane("c_noah", ("c_elena", "c_taylor", "c_lena"), (), (), "project_update", (0, 2, 4), repeats=2),
@@ -691,11 +702,17 @@ class _Builder:
         product_total = sum(plan.misdirected.get(kind, 0) for kind in kinds)
         diag_total = sum(plan.diagnostic_misdirected.get(kind, 0) for kind in kinds)
         all_count = plan.diagnostic_legitimate.get("s08_all", 0)
+        # Reserve all-intended copies that already have a legitimate Bcc before corruptions draw from the pool.
+        all_sources = (
+            self._take(split, "project_update", MAYA, all_count, _project_group_with_bcc)
+            if all_count
+            else []
+        )
         sources = self._take(
             split,
             "project_update",
             MAYA,
-            product_total + diag_total + all_count,
+            product_total + diag_total,
             lambda message: _has_role(message, "cc")
             and not any(_has(message, contact) for contact in (*VENDORS, *(pair[1] for pair in LOOKALIKE_PAIRS))),
         )
@@ -707,16 +724,15 @@ class _Builder:
             for ordinal in range(plan.diagnostic_misdirected.get(kind, 0)):
                 self._s08_variant(sources[cursor], kind, plan.diagnostic_subset, twin=True, ordinal=ordinal)
                 cursor += 1
-        for _ in range(all_count):
+        for source in all_sources:
             self._draft_as_sent(
-                sources[cursor],
+                source,
                 subset=plan.diagnostic_subset,
                 scenario_id="S08",
                 variant="all_intended",
                 topic="project_update",
                 stipulation="Stipulated all-intended group mail. Roles differ, and every recipient was intended.",
             )
-            cursor += 1
 
     def _s08_variant(self, source, kind, subset, twin, ordinal) -> None:
         rows = [dict(row) for row in source["recipients"]]
@@ -1001,8 +1017,17 @@ class _Builder:
                 and _has(message, LEE),
             )
         )
-        if len(forced) != 10:
-            raise RuntimeError(f"{split} could not reserve routine S05 examples")
+        forced.extend(
+            self._take_unused(
+                eligible,
+                8,
+                lambda message: _has_role(message, "bcc")
+                and message["sender_contact_id"] == MAYA
+                and all(_has(message, person) for person in PROJECT_TO),
+            )
+        )
+        if len(forced) != 18:
+            raise RuntimeError(f"{split} could not reserve routine S05 and legitimate Bcc examples")
         for message in forced:
             self.used.add(message["message_id"])
         remaining_pool = [message for message in eligible if message["message_id"] not in self.used]
