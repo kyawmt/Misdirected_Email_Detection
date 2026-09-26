@@ -34,7 +34,7 @@ The cross-phase revision (`project_context/fixes_before_phase7.md`, Sections A, 
 | Active phase | None. Next: Phase 7 (simulated draft-review UI), when the user asks for it. |
 | Owner | Unassigned |
 
-Sections B and C are committed as `d760de7` on branch `v4-rerun-phases-3-6` (not yet merged into `main`). The fixes for the review of that commit (RB-01, RC-01 to RC-06 in `project_context/comments.md`) are in the working tree on the same branch and are not committed yet. The Phase 7 brief is `project_context/phase7.md`.
+Sections B and C are committed as `d760de7`, and the fixes for the review of that commit (RB-01, RC-01 to RC-06 in `project_context/comments.md`) as `b8092e7`. Both were merged into `main` by fast-forward on 2026-09-27 and are not pushed. The Phase 7 brief is `project_context/phase7.md`.
 
 ## Section B (code hygiene) — what changed
 
