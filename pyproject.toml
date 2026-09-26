@@ -1,7 +1,7 @@
 [project]
 name = "med-data"
-version = "0.3.0"
-description = "Fictional data and feature preparation for misdirected email detection"
+version = "0.4.0"
+description = "Fictional data, features, and model comparison for misdirected email detection"
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.26",
@@ -17,6 +17,7 @@ dev = [
 [project.scripts]
 med-data = "med_data.cli:main"
 med-features = "med_features.cli:main"
+med-models = "med_models.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

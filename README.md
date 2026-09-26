@@ -2,7 +2,7 @@
 
 A machine learning project exploring how to identify potentially unintended email recipients before a message is sent. The goal is to reduce accidental data loss while keeping interruptions to legitimate communication low.
 
-**Status: Phase 3 complete.** Requirements and a versioned fictional dataset are in place, and `med-features-v1` builds relationship, co-recipient, contact-similarity, and TF-IDF features for train and validation. Model training, thresholds, scoring, and the review UI have not started. No detection or latency results have been measured.
+**Status: Phase 4 complete.** Requirements, the fictional dataset `med-synth-v2`, and the feature specification `med-features-v1` are in place. `med-model-v1` compares an always-allow baseline, a behavioral rules score, logistic regression, and one small decision tree on train and validation. The selected scorer is an unweighted logistic regression that does not use content cosine. Thresholds, the scoring API, and the review UI have not started. No warning-budget or latency target has been measured.
 
 ## Intended behavior
 
@@ -41,7 +41,7 @@ flowchart LR
 
 Historical profiles must respect each draft's cutoff time. Training and serving will share feature definitions to reduce inconsistencies. Feedback will not trigger automatic retraining.
 
-Dataset construction uses **Python**, **pandas**, and **NumPy**. Feature preparation also uses **scikit-learn** for a frozen TF-IDF transformer. Later phases are planned around **FastAPI** and **Streamlit**, with versioned local files for model artifacts. Serving and modeling are not implemented. The feature specification does not emit a risk score.
+Dataset construction uses **Python**, **pandas**, and **NumPy**. Feature preparation and the model comparison use **scikit-learn**. Later phases are planned around **FastAPI** and **Streamlit**. The scoring API and review UI are not implemented. Model outputs are risk scores. No threshold is stored in `med-model-v1`.
 
 ## Research basis and techniques
 
@@ -54,7 +54,7 @@ The design draws on published work while keeping the initial methods interpretab
 | Stolfo et al. (2006), [*Behavior-based modeling and its application to Email analysis*](https://doi.org/10.1145/1149121.1149125), ACM TOIT 6(2), pp. 187–221 | Combine behavioral profiles and communication-group signals. Its viral-email experiments support anomaly-modeling ideas, not claims about accidental-recipient accuracy. |
 | Balasubramanyan, Carvalho & Cohen (2008), [*CutOnce — Recipient Recommendation and Leak Detection in Action*](https://cdn.aaai.org/Workshops/2008/WS-08-04/WS08-04-001.pdf), AAAI EMAIL Workshop | Use TF-IDF recipient profiles, frequency, recency, and pre-send feedback; evaluate a simple signal combination as an optional comparison. |
 
-Planned baselines include rules and logistic regression, followed by one small tree-based challenger. `med-features-v1` implements TF-IDF/cosine content similarity, relationship frequency and recency, co-recipient support, and contact-name/address similarity. No individual novelty signal defines whether a recipient was intended. A group-topic profile is still optional and is not in this feature specification.
+The recorded comparison is an always-allow baseline, a behavioral rules score, logistic regression, and one depth-limited decision tree. `med-features-v1` implements TF-IDF/cosine content similarity, relationship frequency and recency, co-recipient support, and contact-name/address similarity. No individual novelty signal defines whether a recipient was intended. A group-topic profile is still optional and is not in this feature specification.
 
 Maximum-risk aggregation, model choices, calibration, threshold policies, and operational monitoring are project adaptations or engineering extensions. This project is not a full reproduction of these papers, and their reported results are not performance claims for this system. In particular, identifying an injected wrong recipient in a ranking experiment is different from accurately warning on ordinary outbound traffic.
 
@@ -83,14 +83,22 @@ Misdirected_Email_Detection/
 │   │   ├── LABELING_GUIDE.md
 │   │   ├── DATASET_SPECIFICATION.md
 │   │   └── DATA_QUALITY_AND_LEAKAGE.md
-│   └── phase_3/
-│       ├── FEATURE_CATALOG.md
-│       ├── PROFILE_AND_TRANSFORM.md
-│       ├── FEATURE_QUALITY_REPORT.md
-│       └── TRAINING_SERVING_PARITY.md
+│   ├── phase_3/
+│   │   ├── FEATURE_CATALOG.md
+│   │   ├── PROFILE_AND_TRANSFORM.md
+│   │   ├── FEATURE_QUALITY_REPORT.md
+│   │   └── TRAINING_SERVING_PARITY.md
+│   └── phase_4/
+│       ├── EXPERIMENT_TABLE.md
+│       ├── COMPARISON.md
+│       ├── ABLATIONS.md
+│       ├── MODEL_ARTIFACT.md
+│       └── DECISION_RECORD.md
 ├── artifacts/med-features-v1/ # fitted text transformer and train/validation matrices
+├── artifacts/med-model-v1/    # selected scorer and experiment record
 ├── src/med_data/              # generator, scoring view, validation
 ├── src/med_features/          # shared feature transform
+├── src/med_models/            # baselines, ablations, and the selected scorer
 └── tests/
 ```
 
@@ -106,9 +114,11 @@ pytest
 python -m med_data validate --data data/med-synth-v2
 python -m med_features build --data data/med-synth-v2 --output artifacts/med-features-v1 \
   --quality-markdown docs/phase_3/FEATURE_QUALITY_REPORT.md
+python -m med_models run --features artifacts/med-features-v1 --data data/med-synth-v2 \
+  --output artifacts/med-model-v1 --docs docs/phase_4
 ```
 
-`pytest` rebuilds the dataset from seed `20260926` and checks it against the published files, then checks the feature contract against those files. `validate` reloads `data/med-synth-v2`, verifies SHA-256 checksums and parsed record counts, and runs the quality checklist. `med_features build` fits TF-IDF on sent mail before the validation window and writes recipient-level features for train and validation only. To write the tables again:
+`pytest` rebuilds the dataset from seed `20260926` and checks it against the published files, then checks the feature and model contracts. `validate` reloads `data/med-synth-v2`, verifies SHA-256 checksums and parsed record counts, and runs the quality checklist. `med_features build` fits TF-IDF on sent mail before the validation window and writes recipient-level features for train and validation only. `med_models run` repeats the recorded comparison and rewrites `med-model-v1`. It does not score the frozen test subsets and does not choose a threshold. To write the tables again:
 
 ```bash
 python -m med_data build --output data/med-synth-v2
@@ -116,7 +126,7 @@ python -m med_data build --output data/med-synth-v2
 
 The published build is `med-synth-v2` (generator `1.1.0`). Product-like mail uses a **simulation assumption of 0.5% misdirected emails**. The training subset is enriched to 10% and is not an operating point. `test_product_like` and `test_diagnostic` are frozen for this version. The feature build does not write those subsets.
 
-Read the [feature catalog](docs/phase_3/FEATURE_CATALOG.md), [profile and transform contract](docs/phase_3/PROFILE_AND_TRANSFORM.md), [feature quality report](docs/phase_3/FEATURE_QUALITY_REPORT.md), and [training/serving parity notes](docs/phase_3/TRAINING_SERVING_PARITY.md) for the current signals. The [data dictionary](docs/phase_2/DATA_DICTIONARY.md), [labeling guide](docs/phase_2/LABELING_GUIDE.md), [dataset specification](docs/phase_2/DATASET_SPECIFICATION.md), and [quality and leakage checklist](docs/phase_2/DATA_QUALITY_AND_LEAKAGE.md) describe the tables and the rules that keep future mail and scenario answers out of a scoring view. The [scenarios](docs/phase_1/SCENARIOS.md), [input/output specification](docs/phase_1/INPUT_OUTPUT_SPECIFICATION.md), and [acceptance criteria](docs/phase_1/ACCEPTANCE_CRITERIA.md) still describe the product contract. Model comparison and application startup come in later phases.
+Read the [decision record](docs/phase_4/DECISION_RECORD.md), [experiment table](docs/phase_4/EXPERIMENT_TABLE.md), [comparison](docs/phase_4/COMPARISON.md), and [ablations](docs/phase_4/ABLATIONS.md) for the recorded runs. The [feature catalog](docs/phase_3/FEATURE_CATALOG.md), [profile and transform contract](docs/phase_3/PROFILE_AND_TRANSFORM.md), [feature quality report](docs/phase_3/FEATURE_QUALITY_REPORT.md), and [training/serving parity notes](docs/phase_3/TRAINING_SERVING_PARITY.md) describe the signals. The [data dictionary](docs/phase_2/DATA_DICTIONARY.md), [labeling guide](docs/phase_2/LABELING_GUIDE.md), [dataset specification](docs/phase_2/DATASET_SPECIFICATION.md), and [quality and leakage checklist](docs/phase_2/DATA_QUALITY_AND_LEAKAGE.md) describe the tables. The [scenarios](docs/phase_1/SCENARIOS.md), [input/output specification](docs/phase_1/INPUT_OUTPUT_SPECIFICATION.md), and [acceptance criteria](docs/phase_1/ACCEPTANCE_CRITERIA.md) still describe the product contract. Application startup comes in a later phase.
 
 ## Development roadmap
 
@@ -125,7 +135,7 @@ Read the [feature catalog](docs/phase_3/FEATURE_CATALOG.md), [profile and transf
 | 1 | Product definition, scenarios, contracts, and measurable requirements | Complete — documentation |
 | 2 | Fictional histories, synthetic mistakes, labeling, and chronological splits | Complete — `med-synth-v2` |
 | 3 | Behavioral and text features with consistent historical lookup | Complete — `med-features-v1` |
-| 4 | Baselines, model comparison, and feature ablations | Planned |
+| 4 | Baselines, model comparison, and feature ablations | Complete — `med-model-v1` |
 | 5 | Evaluation, calibration if needed, and threshold selection | Planned |
 | 6 | Scoring API, validation, explanations, and failure handling | Planned |
 | 7 | Interactive draft review and simulated decisions | Planned |
@@ -135,7 +145,7 @@ Read the [feature catalog](docs/phase_3/FEATURE_CATALOG.md), [profile and transf
 
 ## Limitations and data disclaimer
 
-The project uses **fictional identities and synthetic email**. `med-synth-v2` is a generated record with stipulated labels, not a sample of real mail. Results on that data, once any exist, will show behavior under the generator's assumptions and will not establish real-world detection accuracy. The 0.5% product-like prevalence is a simulation assumption; the 10% training mix is enrichment for later fitting. Diagnostic challenge rows are dependent within a `family_id` and are not a substitute for the product-like test. Template language repeats across time. Reference, ticket, and date slots are stripped before TF-IDF, and that does not remove shared topic wording. Restricted relationships also keep separate topics, so content cosine on the training rows separates stipulated mistakes from ordinary repeat mail for a reason that is built into the generator. A later comparison has to include a behavior-only model. The training rows also contain no misdirected first contact. The product-like test contains 10 misdirected emails, so later recall on that set will be coarse. No model has been trained, so no precision, recall, or false-intervention rate has been measured. Feature matrices for train and validation are descriptive only.
+The project uses **fictional identities and synthetic email**. `med-synth-v2` is a generated record with stipulated labels, not a sample of real mail. Results on that data, once any exist, will show behavior under the generator's assumptions and will not establish real-world detection accuracy. The 0.5% product-like prevalence is a simulation assumption; the 10% training mix is enrichment for later fitting. Diagnostic challenge rows are dependent within a `family_id` and are not a substitute for the product-like test. Template language repeats across time. Reference, ticket, and date slots are stripped before TF-IDF, and that does not remove shared topic wording. Restricted relationships also keep separate topics, so content cosine separates stipulated mistakes from ordinary repeat mail for a reason that is built into the generator. The recorded comparison therefore reports a behavior-only model beside the all-features model. On product-like validation, the selected behavior-only logistic regression has email average precision 0.891 with a family-bootstrap interval of 0.583 to 1.000 (5 positive emails out of 1,000). The all-features and content-only fits reach 1.000 on those same 5 emails. That perfect score restates the generator. The selected model does not use content cosine. Its regularization constant is 100, the top of the training grid, and its coefficients on overlapping counts are not separate effects. Unobserved recency is filled with the training median of observed recency, which is one minute on this training set, and then log-transformed. Rewriting the product-like mistakes as first contacts still moves their median risk from 0.9998 to about 0, so this version does not catch a mistaken first contact. The training rows contain no misdirected first contact. Legitimate rows often have another message to the same recipient less than five minutes earlier (66.5% in train, 68.3% on product-like validation), and no misdirected row does, so part of the behavior-only score is that generator timing. A one-day recency floor is reported as a diagnostic and is not used for selection. The product-like validation interval is wide, and the product-like test contains 10 misdirected emails, so later recall on that test will be coarse. No warning threshold has been chosen, so no false-intervention rate has been measured. Diagnostic rates are not 0.5% prevalence results.
 
 The initial scope is English plain-text drafts with 1–20 unique recipients in a fictional environment. Mailbox integration, actual sending or blocking, attachment inspection, enterprise authentication, and production-scale operation are outside scope. Missing intended recipients without an unintended addressee are also outside the detection task.
 
