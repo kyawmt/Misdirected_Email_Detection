@@ -2,7 +2,7 @@
 
 A machine learning project exploring how to identify potentially unintended email recipients before a message is sent. The goal is to reduce accidental data loss while keeping interruptions to legitimate communication low.
 
-**Status: requirements and product specifications complete; implementation has not started.** The repository currently contains documentation only. No dataset, trained model, scoring service, application, or measured performance results are available yet.
+**Status: Phase 2 complete.** Requirements are specified, and a versioned fictional dataset with labels, chronological splits, and leakage checks is included. Feature engineering, model training, scoring, and the review UI have not started. No detection or latency results have been measured.
 
 ## Intended behavior
 
@@ -41,7 +41,7 @@ flowchart LR
 
 Historical profiles must respect each draft's cutoff time. Training and serving will share feature definitions to reduce inconsistencies. Feedback will not trigger automatic retraining.
 
-The proposed stack is **Python**, **pandas/NumPy**, **scikit-learn**, **FastAPI**, and **Streamlit**, with SQLite or versioned local files for lightweight storage. These are planned choices, not installed dependencies or implemented components.
+Dataset construction uses **Python**, **pandas**, and **NumPy**. Later phases are planned around **scikit-learn**, **FastAPI**, and **Streamlit**, with versioned local files for model artifacts. Those serving and modeling pieces are not implemented.
 
 ## Research basis and techniques
 
@@ -66,32 +66,55 @@ Evaluation will compare detection recall within the interruption budget, report 
 
 ## Repository structure
 
-The current documentation files are:
-
 ```text
 Misdirected_Email_Detection/
 ├── README.md
-├── .gitignore
-└── docs/
-    └── phase_1/
-        ├── PRODUCT_BRIEF.md
-        ├── SCENARIOS.md
-        ├── INPUT_OUTPUT_SPECIFICATION.md
-        └── ACCEPTANCE_CRITERIA.md
+├── pyproject.toml
+├── data/
+│   └── med-synth-v1/          # fictional tables, manifest, quality report
+├── docs/
+│   ├── phase_1/
+│   │   ├── PRODUCT_BRIEF.md
+│   │   ├── SCENARIOS.md
+│   │   ├── INPUT_OUTPUT_SPECIFICATION.md
+│   │   └── ACCEPTANCE_CRITERIA.md
+│   └── phase_2/
+│       ├── DATA_DICTIONARY.md
+│       ├── LABELING_GUIDE.md
+│       ├── DATASET_SPECIFICATION.md
+│       └── DATA_QUALITY_AND_LEAKAGE.md
+├── src/med_data/              # generator, scoring view, validation
+└── tests/
 ```
 
 ## Setup and usage
 
-No runtime setup is needed at this stage. Browse the Markdown files on GitHub or open a local copy in a Markdown viewer.
+Python 3.11 or newer is required. From the repository root:
 
-For a documentation walkthrough, read the [scenarios](docs/phase_1/SCENARIOS.md), inspect the [input/output specification](docs/phase_1/INPUT_OUTPUT_SPECIFICATION.md), and review the [acceptance criteria](docs/phase_1/ACCEPTANCE_CRITERIA.md). These describe desired behavior, not executable examples. Installation, dataset preparation, training, and application startup instructions will be added when those components exist.
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+pytest
+python -m med_data validate --data data/med-synth-v1
+```
+
+`pytest` rebuilds the dataset from seed `20260926` and checks it against the published files. `validate` reloads `data/med-synth-v1`, verifies SHA-256 checksums, and runs the quality checklist. To write the tables again:
+
+```bash
+python -m med_data build --output data/med-synth-v1
+```
+
+The published build is `med-synth-v1` (generator `1.0.0`). Product-like mail uses a **simulation assumption of 0.5% misdirected emails**. The training subset is enriched to 10% and is not an operating point. `test_product_like` and `test_diagnostic` are frozen.
+
+Read the [data dictionary](docs/phase_2/DATA_DICTIONARY.md), [labeling guide](docs/phase_2/LABELING_GUIDE.md), [dataset specification](docs/phase_2/DATASET_SPECIFICATION.md), and [quality and leakage checklist](docs/phase_2/DATA_QUALITY_AND_LEAKAGE.md) for the tables and the rules that keep future mail and scenario answers out of a scoring view. The [scenarios](docs/phase_1/SCENARIOS.md), [input/output specification](docs/phase_1/INPUT_OUTPUT_SPECIFICATION.md), and [acceptance criteria](docs/phase_1/ACCEPTANCE_CRITERIA.md) still describe the product contract. Training and application startup come in later phases.
 
 ## Development roadmap
 
 | Phase | Scope | Status |
 | --- | --- | --- |
 | 1 | Product definition, scenarios, contracts, and measurable requirements | Complete — documentation |
-| 2 | Fictional histories, synthetic mistakes, labeling, and chronological splits | Planned |
+| 2 | Fictional histories, synthetic mistakes, labeling, and chronological splits | Complete — `med-synth-v1` |
 | 3 | Behavioral and text features with consistent historical lookup | Planned |
 | 4 | Baselines, model comparison, and feature ablations | Planned |
 | 5 | Evaluation, calibration if needed, and threshold selection | Planned |
@@ -103,7 +126,7 @@ For a documentation walkthrough, read the [scenarios](docs/phase_1/SCENARIOS.md)
 
 ## Limitations and data disclaimer
 
-The project is designed around **fictional identities and synthetic email data**; currently, only scenario narratives exist. Future results on that data will demonstrate behavior under controlled assumptions and will not establish real-world detection accuracy.
+The project uses **fictional identities and synthetic email**. `med-synth-v1` is a generated record with stipulated labels, not a sample of real mail. Results on that data, once any exist, will show behavior under the generator's assumptions and will not establish real-world detection accuracy. The 0.5% product-like prevalence is a simulation assumption; the 10% training mix is enrichment for later fitting. Diagnostic challenge rows are dependent within a `family_id` and are not a substitute for the product-like test. No model has been trained, so no precision, recall, or false-intervention rate has been measured.
 
 The initial scope is English plain-text drafts with 1–20 unique recipients in a fictional environment. Mailbox integration, actual sending or blocking, attachment inspection, enterprise authentication, and production-scale operation are outside scope. Missing intended recipients without an unintended addressee are also outside the detection task.
 

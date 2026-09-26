@@ -1,0 +1,175 @@
+{
+  "dataset_version": "med-synth-v1",
+  "generator_version": "1.0.0",
+  "passed": true,
+  "checks": [
+    {
+      "id": "Q01",
+      "name": "Required columns are present",
+      "passed": true,
+      "detail": "9 tables"
+    },
+    {
+      "id": "Q02",
+      "name": "Primary keys are unique",
+      "passed": true,
+      "detail": "primary keys unique"
+    },
+    {
+      "id": "Q03",
+      "name": "Foreign keys resolve",
+      "passed": true,
+      "detail": "foreign keys resolve"
+    },
+    {
+      "id": "Q04",
+      "name": "Addresses use reserved example domains",
+      "passed": true,
+      "detail": "79 contacts"
+    },
+    {
+      "id": "Q05",
+      "name": "Timestamps sit inside their split windows",
+      "passed": true,
+      "detail": "timestamps match split windows"
+    },
+    {
+      "id": "Q06",
+      "name": "Splits are chronological",
+      "passed": true,
+      "detail": "warmup, then train, validation, and test"
+    },
+    {
+      "id": "Q07",
+      "name": "Labels are complete synthetic stipulations",
+      "passed": true,
+      "detail": "9195 recipient labels"
+    },
+    {
+      "id": "Q08",
+      "name": "Recipient lists are within the product bounds",
+      "passed": true,
+      "detail": "1 to 20 unique recipients"
+    },
+    {
+      "id": "Q09",
+      "name": "Product-like prevalence matches the simulation contract",
+      "passed": true,
+      "detail": "train 100/1000; validation_product_like 5/1000; test_product_like 10/2000"
+    },
+    {
+      "id": "Q10",
+      "name": "Each draft family stays in one split and subset",
+      "passed": true,
+      "detail": "4084 families"
+    },
+    {
+      "id": "Q11",
+      "name": "Non-empty message text does not cross splits",
+      "passed": true,
+      "detail": "28412 non-empty hashes"
+    },
+    {
+      "id": "Q12",
+      "name": "Threads do not cross splits",
+      "passed": true,
+      "detail": "14213 threads"
+    },
+    {
+      "id": "Q13",
+      "name": "Misdirected drafts are not sent mail",
+      "passed": true,
+      "detail": "178 counterfactual drafts"
+    },
+    {
+      "id": "Q14",
+      "name": "Non-counterfactual drafts match a sent message",
+      "passed": true,
+      "detail": "3965 drafts correspond to sent mail"
+    },
+    {
+      "id": "Q15",
+      "name": "Visible history excludes the future, the family, and copied text",
+      "passed": true,
+      "detail": "history cutoff holds for every draft"
+    },
+    {
+      "id": "Q16",
+      "name": "Participants are already in the directory",
+      "passed": true,
+      "detail": "directory dates respected"
+    },
+    {
+      "id": "Q17",
+      "name": "Sent mail keeps scenario relationships on their topics",
+      "passed": true,
+      "detail": "relationship topics held in sent mail"
+    },
+    {
+      "id": "Q18",
+      "name": "Scenario drafts match their stipulated structure",
+      "passed": true,
+      "detail": "S01 through S09 structures hold"
+    },
+    {
+      "id": "Q19",
+      "name": "The canonical walkthrough cast is in the frozen diagnostic set",
+      "passed": true,
+      "detail": "15 walkthrough drafts"
+    },
+    {
+      "id": "Q20",
+      "name": "Uncertain and unaccepted feedback does not change labels",
+      "passed": true,
+      "detail": "3 illustrative feedback rows, none accepted"
+    },
+    {
+      "id": "Q21",
+      "name": "A scoring view omits labels and generator metadata",
+      "passed": true,
+      "detail": "scoring view for d000069"
+    },
+    {
+      "id": "Q22",
+      "name": "The test subsets are frozen",
+      "passed": true,
+      "detail": "test_product_like and test_diagnostic frozen"
+    },
+    {
+      "id": "Q23",
+      "name": "Every row carries the dataset version",
+      "passed": true,
+      "detail": "med-synth-v1"
+    },
+    {
+      "id": "Q24",
+      "name": "Empty subject or body occurs only on little-text drafts",
+      "passed": true,
+      "detail": "27 drafts with empty subject or body"
+    },
+    {
+      "id": "Q25",
+      "name": "Invalid fixtures are outside the labeled tables",
+      "passed": true,
+      "detail": "4 invalid fixtures"
+    },
+    {
+      "id": "Q26",
+      "name": "Hard negatives and diagnostic scenarios are present",
+      "passed": true,
+      "detail": "scenario coverage holds"
+    },
+    {
+      "id": "Q27",
+      "name": "Sent message timestamps are unique",
+      "passed": true,
+      "detail": "28414 unique sent timestamps"
+    },
+    {
+      "id": "Q28",
+      "name": "Topic markers appear in non-empty bodies of that topic",
+      "passed": true,
+      "detail": "topic markers present"
+    }
+  ]
+}

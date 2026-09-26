@@ -1,0 +1,150 @@
+{
+  "dataset_version": "med-synth-v1",
+  "generator_version": "1.0.0",
+  "seed": 20260926,
+  "prevalence_assumption": {
+    "product_like_rate": "0.005",
+    "product_like_meaning": "Five misdirected emails per 1,000 product-like emails.",
+    "train_enriched_rate": "0.10",
+    "statement": "Product-like prevalence is a simulation assumption, not a measured real-world rate. The training subset is enriched and is not an operating point. Precision at a fixed recall and false-positive rate changes when prevalence changes."
+  },
+  "freeze": {
+    "subsets": [
+      "test_product_like",
+      "test_diagnostic"
+    ],
+    "policy": "Do not use the frozen test subsets to choose features, models, or thresholds. A new seed or generator version requires a new dataset version."
+  },
+  "splits": {
+    "warmup": {
+      "start": "2024-01-08T00:00:00Z",
+      "end": "2024-07-01T00:00:00Z",
+      "end_exclusive": true
+    },
+    "train": {
+      "start": "2024-07-01T00:00:00Z",
+      "end": "2025-03-31T00:00:00Z",
+      "end_exclusive": true
+    },
+    "validation": {
+      "start": "2025-03-31T00:00:00Z",
+      "end": "2025-09-01T00:00:00Z",
+      "end_exclusive": true
+    },
+    "test": {
+      "start": "2025-09-01T00:00:00Z",
+      "end": "2026-01-05T00:00:00Z",
+      "end_exclusive": true
+    }
+  },
+  "row_counts": {
+    "messages": 28414,
+    "drafts": 4143,
+    "subsets": {
+      "test_diagnostic": {
+        "drafts": 79,
+        "misdirected": 35,
+        "legitimate": 44
+      },
+      "test_product_like": {
+        "drafts": 2000,
+        "misdirected": 10,
+        "legitimate": 1990
+      },
+      "train": {
+        "drafts": 1000,
+        "misdirected": 100,
+        "legitimate": 900
+      },
+      "validation_diagnostic": {
+        "drafts": 64,
+        "misdirected": 28,
+        "legitimate": 36
+      },
+      "validation_product_like": {
+        "drafts": 1000,
+        "misdirected": 5,
+        "legitimate": 995
+      }
+    },
+    "seed": 20260926,
+    "generator_version": "1.0.0",
+    "dataset_version": "med-synth-v1"
+  },
+  "model_input_denylist": [
+    "asserted_intended",
+    "body_hash",
+    "category",
+    "confidence",
+    "dataset_version",
+    "detail",
+    "expected_status",
+    "family_id",
+    "feedback_id",
+    "fixture_id",
+    "frozen",
+    "generator_topic",
+    "intended",
+    "is_counterfactual",
+    "is_misdirected_email",
+    "is_walkthrough",
+    "label_confidence",
+    "label_source",
+    "message_kind",
+    "notes",
+    "reason",
+    "review_status",
+    "reviewer_id",
+    "scenario_id",
+    "scenario_variant",
+    "source_message_id",
+    "split",
+    "stipulation",
+    "submitted_at",
+    "subset",
+    "thread_id",
+    "withheld_contact_id"
+  ],
+  "files": {
+    "contacts.csv": {
+      "sha256": "d4d57e46c45b5fea5e3afaf5b0d7d789c3b3ce23f67a397cbff1c81660123436",
+      "rows": 79
+    },
+    "messages.csv": {
+      "sha256": "48c34e33fff5c1162515dc53190614536bd854eff6484e21a6aede4a998615fb",
+      "rows": 142022
+    },
+    "message_recipients.csv": {
+      "sha256": "9bc01045c01b586c08c67b627e28daf06ad108fd12db39d428bc4a534ffeecf0",
+      "rows": 45073
+    },
+    "drafts.csv": {
+      "sha256": "d164d0dc0dbf435b6b855f46e26ff7fcdf8d01447b681d962248c06a05bb7366",
+      "rows": 28839
+    },
+    "draft_recipients.csv": {
+      "sha256": "8856334cd61d4f8932bf30e8332f8f59797d3d0b3e0d24725f65335e37226033",
+      "rows": 9195
+    },
+    "labels.csv": {
+      "sha256": "40717037e7793d0eaef5f053e41417c7d24f61484819a281826d9790819d97a9",
+      "rows": 9195
+    },
+    "reviewer_feedback.csv": {
+      "sha256": "e30de46365f6c33edc2beb518bdff57c3a3c2d98b48e31bcaac6cbd388585a38",
+      "rows": 3
+    },
+    "split_manifest.csv": {
+      "sha256": "8a97e628cc29c4061ce8616afd4a53c4738702424481b9c0651ed35053228a35",
+      "rows": 4143
+    },
+    "invalid_fixtures.csv": {
+      "sha256": "480b563cf6f64e99726da69b503709b92cebe04f7e9e7044cb3c34a29dfc1532",
+      "rows": 4
+    },
+    "quality_report.json": {
+      "sha256": "36e03d4ee947be3959f17466e311c8a66f7bf58be8c1fe866b7e8ff83c8f5c19",
+      "rows": 0
+    }
+  }
+}

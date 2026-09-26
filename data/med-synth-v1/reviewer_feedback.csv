@@ -1,0 +1,4 @@
+feedback_id,draft_id,contact_id,reviewer_id,submitted_at,asserted_intended,confidence,review_status,notes,dataset_version
+fb_0001,d000121,c_noah,c_quinn,2024-07-02T09:01:00Z,,uncertain,pending_review,Reviewer could not tell whether the recipient was intended.,med-synth-v1
+fb_0002,d000131,c_noah,c_quinn,2024-07-02T09:02:00Z,false,certain,pending_review,"Reviewer asserted a mistake, and the assertion is still pending.",med-synth-v1
+fb_0003,d000132,c_noah,c_quinn,2024-07-02T09:07:00Z,true,certain,rejected,Reviewer assertion was rejected and does not change the label.,med-synth-v1

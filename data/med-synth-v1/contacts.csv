@@ -1,0 +1,80 @@
+contact_id,display_name,email_address,domain,is_internal,department,directory_visible_from,dataset_version
+c_alex_chan,Alex Chan,alex.chan@demo.example,demo.example,true,Staffing,2024-01-01T00:00:00Z,med-synth-v1
+c_alex_chen,Alex Chen,alex.chen@demo.example,demo.example,true,Workplace,2024-01-01T00:00:00Z,med-synth-v1
+c_avery,Avery Nguyen,avery@demo.example,demo.example,true,Staffing,2024-01-01T00:00:00Z,med-synth-v1
+c_chris,Chris Patel,chris@demo.example,demo.example,true,Finance,2024-01-01T00:00:00Z,med-synth-v1
+c_cold_026,Casey Ibarra,casey.ibarra@demo.example,demo.example,true,Operations,2024-07-10T21:00:00Z,med-synth-v1
+c_cold_027,Drew Ibarra,drew.ibarra@demo.example,demo.example,true,Operations,2024-09-11T21:01:00Z,med-synth-v1
+c_cold_028,Emery Ibarra,emery.ibarra@demo.example,demo.example,true,Operations,2024-11-20T21:02:00Z,med-synth-v1
+c_cold_029,Finley Ibarra,finley.ibarra@demo.example,demo.example,true,Operations,2025-01-22T21:03:00Z,med-synth-v1
+c_cold_038,Oakley Ibarra,oakley.ibarra@demo.example,demo.example,true,Operations,2025-04-09T21:00:00Z,med-synth-v1
+c_cold_039,Parker Ibarra,parker.ibarra@demo.example,demo.example,true,Operations,2025-05-28T21:01:00Z,med-synth-v1
+c_cold_040,Reese Ibarra,reese.ibarra@demo.example,demo.example,true,Operations,2025-07-16T21:02:00Z,med-synth-v1
+c_cold_051,Drew Okada,drew.okada@demo.example,demo.example,true,Operations,2025-09-10T21:00:00Z,med-synth-v1
+c_cold_052,Emery Okada,emery.okada@demo.example,demo.example,true,Operations,2025-10-08T21:01:00Z,med-synth-v1
+c_cold_053,Finley Okada,finley.okada@demo.example,demo.example,true,Operations,2025-11-05T21:02:00Z,med-synth-v1
+c_cold_054,Gray Okada,gray.okada@demo.example,demo.example,true,Operations,2025-12-03T21:03:00Z,med-synth-v1
+c_devon,Devon Clark,devon@demo.example,demo.example,true,Staffing,2024-01-01T00:00:00Z,med-synth-v1
+c_elena,Elena Rossi,elena@demo.example,demo.example,true,Program Delivery,2024-01-01T00:00:00Z,med-synth-v1
+c_elliot,Elliot Berg,elliot.berg@demo.example,demo.example,true,Operations,2026-01-02T17:00:00Z,med-synth-v1
+c_fac_001,Blair Santos,blair.santos@demo.example,demo.example,true,Facilities,2024-01-01T00:00:00Z,med-synth-v1
+c_fac_002,Casey Santos,casey.santos@demo.example,demo.example,true,Facilities,2024-01-01T00:00:00Z,med-synth-v1
+c_fac_003,Drew Santos,drew.santos@demo.example,demo.example,true,Facilities,2024-01-01T00:00:00Z,med-synth-v1
+c_fac_004,Emery Santos,emery.santos@demo.example,demo.example,true,Facilities,2024-01-01T00:00:00Z,med-synth-v1
+c_fac_005,Finley Santos,finley.santos@demo.example,demo.example,true,Facilities,2024-01-01T00:00:00Z,med-synth-v1
+c_fac_006,Gray Santos,gray.santos@demo.example,demo.example,true,Facilities,2024-01-01T00:00:00Z,med-synth-v1
+c_fac_007,Hayden Santos,hayden.santos@demo.example,demo.example,true,Facilities,2024-01-01T00:00:00Z,med-synth-v1
+c_fac_008,Indigo Santos,indigo.santos@demo.example,demo.example,true,Facilities,2024-01-01T00:00:00Z,med-synth-v1
+c_fac_009,Jules Santos,jules.santos@demo.example,demo.example,true,Facilities,2024-01-01T00:00:00Z,med-synth-v1
+c_fac_010,Kendall Santos,kendall.santos@demo.example,demo.example,true,Facilities,2024-01-01T00:00:00Z,med-synth-v1
+c_fac_011,Logan Santos,logan.santos@demo.example,demo.example,true,Facilities,2024-01-01T00:00:00Z,med-synth-v1
+c_fac_012,Marlow Santos,marlow.santos@demo.example,demo.example,true,Facilities,2024-01-01T00:00:00Z,med-synth-v1
+c_fac_013,Nico Santos,nico.santos@demo.example,demo.example,true,Facilities,2024-01-01T00:00:00Z,med-synth-v1
+c_fac_014,Oakley Santos,oakley.santos@demo.example,demo.example,true,Facilities,2024-01-01T00:00:00Z,med-synth-v1
+c_fac_015,Parker Santos,parker.santos@demo.example,demo.example,true,Facilities,2024-01-01T00:00:00Z,med-synth-v1
+c_fac_016,Reese Santos,reese.santos@demo.example,demo.example,true,Facilities,2024-01-01T00:00:00Z,med-synth-v1
+c_fac_017,Shay Santos,shay.santos@demo.example,demo.example,true,Facilities,2024-01-01T00:00:00Z,med-synth-v1
+c_hana,Hana Ito,hana@demo.example,demo.example,true,Facilities,2024-01-01T00:00:00Z,med-synth-v1
+c_jamie_lee,Jamie Lee,jamie.lee@demo.example,demo.example,true,Staffing,2024-01-01T00:00:00Z,med-synth-v1
+c_jamie_li,Jamie Li,jamie.li@demo.example,demo.example,true,Workplace,2024-01-01T00:00:00Z,med-synth-v1
+c_jordan,Jordan Hale,jordan@demo.example,demo.example,true,Program Delivery,2025-12-31T17:00:00Z,med-synth-v1
+c_lee,Lee Park,lee@vendor.example,vendor.example,false,Vendor Scheduling,2024-01-01T00:00:00Z,med-synth-v1
+c_lena,Lena Owens,lena@demo.example,demo.example,true,Program Delivery,2024-01-01T00:00:00Z,med-synth-v1
+c_marcus,Marcus Bell,marcus@demo.example,demo.example,true,Finance,2024-01-01T00:00:00Z,med-synth-v1
+c_maya,Maya Okonkwo,maya@demo.example,demo.example,true,Operations,2024-01-01T00:00:00Z,med-synth-v1
+c_morgan_shaw,Morgan Shaw,morgan.shaw@demo.example,demo.example,true,Staffing,2024-01-01T00:00:00Z,med-synth-v1
+c_morgan_zhao,Morgan Zhao,morgan.zhao@demo.example,demo.example,true,Workplace,2024-01-01T00:00:00Z,med-synth-v1
+c_new_018,Tatum Santos,tatum.santos@demo.example,demo.example,true,Program Delivery,2024-07-10T18:00:00Z,med-synth-v1
+c_new_019,Umber Santos,umber.santos@demo.example,demo.example,true,Program Delivery,2024-09-11T18:01:00Z,med-synth-v1
+c_new_020,Val Santos,val.santos@demo.example,demo.example,true,Program Delivery,2024-11-20T18:02:00Z,med-synth-v1
+c_new_021,Winter Santos,winter.santos@demo.example,demo.example,true,Program Delivery,2025-01-22T18:03:00Z,med-synth-v1
+c_new_022,Yael Santos,yael.santos@northwind.example,northwind.example,false,External Partner,2024-07-10T19:00:00Z,med-synth-v1
+c_new_023,Arden Santos,arden.santos@harborlight.example,harborlight.example,false,External Partner,2024-09-11T19:01:00Z,med-synth-v1
+c_new_024,Briar Santos,briar.santos@brightlane.example,brightlane.example,false,External Partner,2024-11-20T19:02:00Z,med-synth-v1
+c_new_025,Blair Ibarra,blair.ibarra@cedarline.example,cedarline.example,false,External Partner,2025-01-22T19:03:00Z,med-synth-v1
+c_new_030,Gray Ibarra,gray.ibarra@demo.example,demo.example,true,Program Delivery,2025-04-09T18:00:00Z,med-synth-v1
+c_new_031,Hayden Ibarra,hayden.ibarra@demo.example,demo.example,true,Program Delivery,2025-05-14T18:01:00Z,med-synth-v1
+c_new_032,Indigo Ibarra,indigo.ibarra@demo.example,demo.example,true,Program Delivery,2025-06-18T18:02:00Z,med-synth-v1
+c_new_033,Jules Ibarra,jules.ibarra@demo.example,demo.example,true,Program Delivery,2025-07-23T18:03:00Z,med-synth-v1
+c_new_034,Kendall Ibarra,kendall.ibarra@dovetail.example,dovetail.example,false,External Partner,2025-04-09T19:00:00Z,med-synth-v1
+c_new_035,Logan Ibarra,logan.ibarra@eastfield.example,eastfield.example,false,External Partner,2025-05-14T19:01:00Z,med-synth-v1
+c_new_036,Marlow Ibarra,marlow.ibarra@fairhaven.example,fairhaven.example,false,External Partner,2025-06-18T19:02:00Z,med-synth-v1
+c_new_037,Nico Ibarra,nico.ibarra@goldacre.example,goldacre.example,false,External Partner,2025-07-23T19:03:00Z,med-synth-v1
+c_new_041,Shay Ibarra,shay.ibarra@demo.example,demo.example,true,Program Delivery,2025-09-10T18:00:00Z,med-synth-v1
+c_new_042,Tatum Ibarra,tatum.ibarra@demo.example,demo.example,true,Program Delivery,2025-10-01T18:01:00Z,med-synth-v1
+c_new_043,Umber Ibarra,umber.ibarra@demo.example,demo.example,true,Program Delivery,2025-10-22T18:02:00Z,med-synth-v1
+c_new_044,Val Ibarra,val.ibarra@demo.example,demo.example,true,Program Delivery,2025-11-12T18:03:00Z,med-synth-v1
+c_new_045,Winter Ibarra,winter.ibarra@demo.example,demo.example,true,Program Delivery,2025-12-03T18:04:00Z,med-synth-v1
+c_new_046,Yael Ibarra,yael.ibarra@highmeadow.example,highmeadow.example,false,External Partner,2025-09-10T19:00:00Z,med-synth-v1
+c_new_047,Arden Ibarra,arden.ibarra@ionbridge.example,ionbridge.example,false,External Partner,2025-10-01T19:01:00Z,med-synth-v1
+c_new_048,Briar Ibarra,briar.ibarra@juniperlane.example,juniperlane.example,false,External Partner,2025-10-22T19:02:00Z,med-synth-v1
+c_new_049,Blair Okada,blair.okada@keelson.example,keelson.example,false,External Partner,2025-11-12T19:03:00Z,med-synth-v1
+c_new_050,Casey Okada,casey.okada@larkspur.example,larkspur.example,false,External Partner,2025-12-03T19:04:00Z,med-synth-v1
+c_noah,Noah Kim,noah@demo.example,demo.example,true,Program Delivery,2024-01-01T00:00:00Z,med-synth-v1
+c_pat,Pat Okada,pat@parts.example,parts.example,false,Vendor Scheduling,2024-01-01T00:00:00Z,med-synth-v1
+c_priya,Priya Shah,priya@demo.example,demo.example,true,People,2024-01-01T00:00:00Z,med-synth-v1
+c_quinn,Quinn Adler,quinn@demo.example,demo.example,true,People,2024-01-01T00:00:00Z,med-synth-v1
+c_ren,Ren Cho,ren@logistics.example,logistics.example,false,Vendor Scheduling,2024-01-01T00:00:00Z,med-synth-v1
+c_rina,Rina Costa,rina@newpartner.example,newpartner.example,false,External Partner,2025-12-31T17:10:00Z,med-synth-v1
+c_sam,Sam Rivera,sam@demo.example,demo.example,true,Facilities,2024-01-01T00:00:00Z,med-synth-v1
+c_taylor,Taylor Brooks,taylor@demo.example,demo.example,true,Program Delivery,2024-01-01T00:00:00Z,med-synth-v1
