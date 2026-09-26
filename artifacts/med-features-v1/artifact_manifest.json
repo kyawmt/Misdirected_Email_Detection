@@ -1,0 +1,33 @@
+{
+  "feature_spec_version": "med-features-v1",
+  "files": {
+    "feature_schema.json": {
+      "bytes": 4978,
+      "sha256": "1a26f32fa8ff77b54ae3bc82224a343a197f7a2b92e89d1e26e07b449bdd1a81"
+    },
+    "features_train.csv": {
+      "bytes": 519418,
+      "sha256": "d059a1fb701340bacc4f48f7f23012f5c2852888d684694cab0eeab011df6ae0"
+    },
+    "features_validation_diagnostic.csv": {
+      "bytes": 43486,
+      "sha256": "2a45128bb49428381c7a3995ab1f035865458487c951b3b8adaf03c69bd9e52d"
+    },
+    "features_validation_product_like.csv": {
+      "bytes": 507793,
+      "sha256": "f66814b993f23eeba818aa54e0113a3a9d73d9a946729195794d0cfff57a70f4"
+    },
+    "fit_metadata.json": {
+      "bytes": 4231,
+      "sha256": "8f702951b85a48f21568c392cfaab87cac05a333dba5267566c10789435c9a26"
+    },
+    "quality_report.json": {
+      "bytes": 58250,
+      "sha256": "4ee9ed34955bf154a4d056abcd9ae0ad39b961f775afd669afbdc5ba36744c57"
+    },
+    "text_transformer.joblib": {
+      "bytes": 16620,
+      "sha256": "98721935c7c4e08e3c71e6a19683c48738753ddfc64b23ce82e6b2676420a0dd"
+    }
+  }
+}
