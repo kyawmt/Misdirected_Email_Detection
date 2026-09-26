@@ -1,0 +1,57 @@
+{
+  "contract_version": "med-api-v1",
+  "boundary": "test client sends POST /assess until the response body is complete, in process, no network",
+  "server_boundary": "handler start after body read until the response dict is ready (duration_ms)",
+  "subset": "validation_product_like",
+  "warmup_calls": 20,
+  "measured_calls": 1000,
+  "concurrency": 1,
+  "statuses": {
+    "assessed": 1000
+  },
+  "client_p50_ms": 25.62762500019744,
+  "client_p95_ms": 345.83970172097906,
+  "client_max_ms": 492.5112089840695,
+  "server_p50_ms": 24.8385,
+  "server_p95_ms": 344.9883,
+  "server_max_ms": 491.449,
+  "cold_start_seconds": 1.3160337909939699,
+  "cold_start_includes": "app creation and startup: dataset read with checksums, bundle load with checksum checks, transformer load, directory and history index, history vectorization",
+  "target_p95_ms": 300.0,
+  "ac05": "not met",
+  "recipient_mix": {
+    "1": 526,
+    "2": 64,
+    "3": 69,
+    "4": 302,
+    "5": 38,
+    "6": 1
+  },
+  "parity": {
+    "assessed": 1000,
+    "decisions_matching_validation_table": 1000,
+    "max_abs_email_risk_difference": 2.4147350785597155e-15,
+    "draft_at_T_warn": {
+      "draft_id": "d001019",
+      "api_email_risk_score": 0.13455666515725057,
+      "T_warn": 0.13455666515724893,
+      "decision": "warn"
+    }
+  },
+  "versions": {
+    "contract_version": "med-api-v1",
+    "model_version": "med-model-v1",
+    "feature_spec_version": "med-features-v1",
+    "policy_version": "med-policy-v1",
+    "python": "3.11.14",
+    "fastapi": "0.141.1",
+    "scikit_learn": "1.9.1",
+    "numpy": "2.4.6"
+  },
+  "environment": {
+    "platform": "macOS-27.0-arm64-arm-64bit",
+    "machine": "arm64",
+    "processor": "arm",
+    "cpu_count": 10
+  }
+}

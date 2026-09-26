@@ -13,7 +13,8 @@ This file is the handoff for the next session. Standing rules are in [AGENTS.md]
 | 3 — Behavioral and text features | Complete | `med-features-v1`: shared transform, frozen TF-IDF, train/validation matrices. |
 | 4 — Baselines and model comparison | Complete | `med-model-v1`: always-allow, rules, logistic regression, one tree, ablations. No threshold. |
 | 5 — Evaluation and threshold policy | Complete | `med-policy-v1`: one warning cutoff on the risk score, blocking disabled, calibration not fit, one frozen test pass. |
-| 6 through 10 | Not started | No API, UI, monitoring, or deployment. |
+| 6 — Backend and scoring API | Complete | `med-api-v1`: FastAPI service over the frozen bundle, A7 normalizer, `unable_to_assess` failures, feedback file, AC05 measured (not met). |
+| 7 through 10 | Not started | No UI, monitoring, or deployment. |
 
 Phase 2 includes a follow-up correction on the same version line: manifest rows are checked against drafts, ordinary mail includes intended Bcc recipients, and published row counts are parsed CSV records. That correction changed generation rules, so the published dataset is v2 rather than a silent rewrite of v1.
 
@@ -26,7 +27,7 @@ No implementation is in progress.
 | Active phase | None |
 | Owner | Unassigned |
 
-The next session should not start Phase 6 unless the user asks for it.
+The next session should not start Phase 7 unless the user asks for it.
 
 ## Delivered artifacts
 
@@ -104,6 +105,20 @@ The rules policy under the same validation rule warned 2 of 10 on `test_product_
 
 The test pass ran once, after `policy.json` was written. `test_evaluation.json` stores the SHA-256 of `policy.json`. Test features were computed in memory and no test feature file was written. Before that pass, in-memory scoring was checked against the published `validation_diagnostic` matrix (192 rows, maximum score difference below 1e-39).
 
+Phase 6:
+
+- [docs/phase_6/API_CONTRACT.md](docs/phase_6/API_CONTRACT.md)
+- [docs/phase_6/SCORING_FLOW.md](docs/phase_6/SCORING_FLOW.md)
+- [docs/phase_6/ERROR_BEHAVIOR.md](docs/phase_6/ERROR_BEHAVIOR.md)
+- Package `src/med_api/` (`serve`, `latency`, `report`) and `tests/test_phase6.py`
+- Artifact `artifacts/med-api-v1/latency.json`
+- `med_policy.decision.assess_draft` gained `include_features=True`, which returns the feature rows alongside the unchanged decision so the API does not transform twice
+- Feedback is appended to `var/feedback.jsonl` (gitignored), storing the contact id, never the address
+
+Endpoints: `GET /health`, `GET /ready`, `POST /assess`, `POST /feedback`. Contract `med-api-v1`. Snapshot `med-synth-v2` only. `invalid_input` (HTTP 422) and `unavailable` (HTTP 503) are both `unable_to_assess` with null decision, email risk score, recipients, and flagged list. A contact whose `directory_visible_from` is after the draft timestamp is treated as not in the directory at the cutoff (`unavailable`); no published draft addresses such a contact. Scoring timeout 2.0 s (`MED_API_SCORING_TIMEOUT_SECONDS`).
+
+AC05 on the API boundary (client send to complete response, in process, one request in flight, 1000 `validation_product_like` requests after 20 warm-ups): p50 25.63 ms, p95 345.84 ms, max 492.51 ms; server-side p95 344.99 ms; cold start 1.32 s. **AC05 not met.** A profile of the slowest request puts most time in building the content-cosine history centroid row by row, a feature the frozen model does not use. All 1000 API decisions matched `validation_scores.csv`; the largest email risk score difference was 2.4e-15 (CSV features against in-memory features). `d001019` scores 0.13455666515725057 through the API, 1.6e-15 above `T_warn`, and warns.
+
 Published subset counts:
 
 | Subset | Drafts | Misdirected | Legitimate | Frozen |
@@ -124,7 +139,7 @@ Verified on 2026-09-26 from the repository root with the project virtualenv:
 
 | Command | Result |
 | --- | --- |
-| `pytest` | 65 passed in 186.01s |
+| `pytest` | 95 passed in 190.44s |
 | `python -m med_data validate --data data/med-synth-v2` | 30 checks passed |
 | `python -m med_features build --data data/med-synth-v2 --output artifacts/med-features-v1 --quality-markdown docs/phase_3/FEATURE_QUALITY_REPORT.md` | Wrote `med-features-v1` |
 | `python -m med_models run --features artifacts/med-features-v1 --data data/med-synth-v2 --output artifacts/med-model-v1 --docs docs/phase_4` | Wrote `med-model-v1`; selected `logistic_behavior_only_unweighted` |
@@ -133,12 +148,14 @@ Verified on 2026-09-26 from the repository root with the project virtualenv:
 | `python -m med_policy latency` | In-process preliminary: p50 24.63 ms, p95 333.35 ms over 1000 calls; cold start 1.2 s. Not a backend measurement |
 | `python -m med_policy refresh-validation-scores` | Rewrote `validation_scores.csv` with a `warned` column; `policy.json` SHA-256 unchanged; 1000 rows, 4 warned |
 | `python -m med_policy report` | Wrote `docs/phase_5/` (regenerated after the Phase 5 review fixes) |
+| `python -m med_api latency` (run once) | client p50 25.63 ms, p95 345.84 ms over 1000 calls; 1000 assessed; AC05 not met |
+| `python -m med_api report` | Wrote `docs/phase_6/` |
 
-The model run was repeated on 2026-09-26 after the Phase 4 review fixes. The feature build row is the earlier result from the same date. The Phase 5 rows and `pytest` are from the Phase 5 session on 2026-09-26.
+The model run was repeated on 2026-09-26 after the Phase 4 review fixes. The feature build row is the earlier result from the same date. The Phase 5 rows are from the Phase 5 session on 2026-09-26. The Phase 6 rows, `pytest`, and `validate` are from the Phase 6 session on 2026-09-26.
 
 The 44 tests cover the data contract, the feature contract, the public-doc scan, and the model contract: audit columns rejected, train-only scaling, chronological family-safe folds, email-level maximum aggregation, deterministic logistic coefficients, artifact reload, frozen-subset refusal, the hand-written rules score, the recency imputation, the training-fold selection tie-break, and single-draft scoring parity with the batch path and with a `scoring_view` history. The Phase 5 tests cover the validation-only cutoff search and frozen-subset refusal, threshold equality, disabled blocking, maximum aggregation with every recipient at or above the cutoff flagged, `unable_to_assess` for a missing policy or non-finite score, version and checksum refusal, the one-shot test command's refusals, the absence of a test feature writer, the published policy against its validation table, and a decision path with every `fit` patched to fail.
 
-No calibration was fit. No backend latency has been measured. AC05, AC07, AC08, and AC09 are not met; AC06 is partial (duplicate merging is not implemented). AC10's documentation boundary is in force for public files. `tests/test_public_docs.py` scans `README.md` and `docs/` for private terms and for relative links that do not resolve.
+No calibration was fit. AC05 was measured on the API boundary and is not met. AC07 is not met. AC06 now has duplicate-address merging in the API normalizer, one result per unique address with every role, maximum aggregation, and threshold equality, all tested. AC08 and AC09 have API behavior and tests (`unable_to_assess` never allows; responses carry model, feature, policy, and snapshot versions) but stay unrecorded as met until a UI shows them, per their evidence columns. AC10's documentation boundary is in force for public files. `tests/test_public_docs.py` scans `README.md` and `docs/` for private terms and for relative links that do not resolve.
 
 ## Known gaps
 
@@ -151,11 +168,13 @@ No calibration was fit. No backend latency has been measured. AC05, AC07, AC08, 
 - Replies are one sentence and do not quote the parent. Threads are a message plus that reply.
 - Department and directory dates are visible to a future scorer as directory facts. They are not intent labels.
 - S10 invalid fixtures are described and excluded from training. Nothing scores them yet.
-- No API or UI exists. The policy decision function returns `unable_to_assess` for a missing or mismatched policy, a feature or model error, or a non-finite score. A later API must keep that mapping and must not turn it into allow.
+- No UI exists. The API maps every failure to `unable_to_assess`; a UI must show that as unable to assess, never as allow.
+- A well-formed address that is not in the snapshot directory (a typo, or a new contact) is `unavailable`, not a warning.
+- Reason codes are descriptive context from the feature row, not attribution. A warned S04 draft such as `d001019` has no context code, because none of the three flagged-recipient conditions holds.
 - `T_warn` sits just above the highest legitimate validation risk score (0.132046 against 0.134557). Small score drift on new mail would add false warnings. The cutoff must not be moved on test results.
 - The warning budget cannot be supported at its required confidence with 995 or 1,990 legitimate emails: the exact upper bound for zero false warnings is 3.70 and 1.85 per 1,000.
 - The behavior-only scorer misses lookalike replacements (S01) and familiar-recipient topic mistakes (S04). A mistaken first contact scores near 0.
-- The in-process p95 was above 300 ms on this machine. That is not the AC05 result, which needs a backend and assumption A10's timing boundary.
+- API p95 latency is 346 ms against a 300 ms target. The model and policy were not changed to improve it.
 - One warned validation mistake scores exactly `T_warn`. `validation_scores.csv` carries a `warned` column computed from the in-memory floats; use it as the decision audit. Recomputing from `email_risk` needs round-trip float parsing.
 - The selected model is a risk score, not a calibrated probability. Product-like validation has 5 positive emails, so the 0.891 average precision is unstable. Its `C` is 100, the least regularized point in the grid, and coefficients on overlapping counts are not separate effects.
 - IDF is frozen on mail before the validation window. It is not re-estimated at each earlier training draft. Counts and centroids still stop at the draft cutoff.
@@ -165,12 +184,12 @@ No calibration was fit. No backend latency has been measured. AC05, AC07, AC08, 
 
 ## Next steps
 
-When the user asks for Phase 6, and only then, follow `project_context/phase6.md`. That brief is the implementation prompt. In short:
+When the user asks for Phase 7, and only then:
 
-1. Read the Phase 6 section of `project_context/PROJECT_PLAN.md`, `docs/phase_1/INPUT_OUTPUT_SPECIFICATION.md`, and `docs/phase_5/THRESHOLD_POLICY.md`.
-2. Wrap `med_policy.decision.assess_draft` and `load_bundle`. Do not reimplement the cutoff or the aggregation.
-3. Add the request normalizer (duplicate-address merging, limits, malformed input) before the transform. Map every failure to `unable_to_assess`, never allow.
-4. Do not move `T_warn`, enable blocking, calibrate, or rerun `python -m med_policy evaluate-test`. `test_evaluation.json` is the one test result for `med-policy-v1`.
-5. Do not treat as solved: the warning budget at confidence, first-contact mistakes, S01/S04 detection, AC07, and backend latency.
+1. Read the Phase 7 section of `project_context/PROJECT_PLAN.md` and `docs/phase_6/API_CONTRACT.md`.
+2. Call `POST /assess` and `POST /feedback` on `med-api-v1`. Do not reimplement normalization, the cutoff, aggregation, reason codes, or failure mapping in the UI.
+3. Show `unable_to_assess` as its own state. Never display it as allow, and never keep an old decision after the draft changes.
+4. Show risk scores as risk scores, not probabilities. Blocking stays disabled.
+5. Do not treat as solved: the warning budget at confidence, first-contact mistakes, S01/S04 detection, AC07, or AC05.
 
 Keep public documents free of private planning context.

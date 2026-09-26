@@ -58,3 +58,6 @@ coverage.xml
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Local API feedback (reviewed labels, never read by scoring)
+var/

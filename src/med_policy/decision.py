@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 
 from med_features.schema import FEATURE_SPEC_VERSION, FeatureError
+from med_features.transform import transform_draft
 from med_models.data import sha256_file
 from med_models.package import LoadedModel, load_model
 from med_models.version import MODEL_VERSION, ModelError
@@ -141,12 +142,31 @@ def decide(bundle: PolicyBundle | None, recipient_scores: pd.DataFrame, *, reaso
     return result
 
 
-def assess_draft(bundle: PolicyBundle | None, directory, history, transformer, query, *, reason: str | None = None) -> dict:
-    """Transform one draft, score it with the frozen model, and apply the policy."""
+def assess_draft(
+    bundle: PolicyBundle | None,
+    directory,
+    history,
+    transformer,
+    query,
+    *,
+    reason: str | None = None,
+    include_features: bool = False,
+) -> dict:
+    """Transform one draft, score it with the frozen model, and apply the policy.
+
+    With `include_features`, the assessed result also carries the feature rows
+    under `feature_rows` so a caller can describe evidence limitations without
+    transforming the draft twice. The rows never change the decision.
+    """
     if bundle is None:
         return unable_to_assess(reason or "policy_unavailable")
     try:
-        scored = bundle.model.score_query(directory, history, transformer, query)
+        frame = transform_draft(directory, history, transformer, query)
+        scored = frame.loc[:, ["draft_id", "contact_id", "recipient_order"]].copy()
+        scored["risk_score"] = bundle.model.score_frame(frame)
     except (FeatureError, ModelError, ValueError) as error:
         return unable_to_assess(f"scoring_failed: {error}")
-    return decide(bundle, scored)
+    result = decide(bundle, scored)
+    if include_features and result["status"] == "assessed":
+        result["feature_rows"] = frame
+    return result
