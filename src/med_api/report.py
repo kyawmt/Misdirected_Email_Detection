@@ -1,8 +1,10 @@
 """Generate docs/phase_6.
 
-Latency numbers come from `artifacts/med-api-v1/latency.json`. Example
-response bodies come from live calls to the app on fictional `.example`
-requests; the request id is replaced with a placeholder so the docs are stable.
+Latency numbers come from the latency record of the served policy bundle
+(`artifacts/med-api-latency/<policy version>/latency.json`). Example response
+bodies come from live calls to the app on fictional `.example` requests; the
+request id is replaced with a placeholder so the docs are stable. Example
+drafts are chosen by rule from the policy's validation table.
 """
 
 from __future__ import annotations
@@ -10,12 +12,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pandas as pd
 from fastapi.testclient import TestClient
 
 from med_data.io import read_dataset
 from med_api.app import create_app
 from med_api.context import ApiPaths
-from med_api.fixtures import request_from_draft
+from med_api.fixtures import example_draft_ids, request_from_draft
 from med_api.normalize import ALLOWED_FIELDS, DENIED_NAME_PARTS
 from med_api.service import CODE_TEXT, LOG_FIELDS
 from med_api.version import (
@@ -28,8 +31,6 @@ from med_api.version import (
     SNAPSHOT_ID,
 )
 
-WARN_DRAFT = "d001019"
-ALLOW_DRAFT = "d001083"
 
 
 def write_documents(paths: ApiPaths, docs_dir: Path, latency_path: Path) -> list[Path]:
@@ -40,7 +41,7 @@ def write_documents(paths: ApiPaths, docs_dir: Path, latency_path: Path) -> list
     written = []
     for name, text in (
         ("API_CONTRACT.md", _contract(examples)),
-        ("SCORING_FLOW.md", _flow(latency)),
+        ("SCORING_FLOW.md", _flow(latency, _policy_results(paths))),
         ("ERROR_BEHAVIOR.md", _errors(examples)),
     ):
         path = docs_dir / name
@@ -51,12 +52,14 @@ def write_documents(paths: ApiPaths, docs_dir: Path, latency_path: Path) -> list
 
 def _examples(paths: ApiPaths) -> dict:
     dataset = read_dataset(paths.data)
-    warn_request = request_from_draft(dataset, WARN_DRAFT)
-    allow_request = request_from_draft(dataset, ALLOW_DRAFT)
+    scores = pd.read_csv(paths.policy.parent / "validation_scores.csv", float_precision="round_trip")
+    picks = example_draft_ids(dataset, scores)
+    warn_request = request_from_draft(dataset, picks["warn"])
+    allow_request = request_from_draft(dataset, picks["allow"])
     invalid_request = dict(allow_request, to=[{"address": "not-an-email"}], cc=[], bcc=[])
     unknown_request = dict(allow_request, to=[{"address": "nobody@example"}], cc=[], bcc=[])
     snapshot_request = dict(allow_request, context_snapshot_id="other")
-    out = {"requests": {"warn": warn_request, "allow": allow_request}}
+    out = {"requests": {"warn": warn_request, "allow": allow_request}, "picks": picks}
     with TestClient(create_app(paths)) as client:
         for key, payload in (
             ("warn", warn_request),
@@ -71,6 +74,13 @@ def _examples(paths: ApiPaths) -> dict:
             body["duration_ms"] = "<measured>"
             out[key] = {"status_code": response.status_code, "body": body}
     return out
+
+
+def _policy_results(paths: ApiPaths) -> dict:
+    """Stored policy results of the served bundle, read through the policy package. Nothing is rescored."""
+    from med_policy.report import stored_results
+
+    return stored_results(Path(paths.policy).parent)
 
 
 def _block(value) -> str:
@@ -122,13 +132,13 @@ def _contract(examples: dict) -> str:
             "| `email_risk_score` | Maximum recipient risk score. |",
             "| `flagged_recipients` | Every address whose risk score is at or above `T_warn`. |",
             "| `recipients` | One entry per unique address: `address`, `display_name`, `roles`, `risk_score`, `flagged`, `reason_codes`, `evidence_limitations`. |",
-            "| `explanation` | Short sentences, including that draft-text similarity was not used. |",
+            "| `explanation` | Short sentences, including whether draft-text similarity was an input of the served model. |",
             "| `provenance` | Model, feature-spec, and policy versions, `T_warn`, `blocking_enabled: false`, snapshot id, effective cutoff, and the history rule. |",
             "| `duration_ms` | Handler time for this assessment. |",
             "",
             "## Codes",
             "",
-            "Codes are descriptive context from the feature row. They do not change the decision and are not read from model coefficients. `CONTENT_RELATIONSHIP_MISMATCH` is never emitted, because this model does not use content cosine.",
+            "Codes are descriptive context from the feature row. They do not change the decision and are not read from model coefficients. `CONTENT_RELATIONSHIP_MISMATCH` is not emitted by this version. When the served model uses content cosine, a model-level explanation sentence says so; no per-recipient content code is derived from the score.",
             "",
             "| Code | Kind | Emitted when | Text |",
             "| --- | --- | --- | --- |",
@@ -144,9 +154,9 @@ def _contract(examples: dict) -> str:
             "",
             "## Examples",
             "",
-            f"These bodies come from live calls on fictional validation drafts. `{WARN_DRAFT}` is the validation draft whose risk score sets `T_warn`.",
+            f"These bodies come from live calls on fictional validation drafts, chosen by rule from the policy's validation table. `{examples['picks']['warn']}` is the warned validation mistake with the lowest email risk score; `{examples['picks']['allow']}` is the allowed routine draft at the median score.",
             "",
-            f"### Warn request (`{WARN_DRAFT}`)",
+            f"### Warn request (`{examples['picks']['warn']}`)",
             "",
             _block(examples["requests"]["warn"]),
             "",
@@ -154,7 +164,7 @@ def _contract(examples: dict) -> str:
             "",
             _block(examples["warn"]["body"]),
             "",
-            f"### Allow response for `{ALLOW_DRAFT}` (HTTP {examples['allow']['status_code']})",
+            f"### Allow response for `{examples['picks']['allow']}` (HTTP {examples['allow']['status_code']})",
             "",
             _block(examples["allow"]["body"]),
             "",
@@ -170,9 +180,12 @@ def _contract(examples: dict) -> str:
     )
 
 
-def _flow(latency: dict | None) -> str:
+def _flow(latency: dict | None, results: dict) -> str:
+    policy = results["policy"]
     parts = [
         "# Phase 6 — Scoring flow",
+        "",
+        f"Served bundle: dataset snapshot `{SNAPSHOT_ID}`, features `{policy['feature_spec_version']}`, model `{policy['model_version']}` (`{policy['model_run_name']}`), policy `{policy['policy_version']}`, contract `{API_CONTRACT_VERSION}`.",
         "",
         "## Startup",
         "",
@@ -192,58 +205,83 @@ def _flow(latency: dict | None) -> str:
         "2. Normalize (A7): timestamp with timezone, `.example` addresses, merge repeated addresses across roles, limits.",
         f"3. Resolve the snapshot id (`{SNAPSHOT_ID}` only), the sender (internal contact), and every recipient in the directory.",
         "4. Build one `DraftQuery`. The family exclusion is empty, because a client draft has no family. A non-empty body's hash is excluded from history so the draft is not its own earlier mail. History is sent mail strictly earlier than the cutoff.",
-        "5. Call `med_policy.decision.assess_draft` under the scoring timeout. It runs `transform_draft`, the frozen logistic model, and the policy. The API does not reimplement the cutoff, the maximum, or the model.",
+        "5. Call `med_policy.decision.assess_draft` under the scoring timeout. It runs `transform_draft`, the frozen model, and the policy. The API does not reimplement the cutoff, the maximum, or the model.",
         "6. Map the result to the response. Reason codes and limitations are read from the same feature rows. They do not change the decision.",
         "",
         "`T_warn` is loaded from `policy.json`. It is not reselected, and it is not recomputed from `validation_scores.csv`.",
         "",
         "## What the service does not change",
         "",
-        "- The warning budget is not supported at the required confidence: zero false warnings on 1,990 legitimate test emails still leave an exact upper bound of about 1.85 per 1,000.",
-        "- A mistaken first contact scores near 0 and is allowed. A mistyped address that is not in the directory is `unavailable`, not a warning.",
-        "- Lookalike replacements (S01) and familiar-recipient, unusual-topic mistakes (S04) are still missed.",
+        *_limits(results),
+        "- A well-formed address that is not in the snapshot directory, such as a typo, is `unavailable`, not a warning. Changing that is a contract decision.",
         "- No rule warns because a recipient is new, external, a lookalike, or off-topic.",
         "",
+        "## Latency (AC05)",
+        "",
     ]
-    parts += ["## Latency (AC05)", ""]
     if latency is None:
-        parts.append("Not measured.")
-    else:
-        parity = latency["parity"]
-        margin = parity.get("draft_at_T_warn") or {}
-        env = latency["environment"]
-        parts += [
-            f"Measured once with `python -m med_api latency`: {latency['measured_calls']} `POST /assess` calls on `{latency['subset']}` requests after {latency['warmup_calls']} unmeasured warm-up calls, concurrency {latency['concurrency']}. Boundary: {latency['boundary']}. This contains assumption A10's boundary (backend receipt to response preparation) and adds only the in-process client and ASGI hop.",
-            "",
-            "| Measure | Value |",
-            "| --- | --- |",
-            f"| Client p50 | {latency['client_p50_ms']:.2f} ms |",
-            f"| Client p95 | {latency['client_p95_ms']:.2f} ms |",
-            f"| Client max | {latency['client_max_ms']:.2f} ms |",
-            f"| Server-side p50 / p95 / max | {latency['server_p50_ms']:.2f} / {latency['server_p95_ms']:.2f} / {latency['server_max_ms']:.2f} ms |",
-            f"| Target | p95 below {latency['target_p95_ms']:.0f} ms |",
-            f"| AC05 | **{latency['ac05']}** |",
-            f"| Cold start | {latency['cold_start_seconds']:.2f} s ({latency['cold_start_includes']}) |",
-            f"| Statuses | {', '.join(f'{k}: {v}' for k, v in latency['statuses'].items())} |",
-            f"| Recipients per request | {', '.join(f'{k}: {v}' for k, v in latency['recipient_mix'].items())} |",
-            f"| Hardware and OS | {env['platform']}, {env['machine']}, {env['cpu_count']} CPUs |",
-            f"| Versions | {', '.join(f'{k} {v}' for k, v in latency['versions'].items())} |",
-            "",
-            f"AC05 is recorded as **{latency['ac05']}** on the client-side p95 of {latency['client_p95_ms']:.2f} ms, on this machine only. The model and policy were not changed to improve it.",
-            "",
-            "Server-side time is almost all of the client time, so the cost is in scoring, not in HTTP handling. A profile of the slowest request (a four-recipient project update) spends most of its time building the content-cosine history centroid one sparse row at a time, thousands of reads per recipient. The frozen model does not use that feature. Changing how the shared transform computes it belongs to a later phase and must keep batch/single-draft parity.",
-            "",
-            "## Parity with the frozen validation scores",
-            "",
-            f"During the same run, {parity['decisions_matching_validation_table']} of {parity['assessed']} API decisions matched the `warned` column of `validation_scores.csv`. The largest email risk score difference was {parity['max_abs_email_risk_difference']:.2e}: the validation table was scored from the published feature CSV, and the API computes features in memory.",
-        ]
-        if margin:
-            parts += [
-                "",
-                f"`{margin['draft_id']}` is the validation draft whose score set `T_warn` ({margin['T_warn']!r}). Through the API it scores {margin['api_email_risk_score']!r}, {margin['api_email_risk_score'] - margin['T_warn']:.1e} above the cutoff, and returns `{margin['decision']}`. Equality warns, but a difference of this size means the equality case is decided by floating-point detail. The cutoff was not moved.",
-            ]
+        parts.append("Not measured for this bundle.")
         parts.append("")
+        return "\n".join(parts)
+    parity = latency["parity"]
+    env = latency["environment"]
+    workload = latency.get("workload", {})
+    history = workload.get("sender_history_messages", {})
+    parts += [
+        f"Measured once with `python -m med_api latency` for policy bundle `{policy['policy_version']}`: {latency['measured_calls']} `POST /assess` calls on `{latency['subset']}` requests after {latency['warmup_calls']} unmeasured warm-up calls, concurrency {latency['concurrency']}. Boundary: {latency['boundary']}. This contains assumption A10's boundary (backend receipt to response preparation) and adds only the in-process client and ASGI hop. The record is keyed by the policy bundle and is never overwritten.",
+        "",
+        f"Workload: {workload.get('drawn', '')}. Warm-up: {workload.get('warmup', '')}.",
+        "",
+        "| Measure | Value |",
+        "| --- | --- |",
+        f"| Client p50 | {latency['client_p50_ms']:.2f} ms |",
+        f"| Client p95 | {latency['client_p95_ms']:.2f} ms |",
+        f"| Client p99 | {latency['client_p99_ms']:.2f} ms |",
+        f"| Client max | {latency['client_max_ms']:.2f} ms |",
+        f"| Server-side p50 / p95 / max | {latency['server_p50_ms']:.2f} / {latency['server_p95_ms']:.2f} / {latency['server_max_ms']:.2f} ms |",
+        f"| Target | p95 below {latency['target_p95_ms']:.0f} ms |",
+        f"| AC05 | **{latency['ac05']}** |",
+        f"| Cold start | {latency['cold_start_seconds']:.2f} s ({latency['cold_start_includes']}) |",
+        f"| Statuses | {', '.join(f'{k}: {v}' for k, v in latency['statuses'].items())} |",
+        f"| Recipients per request | {', '.join(f'{k}: {v}' for k, v in latency['recipient_mix'].items())} |",
+        f"| Month of draft | {', '.join(f'{k}: {v}' for k, v in workload.get('months', {}).items())} |",
+        f"| Sender history (earlier sent messages) | {', '.join(f'{k}: {v}' for k, v in history.get('bands', {}).items())}; quartiles {history.get('p25', 0):.0f} / {history.get('p50', 0):.0f} / {history.get('p75', 0):.0f}, max {history.get('max', 0)} |",
+        f"| Hardware and OS | {env['platform']}, {env['machine']}, {env['cpu_count']} CPUs |",
+        f"| Versions | {', '.join(f'{k} {v}' for k, v in latency['versions'].items())} |",
+        "",
+        f"AC05 is recorded as **{latency['ac05']}** on the client-side p95 of {latency['client_p95_ms']:.2f} ms, on this machine only. The model and policy were not changed to improve it. The content-cosine centroid is built from one sparse slice of the history matrix per recipient, not one row read at a time; that change leaves every feature value identical.",
+        "",
+        "## Parity with the frozen validation scores",
+        "",
+        f"During the same run, {parity['decisions_matching_validation_table']} of {parity['assessed']} API decisions matched the `warned` column of `validation_scores.csv`. The largest email risk score difference was {parity['max_abs_email_risk_difference']:.2e}. Feature CSVs are lossless, so the remaining difference is summation order in the model, and the policy selection already required identical decisions on every validation draft.",
+    ]
+    for item in parity.get("drafts_at_T_warn", []):
+        parts += [
+            "",
+            f"`{item['draft_id']}` is the validation draft whose score set `T_warn` ({item['T_warn']!r}). Through the API it scores {item['api_email_risk_score']!r} ({item['api_email_risk_score'] - item['T_warn']:+.1e} from the cutoff) and returns `{item['decision']}`.",
+        ]
+    parts.append("")
     return "\n".join(parts)
+
+
+def _limits(results: dict) -> list[str]:
+    test = results.get("test")
+    if not test:
+        return ["- The frozen test pass has not run for this policy."]
+    product = test["subsets"]["test_product_like"]
+    fi = product["policy"]["interventions"]
+    email = product["policy"]["email"]
+    missed = {}
+    for subset in test["subsets"].values():
+        for row in subset["outcomes"]["missed_mistakes"]:
+            missed[row["scenario_id"]] = missed.get(row["scenario_id"], 0) + 1
+    warned = {row["scenario_id"] for subset in test["subsets"].values() for row in subset["outcomes"]["warned_mistakes"]}
+    never = sorted(set(missed) - warned)
+    budget = "within" if fi["interval_per_1000_exact"]["high"] <= fi["budget_per_1000"] else "above"
+    return [
+        f"- The service serves the frozen cutoff. On the one `test_product_like` pass it warned on {email['true_positives']} of {email['positives']} misdirected emails with {fi['false_interventions']} false interventions on {fi['legitimate_emails']} legitimate emails; the exact upper 95% bound, {fi['interval_per_1000_exact']['high']:.2f} per 1,000, is {budget} the budget of {fi['budget_per_1000']:g}. That is a simulation result.",
+        f"- Scenarios never warned in the frozen test subsets: {', '.join(never) or 'none'}. The API does not change that.",
+    ]
 
 
 def _errors(examples: dict) -> str:

@@ -65,7 +65,7 @@ def validate_feature_frame(frame: pd.DataFrame) -> list[str]:
     if not np.isfinite(values).all():
         problems.append("Feature matrix contains a non-finite value")
     if not (frame["feature_spec_version"] == FEATURE_SPEC_VERSION).all():
-        problems.append("Feature spec version is not med-features-v1")
+        problems.append(f"Feature spec version is not {FEATURE_SPEC_VERSION}")
     for name in INDICATOR_FEATURES:
         if not frame[name].isin([0, 1]).all():
             problems.append(f"{name} is not a 0/1 indicator")

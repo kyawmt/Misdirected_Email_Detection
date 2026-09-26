@@ -8,6 +8,7 @@ import time
 from dataclasses import replace
 from pathlib import Path
 
+import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
@@ -15,22 +16,22 @@ import med_policy.decision as decision_module
 from med_data.io import read_dataset
 from med_api.app import create_app
 from med_api.context import ApiPaths
-from med_api.fixtures import FixtureError, request_from_draft
-from med_api.service import format_log_record
+from med_api.fixtures import FixtureError, example_draft_ids, request_from_draft
+from med_api.service import CONTENT_FEATURES, format_log_record
+from med_api.version import API_CONTRACT_VERSION, DEFAULT_PATHS, SNAPSHOT_ID
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / "data" / "med-synth-v2"
-POLICY = ROOT / "artifacts" / "med-policy-v1" / "policy.json"
-WARN_DRAFT = "d001019"
-ROUTINE_DRAFT = "d001083"
-FIRST_CONTACT_DRAFT = "d001065"
+DATA = ROOT / DEFAULT_PATHS["data"]
+POLICY = ROOT / DEFAULT_PATHS["policy"]
+FEATURES = ROOT / DEFAULT_PATHS["features"]
+BASE_TIMESTAMP = "2025-05-05T09:30:00Z"
 
 
 def _paths(tmp: Path, **changes) -> ApiPaths:
     paths = ApiPaths(
         policy=POLICY,
-        model=ROOT / "artifacts" / "med-model-v1" / "model.joblib",
-        features=ROOT / "artifacts" / "med-features-v1",
+        model=ROOT / DEFAULT_PATHS["model"],
+        features=FEATURES,
         data=DATA,
         feedback=tmp / "feedback.jsonl",
     )
@@ -53,16 +54,28 @@ def dataset():
     return read_dataset(DATA)
 
 
+@pytest.fixture(scope="module")
+def picks(dataset):
+    """Example validation drafts chosen by rule, not by id."""
+    scores = pd.read_csv(POLICY.parent / "validation_scores.csv", float_precision="round_trip")
+    return example_draft_ids(dataset, scores)
+
+
+@pytest.fixture(scope="module")
+def validation_scores():
+    return pd.read_csv(POLICY.parent / "validation_scores.csv", float_precision="round_trip").set_index("draft_id")
+
+
 def _base(**changes) -> dict:
     payload = {
-        "draft_timestamp": "2025-05-05T09:30:00Z",
+        "draft_timestamp": BASE_TIMESTAMP,
         "sender": {"address": "maya@demo.example", "display_name": "Maya"},
         "to": [{"address": "sam@demo.example", "display_name": "Sam"}],
         "cc": [],
         "bcc": [],
         "subject": "Facilities walkthrough",
         "body": "Can we confirm the badge list for the walkthrough on Thursday?",
-        "context_snapshot_id": "med-synth-v2",
+        "context_snapshot_id": SNAPSHOT_ID,
     }
     payload.update(changes)
     return payload
@@ -88,7 +101,7 @@ def _assert_unable(response, category):
     assert body["recipients"] is None
     assert body["flagged_recipients"] is None
     assert "allow" not in list(_values(body))
-    assert body["contract_version"] == "med-api-v1"
+    assert body["contract_version"] == API_CONTRACT_VERSION
     return body
 
 
@@ -154,9 +167,11 @@ def test_unknown_well_formed_address_is_unavailable(client):
     _assert_unable(response, "unavailable")
 
 
-def test_contact_listed_after_the_cutoff_is_unavailable(client):
-    # jordan@demo.example is listed in the directory from 2025-12-31.
-    response = client.post("/assess", json=_base(to=[{"address": "jordan@demo.example"}]))
+def test_contact_listed_after_the_cutoff_is_unavailable(client, dataset):
+    contacts = dataset.contacts
+    later = contacts.loc[contacts["directory_visible_from"] > pd.Timestamp(BASE_TIMESTAMP)].sort_values("contact_id")
+    assert not later.empty
+    response = client.post("/assess", json=_base(to=[{"address": str(later.iloc[0]["email_address"])}]))
     _assert_unable(response, "unavailable")
 
 
@@ -195,45 +210,61 @@ def test_empty_subject_and_body_still_assess_with_limited_text(client):
         assert isinstance(recipient["risk_score"], float)
 
 
-def test_score_equal_to_t_warn_warns_through_the_api(client, dataset):
-    body = client.post("/assess", json=request_from_draft(dataset, WARN_DRAFT)).json()
+def test_score_equal_to_t_warn_warns_through_the_api(client, dataset, picks, validation_scores):
+    """The lowest-scoring warned validation mistake warns through the API too."""
+    body = client.post("/assess", json=request_from_draft(dataset, picks["warn"])).json()
     t_warn = json.loads(POLICY.read_text(encoding="utf-8"))["T_warn"]
     assert body["provenance"]["T_warn"] == t_warn
+    assert abs(body["email_risk_score"] - float(validation_scores.loc[picks["warn"], "email_risk"])) <= 1e-12
     assert body["email_risk_score"] >= t_warn
     assert body["decision"] == "warn"
     assert body["flagged_recipients"] == [item["address"] for item in body["recipients"] if item["risk_score"] >= t_warn]
 
 
-def test_routine_validation_draft_allows(client, dataset):
-    body = client.post("/assess", json=request_from_draft(dataset, ROUTINE_DRAFT)).json()
+def test_routine_validation_draft_allows(client, dataset, picks):
+    body = client.post("/assess", json=request_from_draft(dataset, picks["allow"])).json()
     assert body["status"] == "assessed"
     assert body["decision"] == "allow"
     assert body["flagged_recipients"] == []
     assert body["email_risk_score"] == max(item["risk_score"] for item in body["recipients"])
-    assert body["draft_reference"] == f"fixture-{ROUTINE_DRAFT}"
+    assert body["draft_reference"] == f"fixture-{picks['allow']}"
     assert body["mode"] == "simulation"
 
 
-def test_no_block_and_no_content_code(client, dataset):
-    for draft_id in (WARN_DRAFT, ROUTINE_DRAFT, FIRST_CONTACT_DRAFT):
+def test_no_block_and_the_model_note_matches_the_model(client, dataset, picks):
+    from med_models.package import load_model
+
+    features = load_model(ROOT / DEFAULT_PATHS["model"]).feature_columns
+    uses_content = any(name in features for name in CONTENT_FEATURES)
+    for draft_id in picks.values():
         body = client.post("/assess", json=request_from_draft(dataset, draft_id)).json()
         assert "block" not in list(_values(body))
         assert body["provenance"]["blocking_enabled"] is False
-        assert "CONTENT_RELATIONSHIP_MISMATCH" not in json.dumps(body)
-        assert any("Draft-text similarity was not used" in line for line in body["explanation"])
+        if not uses_content:
+            assert "CONTENT_RELATIONSHIP_MISMATCH" not in json.dumps(body)
+            assert any("Draft-text similarity was not used" in line for line in body["explanation"])
+        else:
+            assert any("Draft-text similarity" in line and "also an input" in line for line in body["explanation"])
 
 
-def test_allowed_novel_recipient_is_not_warned_for_novelty(client, dataset):
-    body = client.post("/assess", json=request_from_draft(dataset, FIRST_CONTACT_DRAFT)).json()
+def test_novelty_is_a_limitation_not_a_reason(client, dataset, picks, validation_scores):
+    """A first contact carries LIMITED_RELATIONSHIP_HISTORY; novelty is never a reason code."""
+    draft_id = picks["first_contact"]
+    body = client.post("/assess", json=request_from_draft(dataset, draft_id)).json()
     assert body["status"] == "assessed"
     novel = [item for item in body["recipients"] if "LIMITED_RELATIONSHIP_HISTORY" in [code["code"] for code in item["evidence_limitations"]]]
     assert novel
-    assert body["decision"] == "allow"
-    assert all(not item["flagged"] and item["reason_codes"] == [] for item in novel)
+    for item in body["recipients"]:
+        codes = [code["code"] for code in item["reason_codes"]]
+        assert "LIMITED_RELATIONSHIP_HISTORY" not in codes
+        if not item["flagged"]:
+            assert codes == []
+    assert (body["decision"] == "warn") == any(item["flagged"] for item in body["recipients"])
+    assert (body["decision"] == "warn") == bool(validation_scores.loc[draft_id, "warned"])
 
 
-def test_feedback_appends_and_does_not_change_the_decision(client, dataset, feedback_dir):
-    payload = request_from_draft(dataset, WARN_DRAFT)
+def test_feedback_appends_and_does_not_change_the_decision(client, dataset, feedback_dir, picks):
+    payload = request_from_draft(dataset, picks["warn"])
     first = client.post("/assess", json=payload).json()
     address = first["recipients"][0]["address"]
     path = feedback_dir / "feedback.jsonl"
@@ -301,4 +332,34 @@ def test_no_frozen_test_writer_or_fixture(dataset):
     frozen = dataset.drafts.loc[dataset.drafts["subset"] == "test_product_like", "draft_id"].iloc[0]
     with pytest.raises(FixtureError, match="frozen"):
         request_from_draft(dataset, frozen)
-    assert not list((ROOT / "artifacts" / "med-features-v1").glob("features_test_*"))
+    assert not list(FEATURES.glob("features_test_*"))
+
+
+def test_latency_path_is_keyed_by_bundle_and_never_overwrites(tmp_path):
+    from med_api.latency import LatencyError, measure
+    from med_api.version import LATENCY_PATH
+    from med_policy.version import POLICY_VERSION
+
+    assert LATENCY_PATH.parts[-2] == POLICY_VERSION
+    assert LATENCY_PATH != Path("artifacts") / "med-api-v1" / "latency.json"
+    existing = tmp_path / "latency.json"
+    existing.write_text("{}", encoding="utf-8")
+    with pytest.raises(LatencyError, match="not overwritten"):
+        measure(_paths(tmp_path), existing)
+    assert existing.read_text(encoding="utf-8") == "{}"
+
+
+def test_latency_workload_covers_the_whole_subset_in_a_fixed_order(dataset):
+    import numpy as np
+
+    from med_api.fixtures import validation_draft_ids
+    from med_api.latency import WORKLOAD_SEED, _workload_mix
+
+    ids = validation_draft_ids(dataset, "validation_product_like")
+    order = np.random.default_rng(WORKLOAD_SEED).permutation(len(ids))
+    assert sorted(order.tolist()) == list(range(len(ids)))
+    mix = _workload_mix(dataset, [ids[index] for index in order])
+    assert sum(mix["recipients"].values()) == len(ids)
+    assert sum(mix["months"].values()) == len(ids)
+    assert sum(mix["sender_history_messages"]["bands"].values()) == len(ids)
+    assert len(mix["months"]) > 1

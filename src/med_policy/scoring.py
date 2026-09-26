@@ -39,6 +39,10 @@ FIRST_CONTACT_REWRITE = (
     ("co_partner_fraction", 0.0),
     ("co_focus_conditional_fraction", 0.0),
     ("co_focus_history_available", 0),
+    # A first contact has no pair text, so the content fields take their fallbacks too.
+    ("content_cosine", 0.0),
+    ("content_similarity_observed", 0),
+    ("pair_text_message_count", 0),
 )
 
 TABLE_COLUMNS = (

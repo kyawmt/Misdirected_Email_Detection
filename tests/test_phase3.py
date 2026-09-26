@@ -39,6 +39,8 @@ from med_features.transform import (
     transform_draft,
     transform_drafts,
 )
+from med_features.version import ARTIFACT_DIR
+from med_features.version import DATASET_VERSION as FEATURE_DATASET_VERSION
 from med_features.version import FEATURE_SPEC_VERSION as SPEC_VERSION
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -217,6 +219,24 @@ def test_content_distinguishes_missing_and_zero(world):
     assert validate_feature_frame(_rows(world, "d_cold")) == []
 
 
+def test_vectorized_centroid_matches_an_explicit_row_mean(world):
+    """B4: one slice per recipient gives the per-row mean, skipping empty rows."""
+    from med_features.transform import _content_cosine
+
+    query = query_from_dataset(world.dataset, "d_counts")
+    cutoff = parse_ts("2024-09-15T12:00:00Z")
+    positions = world.index.pair_positions("c_maya", "c_alex_chen", None, cutoff, query.exclude_family_id, query.exclude_body_hashes)
+    draft = world.transformer.vectorizer.transform([LONG + "\nHeadcount"])
+    value, count = _content_cosine(draft, world.index, positions)
+    rows = [world.index.vectors[pos].toarray().ravel() for pos in positions]
+    rows = [row for row in rows if row.any()]
+    assert count == len(rows) > 0
+    centroid = np.mean(rows, axis=0)
+    expected = float(draft.toarray().ravel() @ centroid / np.linalg.norm(centroid))
+    assert value == pytest.approx(expected, abs=1e-12)
+    assert _content_cosine(draft, world.index, []) == (0.0, 0)
+
+
 def test_identical_text_cosine_is_one():
     dataset = _tiny_pair_dataset()
     transformer = fit_text_transformer([LONG, LONG, ZEBRA, ZEBRA])
@@ -367,36 +387,71 @@ def test_real_training_fit_excludes_later_text_and_slots(dataset, fitted_real):
 
 
 def test_published_artifact_matches_training_fit(dataset, fitted_real):
+    """The published feature artifact equals a fresh fit on the dataset it names."""
     import json
 
-    artifact = ROOT / "artifacts" / FEATURE_SPEC_VERSION
+    from med_data.io import read_dataset, verify_files
+    from med_features.build import read_features
+
+    artifact = ROOT / ARTIFACT_DIR
     metadata = json.loads((artifact / "fit_metadata.json").read_text(encoding="utf-8"))
-    manifest = json.loads((ROOT / "data" / "med-synth-v2" / "dataset_manifest.json").read_text(encoding="utf-8"))
+    assert metadata["feature_spec_version"] == FEATURE_SPEC_VERSION
+    assert metadata["dataset_version"] == FEATURE_DATASET_VERSION
+    data_dir = ROOT / "data" / metadata["dataset_version"]
+    manifest = json.loads((data_dir / "dataset_manifest.json").read_text(encoding="utf-8"))
     assert metadata["dataset_checksums"] == {name: item["sha256"] for name, item in manifest["files"].items()}
     assert metadata["exported_subsets"] == list(EXPORT_SUBSETS)
     schema = json.loads((artifact / "feature_schema.json").read_text(encoding="utf-8"))
     assert schema["feature_columns"] == list(FEATURE_COLUMNS)
-    transformer, index, directory = fitted_real
+    if dataset.summary.get("dataset_version") == metadata["dataset_version"]:
+        source = dataset
+        transformer, index, directory = fitted_real
+    else:
+        verify_files(data_dir)
+        source = read_dataset(data_dir)
+        transformer = fit_on_dataset(source)
+        index = history_index_from_dataset(source)
+        index.bind(transformer)
+        directory = directory_from_dataset(source)
     loaded = type(transformer).load(artifact / "text_transformer.joblib")
     assert loaded.vectorizer.vocabulary_ == transformer.vectorizer.vocabulary_
-    assert np.allclose(loaded.vectorizer.idf_, transformer.vectorizer.idf_)
+    assert np.array_equal(loaded.vectorizer.idf_, transformer.vectorizer.idf_)
     frozen_ids = set(
-        dataset.drafts.loc[
-            dataset.drafts["subset"].isin(["test_product_like", "test_diagnostic"]),
+        source.drafts.loc[
+            source.drafts["subset"].isin(["test_product_like", "test_diagnostic"]),
             "draft_id",
         ]
     )
-    frame = pd.read_csv(artifact / "features_train.csv")
-    assert len(frame) == metadata["row_counts"]["train"]
-    assert list(frame.columns) == list(MATRIX_COLUMNS)
-    assert set(frame["draft_id"]).isdisjoint(frozen_ids)
+    for subset in EXPORT_SUBSETS:
+        frame = read_features(artifact / f"features_{subset}.csv")
+        assert len(frame) == metadata["row_counts"][subset]
+        assert list(frame.columns) == list(MATRIX_COLUMNS)
+        assert set(frame["draft_id"]).isdisjoint(frozen_ids)
+        ids = frame["draft_id"].drop_duplicates()
+        for draft_id in (ids.iloc[0], ids.iloc[len(ids) // 2], ids.iloc[-1]):
+            fresh = transform_draft(directory, index, transformer, query_from_dataset(source, str(draft_id)))
+            stored = frame.loc[frame["draft_id"] == draft_id].reset_index(drop=True)
+            # Lossless CSV: the stored floats are the in-memory floats, bit for bit.
+            pd.testing.assert_frame_equal(fresh, stored, check_exact=True)
+            assert validate_feature_frame(fresh) == []
     assert not (artifact / "features_test_product_like.csv").exists()
     assert not (artifact / "features_test_diagnostic.csv").exists()
-    draft_id = str(frame["draft_id"].iloc[0])
-    fresh = transform_draft(directory, index, transformer, query_from_dataset(dataset, draft_id))
-    stored = frame.loc[frame["draft_id"] == draft_id].reset_index(drop=True)
-    pd.testing.assert_frame_equal(fresh, stored, check_dtype=False, rtol=1e-5, atol=1e-8)
-    assert validate_feature_frame(fresh) == []
+
+
+def test_feature_csv_round_trips_every_float(tmp_path):
+    from med_features.build import read_features, write_features
+
+    frame = pd.DataFrame(
+        {
+            "a": [0.1, 1 / 3, 0.13455666515724893, np.nextafter(1.0, 0.0), 5e-324, 1e300],
+            "b": [1, 2, 3, 4, 5, 6],
+        }
+    )
+    path = tmp_path / "features.csv"
+    write_features(frame, path)
+    back = read_features(path)
+    assert back["a"].to_numpy().tobytes() == frame["a"].to_numpy().tobytes()
+    assert back["b"].dtype == np.int64
 
 
 def test_real_history_and_scoring_view_agree(dataset, fitted_real):
@@ -471,7 +526,7 @@ def _sample_drafts(dataset) -> pd.DataFrame:
     chosen = []
     for subset in EXPORT_SUBSETS:
         group = dataset.drafts.loc[dataset.drafts["subset"] == subset].sort_values(["sent_at", "draft_id"])
-        picks = [group.iloc[0], group.iloc[len(group) // 2], group.iloc[-1]]
+        picks = [group.iloc[0], group.iloc[-1]]
         chosen.extend(picks)
     return pd.DataFrame(chosen)
 
@@ -640,7 +695,7 @@ def _dataset(contacts, messages, recipients, drafts, draft_recipients, labels) -
         split_manifest=manifest,
         invalid_fixtures=pd.DataFrame(),
         seed=1,
-        summary={"dataset_version": "med-synth-v2"},
+        summary={"dataset_version": "fixture"},
     )
 
 

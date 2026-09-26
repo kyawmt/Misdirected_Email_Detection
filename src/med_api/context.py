@@ -17,7 +17,7 @@ from med_features.profiles import directory_from_dataset, history_index_from_dat
 from med_features.text_model import FittedText
 from med_models.data import verify_feature_artifact
 from med_policy.decision import PolicyBundle, load_bundle
-from med_api.version import ORGANIZATION_DOMAIN, SNAPSHOT_ID
+from med_api.version import DEFAULT_PATHS, ORGANIZATION_DOMAIN, SNAPSHOT_ID
 
 
 @dataclass(frozen=True)
@@ -32,15 +32,15 @@ class ApiPaths:
     def from_env(cls, root: Path | None = None) -> "ApiPaths":
         base = Path(root) if root else Path(os.environ.get("MED_API_ROOT", "."))
 
-        def pick(name: str, default: str) -> Path:
+        def pick(name: str, default) -> Path:
             value = os.environ.get(name)
             return Path(value) if value else base / default
 
         return cls(
-            policy=pick("MED_API_POLICY", "artifacts/med-policy-v1/policy.json"),
-            model=pick("MED_API_MODEL", "artifacts/med-model-v1/model.joblib"),
-            features=pick("MED_API_FEATURES", "artifacts/med-features-v1"),
-            data=pick("MED_API_DATA", "data/med-synth-v2"),
+            policy=pick("MED_API_POLICY", DEFAULT_PATHS["policy"]),
+            model=pick("MED_API_MODEL", DEFAULT_PATHS["model"]),
+            features=pick("MED_API_FEATURES", DEFAULT_PATHS["features"]),
+            data=pick("MED_API_DATA", DEFAULT_PATHS["data"]),
             feedback=pick("MED_API_FEEDBACK", "var/feedback.jsonl"),
         )
 

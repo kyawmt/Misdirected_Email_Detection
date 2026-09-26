@@ -12,20 +12,20 @@ Real mail, blocking, probability interpretation of scores, reason-code text, dup
 
 | Component | Version |
 | --- | --- |
-| Dataset | `med-synth-v2` |
-| Features | `med-features-v1` |
-| Model | `med-model-v1` (`logistic_behavior_only_unweighted`, logistic regression, `C = 100`, unweighted, behavior-only) |
-| Policy | `med-policy-v1`, `T_warn = 0.134557`, blocking disabled, calibration not fit |
+| Dataset | `med-synth-v4` |
+| Features | `med-features-v2` |
+| Model | `med-model-v2` (`logistic_all_balanced`, logistic regression, `C = 1000`, balanced, all features, content cosine included) |
+| Policy | `med-policy-v2`, `T_warn = 0.999677`, blocking disabled, calibration not fit |
 | Seed | 20260926 |
 
 ## Metrics at the frozen cutoff
 
 | Subset | Warned mistakes | False interventions | Email AP | Emails |
 | --- | --- | --- | --- | --- |
-| `validation_product_like` | 4 / 5 | 0 / 995 = 0.00 per 1,000 | 0.891 | 1000 |
-| `validation_diagnostic` | 20 / 28 | 0 / 36 = 0.00 per 1,000 | 0.977 | 64 |
-| `test_product_like` | 5 / 10 | 0 / 1990 = 0.00 per 1,000 | 0.622 | 2000 |
-| `test_diagnostic` | 25 / 35 | 0 / 44 = 0.00 per 1,000 | 0.959 | 79 |
+| `validation_product_like` | 8 / 20 | 0 / 3980 = 0.00 per 1,000 | 0.831 | 4000 |
+| `validation_diagnostic` | 33 / 80 | 0 / 160 = 0.00 per 1,000 | 0.949 | 240 |
+| `test_product_like` | 9 / 30 | 0 / 5970 = 0.00 per 1,000 | 0.741 | 6000 |
+| `test_diagnostic` | 37 / 88 | 0 / 168 = 0.00 per 1,000 | 0.938 | 256 |
 
 Diagnostic subsets are scenario challenge sets and not the operating mix. Intervals are in the [evaluation report](EVALUATION_REPORT.md).
 
@@ -33,23 +33,23 @@ Diagnostic subsets are scenario challenge sets and not the operating mix. Interv
 
 | Criterion | Status | Evidence |
 | --- | --- | --- |
-| AC01 | **insufficient evidence** | The point estimate is 0.00 per 1,000 (0 of 1990), which meets the budget only provisionally. The exact upper 95% bound is 1.85 per 1,000, above 1. With 1990 legitimate emails, even zero false warnings cannot put the upper bound at or below the budget. |
-| AC02 | **met only for S02, S08; not met for S01, S04** | On this simulation only, on `test_product_like`: 5 of 10 misdirected emails warned (S02 3, S08 2; 5 to 6 recipients; risk scores 0.999 to 1) with 0 false interventions; exact 95% recall interval [0.187, 0.813]. Missed: S01 3, S04 2; 1 recipient each; risk scores 0.00331 to 0.0149. Always-allow warns on none. The rules policy under the same validation rule warned 2 with 3 false interventions (1.51 per 1,000), which is outside the budget on this test. |
+| AC01 | **met** | On this simulation only: 0 false interventions on 5970 legitimate `test_product_like` emails, 0.00 per 1,000, with an exact upper 95% bound of 0.62 per 1,000, within the budget of 1. Warnings 9, blocks 0, coverage 100.0%, assumed prevalence 0.5%. The validation bound is not independent evidence, because validation chose the cutoff. |
+| AC02 | **met for S09; partly met for S02, S08; not met for S01, S04, S11** | On this simulation only, on `test_product_like`: 9 of 30 misdirected emails warned (S02 2, S08 5, S09 2; 1 to 7 recipients; risk scores 0.9997 to 1) with 0 false interventions; exact 95% recall interval [0.147, 0.494]. Missed: S01 6, S02 4, S04 5, S08 3, S11 3; 1 to 5 recipients; risk scores 0.1514 to 0.9985. Always-allow warns on none. The rules policy under the same validation rule warned 0 with 0 false interventions (0.00 per 1,000), within the budget on this test. |
 | AC03 | **met** | T_warn was chosen on validation_product_like only, written to policy.json before any test label was read, and applied once to the frozen test. The policy checksum is stored in test_evaluation.json. |
 | AC04 | **met** | Blocking is disabled. T_block is null and the block count is 0 on every subset. |
 
 ## Failure modes
 
-- A mistaken first contact scores near 0 and is allowed.
-- Lookalike replacements (S01) and familiar-recipient, unusual-topic mistakes (S04) are missed, because the scorer leaves content out.
-- The cutoff sits just above the highest legitimate validation score, so a small drift in legitimate scores adds false warnings.
-- Part of the score reflects generator timing (sub-five-minute repeat mail).
-- A missing or mismatched policy or model returns `unable_to_assess`; it never allows.
+- Mistaken first contacts (S11), lookalike replacements (S01), and familiar-recipient, unusual-topic mistakes (S04) are allowed at the frozen cutoff: `validation_product_like`: S01 0 of 4 warned, S04 0 of 4 warned, S11 0 of 2 warned; `validation_diagnostic`: S01 0 of 10 warned, S04 0 of 10 warned, S11 0 of 10 warned; `test_product_like`: S01 0 of 6 warned, S04 0 of 5 warned, S11 0 of 3 warned; `test_diagnostic`: S01 0 of 11 warned, S04 0 of 11 warned, S11 0 of 11 warned.
+- Legitimate first contacts score just below the cutoff. A small drift in legitimate scores, or a new kind of legitimate first contact, would add false warnings.
+- The cutoff sits just above the highest legitimate validation score, so it is tight by construction.
+- Content cosine is an input. Off-topic mistakes are partly caught because the generator wrote them off-topic.
+- An address that is not in the directory is `unable_to_assess`, not a warning. A missing or mismatched policy or model also returns `unable_to_assess`; it never allows.
 
 Read every recall figure in this phase next to these limits of the synthetic data and the frozen scorer:
 
-- **Content shortcut.** An all-features logistic model reaches email average precision 1.000 on `validation_product_like` because content cosine restates the generator's per-relationship topics. The frozen scorer is behavior-only and does not use it, so lookalike replacements (S01) and familiar-recipient, unusual-topic mistakes (S04) are mostly missed: `validation_product_like`: S01 0 warned / 1 missed, S04 1 warned / 0 missed; `validation_diagnostic`: S01 0 warned / 4 missed, S04 0 warned / 4 missed; `test_product_like`: S01 0 warned / 3 missed, S04 0 warned / 2 missed; `test_diagnostic`: S01 0 warned / 5 missed, S04 0 warned / 5 missed. The drafts are listed in the [error analysis](ERROR_ANALYSIS.md).
-- **Five-minute burst.** 1543 of 2259 legitimate recipient rows on `validation_product_like` had earlier mail to the same recipient under five minutes before the draft; 0 of 6 unintended rows did. Part of the behavior-only risk score is that generator timing.
-- **First contact near 0.** Rewriting the 6 unintended `validation_product_like` rows as first contacts moves their median risk score from 0.9998 to 5.3e-08; 0 of them would still be flagged. This version cannot warn on a mistaken first contact.
-- **Few positives.** `validation_product_like` has 5 misdirected emails and `test_product_like` has 10. Recall intervals are wide.
-- **Unregularized fit.** The scorer is logistic regression with `C = 100`, the top of its training grid. Coefficients on overlapping counts are not separate effects.
+- **Content signal.** The scorer uses all features, content cosine included. On train, content cosine alone separates mistakes from ordinary mail with separation 0.932 (the eligibility audit flags a feature only beyond 0.95). The same-family behavior-only model has product-like validation email average precision 0.467 against 0.831 for the scorer. S01, S04, and S11 outcomes by subset: `validation_product_like`: S01 0 of 4 warned, S04 0 of 4 warned, S11 0 of 2 warned; `validation_diagnostic`: S01 0 of 10 warned, S04 0 of 10 warned, S11 0 of 10 warned; `test_product_like`: S01 0 of 6 warned, S04 0 of 5 warned, S11 0 of 3 warned; `test_diagnostic`: S01 0 of 11 warned, S04 0 of 11 warned, S11 0 of 11 warned. The drafts are listed in the [error analysis](ERROR_ANALYSIS.md).
+- **Five-minute recency.** 0 of 4948 legitimate recipient rows on `validation_product_like` had earlier mail between the sender and that recipient under five minutes before the draft; 1 of 22 unintended rows did.
+- **First contacts.** Rewriting the 22 unintended `validation_product_like` rows as first contacts (no pair history, no pair text) moves their median risk score from 0.9940 to 0.9986; 9 are flagged as stored and 9 after the rewrite. The 30 intended first-contact rows reach a highest risk score of 0.99737, just below `T_warn`, and none is flagged. Legitimate first contacts are among the highest-scoring legitimate rows; the high cutoff, not the score, keeps them allowed.
+- **Few positives.** `validation_product_like` has 20 misdirected emails and `test_product_like` has 30. Recall intervals are wide.
+- **Weak regularization.** The scorer is logistic regression with `C = 1000`, the top edge of its training grid. Coefficients on overlapping counts are not separate effects.

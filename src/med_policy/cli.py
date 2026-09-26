@@ -13,14 +13,14 @@ import argparse
 import json
 from pathlib import Path
 
-from med_policy.version import POLICY_VERSION
+from med_policy.version import DATA_DIR, DOCS_DIR, FEATURES_DIR, MODEL_PATH, POLICY_DIR, POLICY_VERSION
 
 DEFAULTS = {
-    "policy_dir": Path(f"artifacts/{POLICY_VERSION}"),
-    "model": Path("artifacts/med-model-v1/model.joblib"),
-    "features": Path("artifacts/med-features-v1"),
-    "data": Path("data/med-synth-v2"),
-    "docs": Path("docs/phase_5"),
+    "policy_dir": POLICY_DIR,
+    "model": MODEL_PATH,
+    "features": FEATURES_DIR,
+    "data": DATA_DIR,
+    "docs": Path(DOCS_DIR),
 }
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from med_models.version import MODEL_VERSION, N_BOOTSTRAP, SEED
+from med_models.version import DATASET_VERSION, FEATURE_SPEC_VERSION, MODEL_VERSION, N_BOOTSTRAP, SEED
 
 
 def write_documents(directory, payload: dict, metadata: dict) -> None:
@@ -20,7 +20,7 @@ def _experiment_table(payload: dict, runs: list[dict]) -> str:
     lines = [
         f"# Phase 4 — Experiment table",
         "",
-        f"Model bundle `{MODEL_VERSION}`. Dataset `med-synth-v2`. Features `med-features-v1`. Seed `{SEED}`.",
+        f"Model bundle `{MODEL_VERSION}`. Dataset `{DATASET_VERSION}`. Features `{FEATURE_SPEC_VERSION}`. Seed `{SEED}`.",
         "",
         "C and tree settings were chosen by mean email-level average precision on expanding chronological folds inside `train`. Each row below was then fit on all of `train` and scored once on validation. No frozen test subset was scored. No threshold was chosen.",
         "",
@@ -34,7 +34,7 @@ def _experiment_table(payload: dict, runs: list[dict]) -> str:
         "",
         _run_table(runs),
         "",
-        "Average precision is the area under the precision-recall curve. Email risk is the maximum recipient score. An email is positive when any recipient was unintended. `validation_product_like` has 5 misdirected emails, so its intervals are wide. Diagnostic rates are not 0.5% prevalence results.",
+        f"Average precision is the area under the precision-recall curve. Email risk is the maximum recipient score. An email is positive when any recipient was unintended. `validation_product_like` has {_positives(runs)} misdirected emails, so its intervals are wide. Diagnostic rates are not 0.5% prevalence results.",
         "",
         "## Train cross-validation of the chosen settings",
         "",
@@ -54,7 +54,7 @@ def _comparison(runs: list[dict]) -> str:
         "",
         _run_table([run for run in runs if run["ablation"] in {"behavior_only", "none", "fusion", "all"} and _primary(run)]),
         "",
-        "Behavior-only rows drop `content_cosine`, `content_similarity_observed`, and `pair_text_message_count`. All-features rows keep them. On this generator the all-features gain is the topic shortcut, not a product result. Unobserved recency is imputed with the training median and then log-transformed, so the old 3650-day fallback is not a raw input.",
+        "Behavior-only rows drop `content_cosine`, `content_similarity_observed`, and `pair_text_message_count`. All-features rows keep them. Whether an all-features model may be selected is decided by the recorded eligibility checks in the [decision record](DECISION_RECORD.md), not by this table. Unobserved recency is imputed with the training median and then log-transformed, so the 3650-day fallback is not a raw input.",
         "",
     ]
     return "\n".join(lines)
@@ -64,7 +64,7 @@ def _ablations(runs: list[dict]) -> str:
     lines = [
         "# Phase 4 — Ablations",
         "",
-        "Each learned ablation was tuned on `train` only, then scored once. Behavior-only is the comparison that does not use the content shortcut. Content-only is a diagnostic of that shortcut. `behavior_recency_floor` floors recency at one day. `behavior_drop_rate` removes `pair_outbound_rate_per_day`. Neither diagnostic enters model selection.",
+        "Each learned ablation was tuned on `train` only, then scored once. Behavior-only drops the three content-cosine columns. Drop-content drops every text-derived column, draft-length flags included. Content-only keeps only text-derived columns. `behavior_recency_floor` floors recency at one day. `behavior_drop_rate` removes `pair_outbound_rate_per_day`. Neither diagnostic enters model selection.",
         "",
         _run_table([run for run in runs if run["kind"] in {"logistic", "tree"}]),
         "",
@@ -110,18 +110,40 @@ def _artifact_doc(metadata: dict) -> str:
             "",
             "Labels, roles, scenarios, splits, subsets, families, and other audit fields are rejected. A different feature-spec version or a different installed feature list is rejected.",
             "",
+            "## Preprocessing stored with the model",
+            "",
+            _recency_fill_text(metadata),
+            "",
             "## Output",
             "",
             "One `risk_score` per recipient row. Email risk, when needed, is the maximum of those scores. The bundle does not return a decision.",
             "",
             "## Load checks",
             "",
-            "- `model_version` must be `med-model-v1`.",
+            f"- `model_version` must be `{metadata['model_version']}`.",
             "- `feature_spec_version` must match the installed feature package.",
             "- `full_feature_columns` must match `FEATURE_COLUMNS` in order.",
             "- The loader does not call `fit`.",
             "",
         ]
+    )
+
+
+def _recency_fill_text(metadata: dict) -> str:
+    fill = metadata.get("recency_fill_days")
+    if metadata.get("kind") not in {"logistic", "tree"} or "pair_recency_days" not in metadata["feature_columns"]:
+        return "The selected scorer does not read `pair_recency_days`, so no recency fill is stored."
+    if fill is None:
+        return "No recency fill value was recorded for this bundle."
+    return (
+        "When recency was not observed (`pair_recency_observed` is 0), the feature row carries the "
+        "documented 3650-day fallback. The model does not read that value: it replaces it with the median "
+        f"observed `pair_recency_days` on the training rows, {float(fill):.6g} days "
+        f"({float(fill) * 1440:.1f} minutes), and then applies `log1p`. A first contact therefore enters the model "
+        "with the recency of a typical recent correspondent, and `pair_recency_observed` = 0 is the input that "
+        "marks it as unobserved. Counts also take `log1p`. "
+        + ("Logistic regression then standardizes with the training mean and standard deviation." if metadata.get("kind") == "logistic" else "The tree does not standardize.")
+        + " All of these values are fit on `train` only and stored in `model.joblib`."
     )
 
 
@@ -132,9 +154,19 @@ def _decision(payload: dict, selected: dict, runs: list[dict]) -> str:
     lines = [
         "# Phase 4 — Model selection",
         "",
+        f"Model bundle `{MODEL_VERSION}`. Dataset `{DATASET_VERSION}`. Features `{FEATURE_SPEC_VERSION}`.",
+        "",
         "## Rule",
         "",
-        "Choose the simplest behavior-only model whose email-level average precision on `validation_product_like` falls inside the family bootstrap interval of the best behavior-only model on that same metric. Rules are simpler than logistic regression. Logistic regression is simpler than the tree. When two models are equally simple, the higher mean email average precision from the training folds wins. That tie-break does not use the validation point estimate. Always-allow is the floor and is not eligible. Fusion, the recency-floor diagnostic, and the dropped-rate diagnostic are not eligible.",
+        "Choose the simplest eligible model whose email-level average precision on `validation_product_like` falls inside the family bootstrap interval of the best eligible model on that same metric. Rules are simpler than logistic regression. Logistic regression is simpler than the tree. When two models are equally simple, the higher mean email average precision from the training folds wins. That tie-break does not use the validation point estimate. Always-allow is the floor and is not eligible. Fusion and the diagnostic runs (recency floor, dropped rate) are not eligible.",
+        "",
+        "Behavior-only models are always eligible. An all-features model is eligible only if the checks in the next section hold for its model family.",
+        "",
+        "## Eligibility of all-features models",
+        "",
+        _eligibility_section(payload),
+        "",
+        "## Selected model",
         "",
         f"The rule selects `{selected['name']}`.",
         "",
@@ -156,13 +188,15 @@ def _decision(payload: dict, selected: dict, runs: list[dict]) -> str:
         "",
         _first_contact_paragraph(selected),
         "",
+        _s11_section(selected, runs),
+        "",
         "## Recency",
         "",
         _recency_paragraph(payload, runs),
         "",
         "## Coefficients",
         "",
-        _coefficient_paragraph(selected, runs),
+        _coefficient_paragraph(selected, runs, payload),
         "",
         "## Tree scores",
         "",
@@ -178,21 +212,145 @@ def _decision(payload: dict, selected: dict, runs: list[dict]) -> str:
         "",
         "## Limitations",
         "",
-        "- Content cosine almost separates training mistakes from ordinary repeat mail because relationships keep separate topics. An all-features or content-only score restates that generator.",
-        "- No training row is a misdirected first contact. The paired score check is the evidence for how this model treats one, not the sign of a single coefficient.",
-        "- Many legitimate rows have another message to the same recipient less than five minutes earlier, and no misdirected row does. Part of the behavior-only score is that generator timing.",
-        "- `validation_product_like` has 5 misdirected emails. Intervals are wide. A gap smaller than an interval is not a ranking.",
-        "- The training mix is 10% misdirected. Precision at that mix is not an operating point. Product-like prevalence is a 0.5% simulation assumption.",
-        "- Scores are risk scores. Nothing was calibrated. No threshold was selected. The frozen test subsets were not scored.",
-        "- AC01, AC02, and AC05 were not measured.",
+        _limitations(payload, selected, runs),
         "",
     ]
     return "\n".join(lines)
 
 
+def _eligibility_section(payload: dict) -> str:
+    evidence = payload.get("eligibility") or {}
+    audit = evidence.get("audit") or {}
+    lines = [evidence.get("rule", ""), ""]
+    if "content_auc" in audit:
+        bounds = audit["auc_bounds"]
+        listed = ", ".join(
+            f"`{name}` AUC {value:.3f} (separation {audit['content_separation'][name]:.3f})"
+            for name, value in audit["content_auc"].items()
+        )
+        lines.append(
+            f"Check 1, train shortcut audit (from the feature artifact): content features {listed}. "
+            f"Flag bounds are {bounds[0]} and {bounds[1]}. "
+            + ("No content feature is flagged, so the check passes." if audit["passed"] else f"Flagged: {', '.join(audit['flagged_content'])}. The check fails.")
+        )
+    else:
+        lines.append(f"Check 1, train shortcut audit: {audit.get('reason', 'not available')}. The check fails.")
+    lines += [
+        "",
+        "Checks 2 and 3 compare email average precision fold by fold on the expanding chronological train folds, each model at its own tuned setting. A margin is all-features minus the other model on that fold.",
+        "",
+        "| Family | All-features run | Check 2: min margin over behavior-only (per fold) | Check 3: min margin over content-only (per fold) | Checks passed | Eligible |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    for family, item in (evidence.get("families") or {}).items():
+        stability = item["fold_stability"]
+        content = item["not_content_alone"]
+        passed = [name for name, ok in item["checks"].items() if ok]
+        lines.append(
+            f"| {family} | `{item['run']}` | {_margin(stability)} | {_margin(content)} | {', '.join(passed) or 'none'} | "
+            f"{'yes' if item['eligible'] else 'no (failed: ' + ', '.join(item['failed']) + ')'} |"
+        )
+    lines += [
+        "",
+        "Train-fold mean email average precision by ablation, with the product-like validation figure beside it for reference only:",
+        "",
+        "| Family | All | Behavior-only | Content-only | Drop content (all text) | Drop similarity |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    for family, item in (evidence.get("families") or {}).items():
+        cells = []
+        for ablation in ("all", "behavior_only", "content_only", "drop_content", "drop_similarity"):
+            entry = item["ablations"].get(ablation)
+            if entry is None:
+                cells.append("—")
+                continue
+            cells.append(f"{_num_plain(entry['cv_mean'])} (val {_num_plain(entry['validation_product_like_email_ap'])})")
+        lines.append(f"| {family} | " + " | ".join(cells) + " |")
+    return "\n".join(lines)
+
+
+def _margin(block: dict) -> str:
+    if not block.get("folds"):
+        return "no common folds"
+    per_fold = ", ".join(f"{item['margin']:+.3f}" for item in block["folds"])
+    return f"{block['min_margin']:+.3f} ({per_fold})"
+
+
+def _s11_section(selected: dict, runs: list[dict]) -> str:
+    lines = [
+        "### Mistaken first contacts (S11) against legitimate first contacts (S03, S06)",
+        "",
+        "Recipient-level risk scores, no cutoff applied. S11 rows are unintended recipients the sender had never emailed. Legitimate first-contact rows are intended S03 and S06 recipients who are novel to the sender. AUC is the chance that an S11 row outranks a legitimate first-contact row. No recall is reported here: recall needs the operating cutoff, which Phase 5 sets.",
+        "",
+        "| Run | Subset | S11 rows | S11 median [p25, p75] | Legitimate first-contact rows | Legitimate median [p25, p75] | AUC | AP | S11 above every legitimate first contact | AUC against all other legitimate rows |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    shown = [selected] + [
+        run
+        for run in runs
+        if run["name"] != selected["name"]
+        and run["kind"] in {"logistic", "tree"}
+        and run["ablation"] in {"behavior_only", "all"}
+        and run["name"].endswith(("unweighted", "only", "all"))
+    ]
+    for run in shown:
+        diagnostics = run.get("first_contact_diagnostics") or {}
+        for subset in ("validation_product_like", "validation_diagnostic"):
+            block = diagnostics.get(subset)
+            if not block:
+                continue
+            s11, legit = block["s11_unintended"], block["legitimate_first_contact"]
+            pair = block.get("s11_vs_legitimate_first_contact") or {}
+            other = block.get("s11_vs_all_other_legitimate") or {}
+            lines.append(
+                f"| `{run['name']}` | `{subset}` | {s11['n']} | {_dist(s11)} | {legit['n']} | {_dist(legit)} | "
+                f"{_num_plain(pair.get('roc_auc'))} | {_num_plain(pair.get('average_precision'))} | "
+                f"{pair.get('s11_above_max_legitimate_first_contact', '—')} of {s11['n']} | {_num_plain(other.get('roc_auc'))} |"
+            )
+    lines += [
+        "",
+        "Product-like validation has only a handful of S11 and S03/S06 drafts, so its row is anecdotal. Diagnostic rows share families and are not independent.",
+    ]
+    return "\n".join(lines)
+
+
+def _dist(block: dict) -> str:
+    if not block.get("n"):
+        return "—"
+    return f"{block['median']:.3g} [{block['p25']:.3g}, {block['p75']:.3g}]"
+
+
+def _limitations(payload: dict, selected: dict, runs: list[dict]) -> str:
+    items = []
+    audit = (payload.get("eligibility") or {}).get("audit") or {}
+    cosine = (audit.get("content_separation") or {}).get("content_cosine")
+    if cosine is not None:
+        items.append(
+            f"Content cosine is a real but strong train signal (separation {cosine:.3f}). Off-topic mistakes (S02, S04) sit low on it by their scenario definitions, so a content model's gain on those scenarios partly restates how they were written."
+        )
+    shortcut = (payload.get("recency_shortcut") or {}).get("train") or {}
+    if shortcut:
+        items.append(
+            f"Recency under five minutes: {_share(shortcut.get('legitimate_share_under_5_minutes'))} of legitimate and "
+            f"{_share(shortcut.get('misdirected_share_under_5_minutes'))} of misdirected train rows."
+        )
+    product = selected["validation_product_like"]["email"]
+    items.append(
+        f"`validation_product_like` has {product['positives']} misdirected emails out of {product['n']}. Intervals are wide. A gap smaller than an interval is not a ranking."
+    )
+    items += [
+        "The training mix is 10% misdirected. Precision at that mix is not an operating point. Product-like prevalence is a 0.5% simulation assumption.",
+        "Scores are risk scores. Nothing was calibrated. No threshold was selected. The frozen test subsets were not scored.",
+        "Coefficients on overlapping count features are not separate effects.",
+        "AC01, AC02, and AC05 were not measured in this phase.",
+    ]
+    return "\n".join(f"- {item}" for item in items)
+
+
 def _why(selected: dict, runs: list[dict]) -> str:
     eligible = [run for run in runs if run["eligible"]]
     best = max(eligible, key=_ap)
+    behavior = [run for run in eligible if run["ablation"] == "behavior_only"]
     interval = best["validation_product_like"]["email"]["bootstrap"]["average_precision"]
     outside = []
     inside = []
@@ -203,7 +361,7 @@ def _why(selected: dict, runs: list[dict]) -> str:
         else:
             inside.append(run)
     text = (
-        f"The highest behavior-only email average precision on product-like validation is `{best['name']}` "
+        f"The highest email average precision among eligible models on product-like validation is `{best['name']}` "
         f"at {_fmt_ap(best['validation_product_like']['email'])}."
     )
     if outside:
@@ -221,8 +379,11 @@ def _why(selected: dict, runs: list[dict]) -> str:
         )
     else:
         text += f" The simplest model inside the interval is `{selected['name']}`."
+    if behavior:
+        top = max(behavior, key=_ap)
+        text += f" The best behavior-only model is `{top['name']}` at {_fmt_ap(top['validation_product_like']['email'])}."
     if selected["ablation"] == "behavior_only":
-        text += " It does not use the content cosine columns."
+        text += " The selected model does not use the content cosine columns."
     return text
 
 
@@ -235,7 +396,7 @@ def _first_contact_paragraph(selected: dict) -> str:
     text = (
         f"On product-like validation, the {contrast['n_positive']} unintended recipient rows have median risk "
         f"{before:.4f}. Rewriting each of those rows as a first contact for the same sender "
-        f"(no pair counts, novelty on, recency marked unobserved) moves the median to {after:.4f}."
+        f"(no pair counts, novelty on, recency unobserved, no pair text) moves the median to {after:.4f}."
     )
     fill = selected.get("recency_fill_days")
     if fill is not None:
@@ -244,12 +405,13 @@ def _first_contact_paragraph(selected: dict) -> str:
             f"{float(fill) * 1440:.1f} minutes, and then log-transformed. The old 3650-day fallback is not a raw input."
         )
     if after is not None and after < 0.05:
-        text += " This version still assigns essentially no risk to a mistaken first contact."
+        text += (
+            " A familiar-recipient mistake stripped of its history therefore loses almost all of its risk. The rewrite is "
+            "synthetic; the S11 comparison below scores real mistaken first contacts."
+        )
     else:
         text += (
-            " The unobserved-recency fallback is no longer passed in as 3650 days, so a missing history is not "
-            "automatically a large negative input. Training still contains no misdirected first contact, so this "
-            "paired change is not evidence that a real first-contact mistake would be caught."
+            " The rewrite is a synthetic check; the S11 comparison below scores real mistaken first contacts."
         )
     diagnostic = (selected.get("first_contact_contrast") or {}).get("validation_diagnostic")
     if diagnostic:
@@ -266,14 +428,12 @@ def _recency_paragraph(payload: dict, runs: list[dict]) -> str:
     train = shortcut.get("train") or {}
     product = shortcut.get("validation_product_like") or {}
     text = (
-        "Legitimate rows often have another message to the same recipient less than five minutes earlier. "
-        f"That share is {_share(train.get('legitimate_share_under_5_minutes'))} of {train.get('n_legitimate', '—')} "
-        f"legitimate training rows and {_share(product.get('legitimate_share_under_5_minutes'))} of "
-        f"{product.get('n_legitimate', '—')} legitimate product-like validation rows. "
-        f"No misdirected row in those sets is that recent. The shortest misdirected gap is "
-        f"{_days(train.get('misdirected_min_days'))} in train and {_days(product.get('misdirected_min_days'))} "
-        "on product-like validation. The generator writes some legitimate mail in one-minute bursts, so recency "
-        "is partly a timing artifact."
+        "Share of recipient rows whose last mail between the sender and that recipient was less than five minutes before the draft: "
+        f"{_share(train.get('legitimate_share_under_5_minutes'))} of {train.get('n_legitimate', '—')} legitimate and "
+        f"{_share(train.get('misdirected_share_under_5_minutes'))} of {train.get('n_misdirected', '—')} misdirected training rows; "
+        f"{_share(product.get('legitimate_share_under_5_minutes'))} of {product.get('n_legitimate', '—')} legitimate and "
+        f"{_share(product.get('misdirected_share_under_5_minutes'))} of {product.get('n_misdirected', '—')} misdirected product-like validation rows. "
+        f"The shortest misdirected gap is {_days(train.get('misdirected_min_days'))} in train."
     )
     floor = _named(runs, "logistic_behavior_recency_floor_unweighted")
     if floor:
@@ -285,24 +445,32 @@ def _recency_paragraph(payload: dict, runs: list[dict]) -> str:
     return text
 
 
-def _coefficient_paragraph(selected: dict, runs: list[dict]) -> str:
+def _coefficient_paragraph(selected: dict, runs: list[dict], payload: dict) -> str:
     logistic = selected if selected.get("kind") == "logistic" else _named(runs, "logistic_behavior_only_unweighted")
     if logistic is None:
-        return "No behavior-only logistic model was recorded."
+        return "No logistic model was recorded."
     config = logistic.get("config") or {}
+    grid = payload.get("c_grid") or []
     subject = "The selected logistic" if logistic["name"] == selected["name"] else f"`{logistic['name']}`"
-    text = f"{subject} `C` is {config.get('C')}. The train grid is 0.01, 0.1, 1, 10, and 100. "
-    if config.get("C") is not None and float(config["C"]) == 100.0:
-        text += "Tuning stopped on the top edge, so the fit is the least regularized point in that grid. "
-    elif config.get("C") is not None and float(config["C"]) == 0.01:
-        text += "Tuning stopped on the bottom edge of that grid. "
+    text = f"{subject} `C` is {config.get('C'):g}. The train grid is {', '.join(f'{value:g}' for value in grid)}. "
+    edge = logistic.get("grid_edge")
+    if edge == "top":
+        text += "Tuning stopped on the top edge of the grid, the least regularized point; the search may not have reached its best value. "
+    elif edge == "bottom":
+        text += "Tuning stopped on the bottom edge of the grid, the most regularized point. "
+    else:
+        text += "The chosen value is inside the grid, not on an edge. "
+    edges = [f"`{run['name']}` ({run['grid_edge']})" for run in runs if run.get("grid_edge") and run["name"] != logistic["name"]]
+    if edges:
+        text += f"Other logistic runs whose `C` landed on a grid edge: {', '.join(edges)}. "
     largest = ((logistic.get("novelty") or {}).get("largest_coefficients")) or []
     if largest:
         listed = ", ".join(f"`{item['feature']}` {item['coefficient']:+.2f}" for item in largest[:6])
         text += f"The largest standardized coefficients are {listed}. "
     text += (
-        "Those weights sit on overlapping count features and are not separate effects. "
-        "A single coefficient, including the novelty coefficient, is not a behavioral finding."
+        "Extending the grid is a tuning change only; it does not remove collinearity, and a larger `C` can make correlated "
+        "coefficients less stable. Weights on overlapping count features are not separate effects, and no single coefficient, "
+        "including the novelty coefficient, is a behavioral finding."
     )
     dropped = _named(runs, "logistic_behavior_drop_rate_unweighted")
     if dropped:
@@ -336,6 +504,12 @@ def _tree_paragraph(runs: list[dict]) -> str:
     )
 
 
+def _positives(runs: list[dict]) -> str:
+    for run in runs:
+        return str(run["validation_product_like"]["email"]["positives"])
+    return "—"
+
+
 def _named(runs: list[dict], name: str) -> dict | None:
     for run in runs:
         if run["name"] == name:
@@ -359,7 +533,10 @@ def _content_paragraph(selected: dict, runs: list[dict]) -> str:
     if selected["ablation"] == "behavior_only" or selected["kind"] == "rules":
         uses = "The selected model does not use content cosine, the content-observed flag, or the pair-text count."
     else:
-        uses = "The selected model uses content features. Treat that advantage as the generator shortcut unless a behavior-only model matches it."
+        uses = (
+            "The selected model uses content features. It was a candidate only because its family passed the eligibility checks above; "
+            "the behavior-only model of the same family is reported beside it."
+        )
     return uses + " " + _gap_sentence(runs)
 
 

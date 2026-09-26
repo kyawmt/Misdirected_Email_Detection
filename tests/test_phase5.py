@@ -20,14 +20,27 @@ from med_policy.decision import PolicyBundle, assess_draft, decide, load_bundle,
 from med_policy.evaluate import clopper_pearson, operating_point
 from med_policy.pipeline import TEST_EVALUATION_FILE, run_frozen_evaluation, run_selection
 from med_policy.select import email_scores, select_cutoff
-from med_policy.version import POLICY_VERSION, PolicyError
+from med_policy.version import (
+    DATA_DIR,
+    FEATURE_SPEC_VERSION,
+    FEATURES_DIR,
+    MODEL_PATH,
+    MODEL_VERSION,
+    POLICY_DIR as POLICY_REL,
+    POLICY_VERSION,
+    PolicyError,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
-POLICY_DIR = ROOT / "artifacts" / POLICY_VERSION
-MODEL = ROOT / "artifacts" / "med-model-v1" / "model.joblib"
-FEATURES = ROOT / "artifacts" / "med-features-v1"
+POLICY_DIR = ROOT / POLICY_REL
+MODEL = ROOT / MODEL_PATH
+FEATURES = ROOT / FEATURES_DIR
 MANIFEST = FEATURES / "artifact_manifest.json"
-DATA = ROOT / "data" / "med-synth-v2"
+DATA = ROOT / DATA_DIR
+# Batch (published CSV) and single-draft (in-memory) scores may differ only by
+# summation order. Decisions must match exactly.
+SCORE_BOUND = 1e-12
+NEAR_CUTOFF = 10
 
 
 def _table(rows, subset="validation_product_like"):
@@ -45,7 +58,7 @@ def _table(rows, subset="validation_product_like"):
 
 
 def _bundle(t_warn: float) -> PolicyBundle:
-    policy = {"model_version": "med-model-v1", "feature_spec_version": "med-features-v1", "policy_version": POLICY_VERSION}
+    policy = {"model_version": MODEL_VERSION, "feature_spec_version": FEATURE_SPEC_VERSION, "policy_version": POLICY_VERSION}
     return PolicyBundle(policy=policy, model=None, t_warn=t_warn)
 
 
@@ -246,3 +259,29 @@ def test_decision_path_does_not_fit(monkeypatch):
         assert result["email_risk"] == pytest.approx(row.email_risk, abs=1e-12)
         assert result["decision"] == ("warn" if row.email_risk >= bundle.t_warn else "allow")
         assert result["policy_version"] == POLICY_VERSION
+
+
+def test_batch_and_single_draft_scores_agree_at_the_cutoff():
+    """B3: the drafts nearest T_warn get the same decision from both scoring paths.
+
+    `validation_scores.csv` holds the scores the cutoff was chosen on. The
+    decision path recomputes features in memory for one draft at a time, as the
+    API does. Scores may differ by summation order only; decisions may not.
+    """
+    dataset = read_dataset(DATA)
+    transformer = FittedText.load(FEATURES / "text_transformer.joblib")
+    bundle = load_bundle(POLICY_DIR / "policy.json", MODEL, MANIFEST)
+    directory = directory_from_dataset(dataset)
+    index = history_index_from_dataset(dataset)
+    index.bind(transformer)
+    scores = pd.read_csv(POLICY_DIR / "validation_scores.csv", float_precision="round_trip")
+    scores["gap"] = (scores["email_risk"] - bundle.t_warn).abs()
+    near = scores.sort_values(["gap", "draft_id"]).head(NEAR_CUTOFF)
+    at_cutoff = scores.loc[scores["email_risk"] == bundle.t_warn]
+    sample = pd.concat([near, at_cutoff]).drop_duplicates("draft_id")
+    assert sample["warned"].any() and (~sample["warned"].astype(bool)).any()
+    for row in sample.itertuples(index=False):
+        result = assess_draft(bundle, directory, index, transformer, query_from_dataset(dataset, row.draft_id))
+        assert result["status"] == "assessed"
+        assert abs(result["email_risk"] - row.email_risk) <= SCORE_BOUND
+        assert (result["decision"] == "warn") == bool(row.warned), row.draft_id

@@ -15,11 +15,15 @@ import numpy as np
 import pandas as pd
 
 from med_data.calendar import FROZEN_SUBSETS
+from med_data.io import read_dataset
+from med_features.profiles import directory_from_dataset, history_index_from_dataset
+from med_features.text_model import FittedText
+from med_features.transform import query_from_dataset
 from med_features.schema import FEATURE_SPEC_VERSION
 from med_models.data import sha256_file, verify_feature_artifact
 from med_models.package import load_model
 from med_models.version import MODEL_VERSION
-from med_policy.decision import load_bundle
+from med_policy.decision import PolicyBundle, assess_draft, load_bundle
 from med_policy.evaluate import (
     examples,
     first_contact_check,
@@ -38,6 +42,7 @@ from med_policy.version import (
     DIAGNOSTIC_SUBSET,
     N_BOOTSTRAP,
     POLICY_VERSION,
+    SCORE_PARITY_BOUND,
     SEED,
     SELECTION_SUBSET,
     TEST_SUBSETS,
@@ -75,6 +80,17 @@ def run_selection(features_dir: Path, data_dir: Path, model_path: Path, out_dir:
     rules_selection = select_cutoff(email_scores(product, "rules_score"), SELECTION_SUBSET)
     t_warn = selection["chosen"]["cutoff"]
     point = operating_point(product, t_warn)
+    parity = scoring_path_parity(
+        PolicyBundle(
+            policy={"model_version": MODEL_VERSION, "feature_spec_version": FEATURE_SPEC_VERSION, "policy_version": POLICY_VERSION},
+            model=model,
+            t_warn=t_warn,
+        ),
+        features_dir,
+        data_dir,
+        product_emails,
+    )
+    n_positive = int(product_emails["positive"].sum())
 
     out_dir.mkdir(parents=True, exist_ok=True)
     policy = {
@@ -89,9 +105,10 @@ def run_selection(features_dir: Path, data_dir: Path, model_path: Path, out_dir:
         "scores_are": "risk_scores",
         "calibration": "not_fit",
         "calibration_reason": (
-            "validation_product_like has 5 misdirected emails, too few to fit or to split for a calibrator. "
-            "validation_diagnostic is not the operating mix and train fit the model. A reliability table on "
-            "validation_diagnostic is a shape check only."
+            f"{SELECTION_SUBSET} has {n_positive} misdirected emails. Separate chronological portions for calibration "
+            f"and threshold selection would leave about {n_positive // 2} positives in each, too few to fit a calibrator "
+            "and still choose a cutoff. validation_diagnostic is not the operating mix and train fit the model. "
+            "A reliability table on validation_diagnostic is a shape check only."
         ),
         "decision_rule": {
             "email_risk": "maximum recipient risk score",
@@ -125,6 +142,7 @@ def run_selection(features_dir: Path, data_dir: Path, model_path: Path, out_dir:
             "model.joblib": sha256_file(Path(model_path)),
             "artifact_manifest.json": sha256_file(Path(features_dir) / "artifact_manifest.json"),
         },
+        "scoring_path_parity": parity,
         "test_subsets_used": False,
         "statement": "Selected on validation_product_like only. test_product_like and test_diagnostic were not read.",
         "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -150,6 +168,51 @@ def run_selection(features_dir: Path, data_dir: Path, model_path: Path, out_dir:
     }
     _write_json(out_dir / VALIDATION_EVALUATION_FILE, evaluation)
     return {"policy": policy, "evaluation": evaluation}
+
+
+def scoring_path_parity(bundle: PolicyBundle, features_dir: Path, data_dir: Path, emails: pd.DataFrame) -> dict:
+    """B3: score every selection draft through `assess_draft`, the function the API calls.
+
+    The cutoff was chosen on batch scores from the published feature CSV. This
+    recomputes features in memory one draft at a time and requires identical
+    decisions on every draft, including any at the cutoff, and score
+    differences within SCORE_PARITY_BOUND. Otherwise no policy is written.
+    """
+    dataset = read_dataset(data_dir)
+    transformer = FittedText.load(Path(features_dir) / "text_transformer.joblib")
+    directory = directory_from_dataset(dataset)
+    index = history_index_from_dataset(dataset)
+    index.bind(transformer)
+    t_warn = bundle.t_warn
+    max_diff = 0.0
+    mismatched = []
+    at_cutoff = []
+    for row in emails.itertuples(index=False):
+        result = assess_draft(bundle, directory, index, transformer, query_from_dataset(dataset, row.draft_id))
+        if result["status"] != "assessed":
+            raise PolicyError(f"{row.draft_id} could not be assessed on the single-draft path: {result.get('reason')}")
+        diff = abs(result["email_risk"] - float(row.email_risk))
+        max_diff = max(max_diff, diff)
+        batch_warn = float(row.email_risk) >= t_warn
+        single_warn = result["decision"] == "warn"
+        if batch_warn != single_warn:
+            mismatched.append(row.draft_id)
+        if float(row.email_risk) == t_warn:
+            at_cutoff.append({"draft_id": row.draft_id, "batch": float(row.email_risk), "single": result["email_risk"], "decision": result["decision"]})
+    if mismatched or max_diff > SCORE_PARITY_BOUND:
+        raise PolicyError(
+            f"Scoring paths disagree on {SELECTION_SUBSET}: {len(mismatched)} decisions differ, max score difference {max_diff:.3e}"
+        )
+    return {
+        "subset": SELECTION_SUBSET,
+        "selected_on": "batch scores from the published feature CSV (lossless float round trip)",
+        "compared_with": "assess_draft on each draft with features computed in memory, the function the API calls",
+        "drafts": int(len(emails)),
+        "identical_decisions": int(len(emails) - len(mismatched)),
+        "max_abs_email_risk_difference": max_diff,
+        "bound": SCORE_PARITY_BOUND,
+        "drafts_at_T_warn": at_cutoff,
+    }
 
 
 def write_validation_scores(emails: pd.DataFrame, t_warn: float, path: Path) -> None:

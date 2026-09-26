@@ -3,10 +3,18 @@
 Hyperparameters are chosen by mean email-level average precision on expanding
 chronological folds inside train. Each chosen configuration is then fit on all
 of train and scored once on each validation subset.
+
+Behavior-only models are always selection candidates. An all-features model
+becomes a candidate only when three recorded checks hold (see `eligibility`):
+the train shortcut audit flags no content feature, its advantage over the
+behavior-only model of the same family holds in every chronological train
+fold, and it also beats the content-only model of that family in every fold.
+The checks use train folds only; validation is not used to decide eligibility.
 """
 
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 
@@ -21,6 +29,13 @@ from med_models.metrics import breakdowns, email_table, email_view, ranking_metr
 from med_models.version import SEED
 
 SIMPLICITY = {"rules": 0, "logistic": 1, "tree": 2}
+FAMILIES = (
+    ("logistic_unweighted", "logistic_{ablation}_unweighted"),
+    ("logistic_balanced", "logistic_{ablation}_balanced"),
+    ("tree", "tree_{ablation}"),
+)
+FIRST_CONTACT_LEGITIMATE = ("S03", "S06")
+FIRST_CONTACT_MISTAKE = "S11"
 
 
 def run_experiments(features_dir: Path, data_dir: Path) -> dict:
@@ -131,8 +146,16 @@ def run_experiments(features_dir: Path, data_dir: Path) -> dict:
             fitted[run["name"]] = FusionModel()
         elif run["name"] == "always_allow":
             fitted[run["name"]] = AlwaysAllow()
+    for run in runs:
+        run["family"] = _family(run["name"])
+    eligibility = eligibility_checks(runs, _audit_report(features_dir))
+    for run in runs:
+        if run["ablation"] == "all" and run["kind"] in SIMPLICITY and run["family"] in eligibility["families"]:
+            run["eligible"] = eligibility["families"][run["family"]]["eligible"]
     selected_name = _select(runs)
     return {
+        "eligibility": eligibility,
+        "c_grid": list(C_GRID),
         "seed": SEED,
         "folds": boundaries,
         "runs": runs,
@@ -323,6 +346,7 @@ def _score_fitted(name, kind, ablation, model, columns, config, tuning, train_fr
         "config": _json_ready(config),
         "simplicity": SIMPLICITY.get(kind, 9),
         "eligible": kind in SIMPLICITY and ablation == "behavior_only",
+        "grid_edge": _grid_edge(kind, config),
         "cv": _json_ready(cv),
         "tuning_grid": tuning.get("grid", []),
         "fit_seconds": fit_seconds,
@@ -332,6 +356,14 @@ def _score_fitted(name, kind, ablation, model, columns, config, tuning, train_fr
         "recency_fill_days": _json_ready(getattr(getattr(model, "scaler", None), "recency_fill_", None)),
         "first_contact_contrast": _json_ready(_contrasts(model, columns, product_frame, product_audit, diagnostic_frame, diagnostic_audit))
         if kind == "logistic" and "recipient_novel_to_sender" in columns
+        else None,
+        "first_contact_diagnostics": _json_ready(
+            {
+                "validation_product_like": first_contact_diagnostics(model, product_frame, product_audit, columns),
+                "validation_diagnostic": first_contact_diagnostics(model, diagnostic_frame, diagnostic_audit, columns),
+            }
+        )
+        if kind in {"logistic", "tree", "rules"}
         else None,
     }
 
@@ -354,10 +386,180 @@ def _evaluate(model, frame, audit, columns) -> dict:
     return result
 
 
+def _audit_report(features_dir: Path) -> dict | None:
+    path = Path(features_dir) / "quality_report.json"
+    if not path.exists():
+        return None
+    return json.loads(path.read_text(encoding="utf-8")).get("shortcut_checks")
+
+
+def _family(name: str) -> str | None:
+    for family, pattern in FAMILIES:
+        prefix, suffix = pattern.split("{ablation}")
+        if name.startswith(prefix) and name.endswith(suffix):
+            return family
+    return None
+
+
+def _fold_map(run: dict | None) -> dict[int, float]:
+    if run is None:
+        return {}
+    return {
+        int(item["fold"]): float(item["average_precision"])
+        for item in (run.get("cv") or {}).get("folds", [])
+        if item.get("average_precision") is not None
+    }
+
+
+def _fold_margins(better: dict | None, worse: dict | None) -> dict:
+    left, right = _fold_map(better), _fold_map(worse)
+    folds = sorted(set(left) & set(right))
+    margins = [{"fold": fold, "margin": left[fold] - right[fold]} for fold in folds]
+    values = [item["margin"] for item in margins]
+    return {
+        "folds": margins,
+        "n_folds": len(folds),
+        "min_margin": min(values) if values else None,
+        "mean_margin": float(np.mean(values)) if values else None,
+        "holds_in_every_fold": bool(values) and min(values) > 0,
+    }
+
+
+def eligibility_checks(runs: list[dict], audit: dict | None) -> dict:
+    """C3: decide from recorded evidence whether all-features models may be selected.
+
+    1. audit: the train shortcut audit flags no content feature as a near-perfect separator
+    2. fold stability: all-features beats behavior-only of the same family in every train fold
+    3. not content alone: all-features also beats content-only of the same family in every train fold
+    Drop-content and drop-similarity are recorded beside them as context.
+    """
+    by_name = {run["name"]: run for run in runs}
+    if audit is None:
+        audit_check = {"passed": False, "reason": "no train shortcut audit in the feature artifact"}
+    else:
+        flagged = list(audit.get("flagged_content", []))
+        content = {item["feature"]: item for item in audit["features"] if item.get("content")}
+        audit_check = {
+            "passed": not flagged,
+            "flagged_content": flagged,
+            "auc_bounds": audit["auc_bounds"],
+            "content_auc": {name: item["auc"] for name, item in content.items()},
+            "content_separation": {name: item["separation"] for name, item in content.items()},
+        }
+    families = {}
+    for family, pattern in FAMILIES:
+        named = {ablation: by_name.get(pattern.format(ablation=ablation)) for ablation in ABLATIONS}
+        full = named["all"]
+        if full is None:
+            continue
+        stability = _fold_margins(full, named["behavior_only"])
+        not_content = _fold_margins(full, named["content_only"])
+        context = {}
+        for ablation in ("all", "behavior_only", "content_only", "drop_content", "drop_similarity"):
+            run = named.get(ablation)
+            if run is None:
+                continue
+            context[ablation] = {
+                "run": run["name"],
+                "cv_mean": (run.get("cv") or {}).get("mean"),
+                "cv_folds": _fold_map(run),
+                "validation_product_like_email_ap": run["validation_product_like"]["email"]["average_precision"],
+            }
+        checks = {
+            "audit": audit_check["passed"],
+            "fold_stability": stability["holds_in_every_fold"],
+            "not_content_alone": not_content["holds_in_every_fold"],
+        }
+        failed = [name for name, passed in checks.items() if not passed]
+        families[family] = {
+            "run": full["name"],
+            "checks": checks,
+            "failed": failed,
+            "eligible": not failed,
+            "fold_stability": stability,
+            "not_content_alone": not_content,
+            "ablations": context,
+        }
+    return {
+        "rule": (
+            "An all-features model is a selection candidate only if (1) the train shortcut audit flags no content "
+            "feature, (2) it beats the behavior-only model of the same family in every chronological train fold, "
+            "and (3) it beats the content-only model of the same family in every train fold. Otherwise behavior-only "
+            "selection stands. Validation is not used for these checks."
+        ),
+        "audit": audit_check,
+        "families": families,
+    }
+
+
+def first_contact_diagnostics(model, frame, audit, columns) -> dict:
+    """C4: threshold-free scores for mistaken first contacts against legitimate ones.
+
+    Recipient rows only. S11 unintended rows are compared with legitimate
+    first-contact rows (S03, S06 intended rows whose recipient is novel to the
+    sender). No cutoff is applied, so no recall is reported here.
+    """
+    scores = np.asarray(model.predict(model_matrix(frame, columns)), dtype=np.float64)
+    scenario = audit["scenario_id"].astype(str).to_numpy()
+    positive = audit["positive"].to_numpy(dtype=bool)
+    novel = audit["recipient_novel_to_sender"].to_numpy() == 1
+    mistake = (scenario == FIRST_CONTACT_MISTAKE) & positive
+    legitimate = np.isin(scenario, FIRST_CONTACT_LEGITIMATE) & ~positive & novel
+    other_legitimate = ~positive & ~legitimate
+    result = {
+        "s11_unintended": _distribution(scores[mistake]),
+        "legitimate_first_contact": _distribution(scores[legitimate]),
+        "all_other_legitimate": _distribution(scores[other_legitimate]),
+    }
+    if mistake.any() and legitimate.any():
+        pair = mistake | legitimate
+        metrics = ranking_metrics(mistake[pair], scores[pair])
+        result["s11_vs_legitimate_first_contact"] = {
+            "roc_auc": metrics["roc_auc"],
+            "average_precision": metrics["average_precision"],
+            "positives": metrics["positives"],
+            "negatives": metrics["negatives"],
+            "s11_above_max_legitimate_first_contact": int((scores[mistake] > scores[legitimate].max()).sum()),
+        }
+    if mistake.any() and other_legitimate.any():
+        pair = mistake | other_legitimate
+        metrics = ranking_metrics(mistake[pair], scores[pair])
+        result["s11_vs_all_other_legitimate"] = {
+            "roc_auc": metrics["roc_auc"],
+            "average_precision": metrics["average_precision"],
+            "positives": metrics["positives"],
+            "negatives": metrics["negatives"],
+        }
+    return result
+
+
+def _distribution(values: np.ndarray) -> dict:
+    if len(values) == 0:
+        return {"n": 0}
+    return {
+        "n": int(len(values)),
+        "min": float(values.min()),
+        "p25": float(np.percentile(values, 25)),
+        "median": float(np.median(values)),
+        "p75": float(np.percentile(values, 75)),
+        "max": float(values.max()),
+    }
+
+
+def _grid_edge(kind: str, config: dict) -> str | None:
+    if kind != "logistic" or "C" not in config:
+        return None
+    if float(config["C"]) == max(C_GRID):
+        return "top"
+    if float(config["C"]) == min(C_GRID):
+        return "bottom"
+    return None
+
+
 def _select(runs: list[dict]) -> str:
     candidates = [run for run in runs if run["eligible"]]
     if not candidates:
-        raise RuntimeError("No behavior-only model was eligible for selection")
+        raise RuntimeError("No model was eligible for selection")
     best = max(candidates, key=lambda run: _email_ap(run))
     interval = best["validation_product_like"]["email"]["bootstrap"]["average_precision"]
     within = []
@@ -398,6 +600,10 @@ def _first_contact_contrast(model, frame, audit, columns) -> dict:
         ("co_partner_fraction", 0.0),
         ("co_focus_conditional_fraction", 0.0),
         ("co_focus_history_available", 0),
+        # A first contact has no pair text, so the content fields take their fallbacks too.
+        ("content_cosine", 0.0),
+        ("content_similarity_observed", 0),
+        ("pair_text_message_count", 0),
     ):
         if name in altered.columns:
             altered[name] = value

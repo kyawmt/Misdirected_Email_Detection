@@ -12,7 +12,6 @@ from datetime import timedelta
 
 import numpy as np
 import pandas as pd
-from scipy.sparse import vstack
 
 from med_data.history import family_body_hashes
 from med_features.preprocess import document_text, is_blank, unigrams
@@ -266,16 +265,21 @@ def _unique_sorted(history, positions: list[int]) -> list[int]:
 
 
 def _content_cosine(draft_vector, history, positions: list[int]) -> tuple[float, int]:
-    usable = []
-    for pos in positions:
-        row = history.vector_at(pos)
-        if row.nnz:
-            usable.append(row)
-    text_count = len(usable)
+    """Cosine between the draft and the mean TF-IDF row of the pair's earlier mail.
+
+    The history rows are sliced once per recipient. Rows with no vocabulary
+    term are left out of the count and the mean, in the original time order.
+    """
+    if not positions:
+        return 0.0, 0
+    rows = history.vector_rows(positions)
+    nonempty = np.diff(rows.indptr) > 0
+    text_count = int(nonempty.sum())
     if draft_vector.nnz == 0 or text_count == 0:
         return 0.0, text_count
-    stacked = vstack(usable, format="csr")
-    centroid = np.asarray(stacked.mean(axis=0)).ravel()
+    if text_count < rows.shape[0]:
+        rows = rows[np.flatnonzero(nonempty)]
+    centroid = np.asarray(rows.mean(axis=0)).ravel()
     norm = float(np.linalg.norm(centroid))
     if norm == 0.0:
         return 0.0, text_count

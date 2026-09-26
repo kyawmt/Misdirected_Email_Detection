@@ -13,6 +13,7 @@ from pathlib import Path
 import pandas as pd
 
 from med_data.calendar import parse_ts
+from med_features.build import read_features
 from med_features.schema import FEATURE_COLUMNS, FEATURE_SPEC_VERSION, MATRIX_COLUMNS
 from med_models.version import ModelError
 
@@ -70,11 +71,11 @@ def load_model_table(features_dir: Path, data_dir: Path, subset: str) -> tuple[p
     if subset not in ALLOWED_SUBSETS:
         raise ModelError(f"Unknown subset {subset}")
     verify_feature_artifact(features_dir)
-    frame = pd.read_csv(features_dir / f"features_{subset}.csv")
+    frame = read_features(features_dir / f"features_{subset}.csv")
     if list(frame.columns) != list(MATRIX_COLUMNS):
         raise ModelError(f"features_{subset}.csv columns do not match the feature schema")
     if not (frame["feature_spec_version"] == FEATURE_SPEC_VERSION).all():
-        raise ModelError("Feature spec version on a row does not match med-features-v1")
+        raise ModelError(f"Feature spec version on a row does not match {FEATURE_SPEC_VERSION}")
     leaked = set(frame.columns) & FORBIDDEN_COLUMNS
     if leaked:
         raise ModelError(f"Feature matrix contains audit columns: {sorted(leaked)}")

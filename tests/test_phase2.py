@@ -11,31 +11,38 @@ from med_data.io import _row_count, read_dataset, write_dataset
 from med_data.prevalence import precision_from_rates
 from med_data.schema import MODEL_INPUT_DENYLIST, TABLES
 from med_data.validate import assert_valid
-from med_data.version import DATASET_VERSION, SEED
+from med_data import version
+from med_data.version import DATA_DIR, SEED
 from med_data.views import denied_keys, scoring_view
 
 ROOT = Path(__file__).resolve().parents[1]
-PUBLISHED = ROOT / "data" / DATASET_VERSION
+PUBLISHED = ROOT / DATA_DIR
 
 
 def test_published_contract_passes_validation(dataset):
     checks = assert_valid(dataset)
-    assert len(checks) == 31
+    ids = [check.check_id for check in checks]
+    assert ids == [f"Q{index:02d}" for index in range(1, len(ids) + 1)]
     assert dataset.seed == SEED
-    assert {check.check_id for check in checks} >= {"Q29", "Q30", "Q31"}
+    assert set(ids) >= {"Q29", "Q30", "Q31"}
 
 
 def test_product_like_prevalence_and_enrichment(dataset):
     manifest = dataset.split_manifest
     expected = {
-        "train": (300, 3000),
-        "validation_product_like": (20, 4000),
-        "test_product_like": (30, 6000),
+        "train": (version.TRAIN_MISDIRECTED, version.TRAIN_DRAFTS, 0.10),
+        "validation_product_like": (
+            version.PRODUCT_LIKE_VALIDATION_MISDIRECTED,
+            version.PRODUCT_LIKE_VALIDATION_DRAFTS,
+            0.005,
+        ),
+        "test_product_like": (version.PRODUCT_LIKE_TEST_MISDIRECTED, version.PRODUCT_LIKE_TEST_DRAFTS, 0.005),
     }
-    for subset, (misdirected, total) in expected.items():
+    for subset, (misdirected, total, rate) in expected.items():
         group = manifest.loc[manifest["subset"] == subset]
         assert len(group) == total
         assert int(group["is_misdirected_email"].sum()) == misdirected
+        assert misdirected / total == pytest.approx(rate)
     frozen = manifest.loc[manifest["frozen"], "subset"].unique()
     assert set(frozen) == {"test_product_like", "test_diagnostic"}
 

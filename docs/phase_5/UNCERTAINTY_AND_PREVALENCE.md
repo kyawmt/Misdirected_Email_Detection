@@ -9,10 +9,10 @@
 
 | Subset | Legitimate emails | One false warning, per 1,000 | False warnings | Rate per 1,000 | Exact upper 95% | Upper 95% if zero |
 | --- | --- | --- | --- | --- | --- | --- |
-| `validation_product_like` | 995 | 1.005 | 0 | 0.00 | 3.70 | 3.70 |
-| `test_product_like` | 1990 | 0.503 | 0 | 0.00 | 1.85 | 1.85 |
+| `validation_product_like` | 3980 | 0.251 | 0 | 0.00 | 0.93 | 0.93 |
+| `test_product_like` | 5970 | 0.168 | 0 | 0.00 | 0.62 | 0.62 |
 
-The budget is 1 false intervention per 1,000 legitimate emails. Even zero false warnings on these sample sizes leave the upper bound above it, so the strong AC01 claim cannot be supported by this data. A point estimate within the budget is provisional. The subsets were not enlarged.
+The budget is 1 false intervention per 1,000 legitimate emails. A point estimate within the budget is provisional; the strong AC01 claim needs the exact upper bound at or below the budget. With 3980 legitimate emails on `validation_product_like`, zero false warnings give an upper bound of 0.93 per 1,000, within the budget. With 5970 legitimate emails on `test_product_like`, zero false warnings give an upper bound of 0.62 per 1,000, within the budget. Only the `test_product_like` pass counts for AC01, because `validation_product_like` chose the cutoff.
 
 ## Prevalence sensitivity
 
@@ -22,18 +22,18 @@ The budget is 1 false intervention per 1,000 legitimate emails. Even zero false 
 
 | Prevalence | TPR | FPR | Precision | FPR upper 95% | Precision at FPR upper |
 | --- | --- | --- | --- | --- | --- |
-| 0.1% | 0.800 | 0.00000 | 1.000 | 0.00370 | 0.178 |
-| 0.5% | 0.800 | 0.00000 | 1.000 | 0.00370 | 0.521 |
-| 1.0% | 0.800 | 0.00000 | 1.000 | 0.00370 | 0.686 |
-| 2.0% | 0.800 | 0.00000 | 1.000 | 0.00370 | 0.815 |
+| 0.1% | 0.400 | 0.00000 | 1.000 | 0.00093 | 0.302 |
+| 0.5% | 0.400 | 0.00000 | 1.000 | 0.00093 | 0.685 |
+| 1.0% | 0.400 | 0.00000 | 1.000 | 0.00093 | 0.813 |
+| 2.0% | 0.400 | 0.00000 | 1.000 | 0.00093 | 0.898 |
 
 ### `test_product_like`
 
 | Prevalence | TPR | FPR | Precision | FPR upper 95% | Precision at FPR upper |
 | --- | --- | --- | --- | --- | --- |
-| 0.1% | 0.500 | 0.00000 | 1.000 | 0.00185 | 0.213 |
-| 0.5% | 0.500 | 0.00000 | 1.000 | 0.00185 | 0.576 |
-| 1.0% | 0.500 | 0.00000 | 1.000 | 0.00185 | 0.732 |
-| 2.0% | 0.500 | 0.00000 | 1.000 | 0.00185 | 0.846 |
+| 0.1% | 0.300 | 0.00000 | 1.000 | 0.00062 | 0.327 |
+| 0.5% | 0.300 | 0.00000 | 1.000 | 0.00062 | 0.709 |
+| 1.0% | 0.300 | 0.00000 | 1.000 | 0.00062 | 0.831 |
+| 2.0% | 0.300 | 0.00000 | 1.000 | 0.00062 | 0.908 |
 
 Diagnostic-set rates are not product-like prevalence results and are not used in this table. Train precision at the 10% training mix is not an operating point.

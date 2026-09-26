@@ -193,10 +193,11 @@ class HistoryIndex:
     def domains_at(self, pos: int) -> tuple[str, ...]:
         return self.recipient_domains[pos]
 
-    def vector_at(self, pos: int):
+    def vector_rows(self, positions: list[int]):
+        """TF-IDF rows for these positions, in the given order, as one CSR slice."""
         if self.vectors is None:
             raise FeatureError("History index has no text vectors")
-        return self.vectors.getrow(pos)
+        return self.vectors[np.asarray(positions, dtype=np.intp)]
 
     def visible_message_ids(self, cutoff, family: str | None, hashes: frozenset[str]) -> list[str]:
         hi = bisect_left(self.sent_at, cutoff)
@@ -355,8 +356,11 @@ class EventHistory:
     def domains_at(self, pos: int) -> tuple[str, ...]:
         return self.events[pos].recipient_domains
 
-    def vector_at(self, pos: int):
-        return self.vectors.getrow(pos)
+    def vector_rows(self, positions: list[int]):
+        """TF-IDF rows for these positions, in the given order, as one CSR slice."""
+        if self.vectors is None:
+            raise FeatureError("History has no text vectors")
+        return self.vectors[np.asarray(positions, dtype=np.intp)]
 
     def _window(self, positions, start, cutoff, family, hashes) -> list[int]:
         if not positions:

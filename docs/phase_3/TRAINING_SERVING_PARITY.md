@@ -1,6 +1,6 @@
 # Phase 3 — Training and serving parity
 
-Feature specification: `med-features-v1`.
+Feature specification: `med-features-v2`.
 
 Training rows and a later single-draft score use one row builder, one feature order, and one fitted text transformer. The checks below are implemented in `tests/test_phase3.py`. They use small fixtures for behavior and the published dataset only for integrity: history identity, train-only fitting, and agreement between the index and a scoring view. They do not inspect frozen-test feature distributions.
 
@@ -10,6 +10,8 @@ Training rows and a later single-draft score use one row builder, one feature or
 - Calling the transform twice on the same index and transformer returns the same frame.
 - Saving `text_transformer.joblib` and loading it, then binding a new index, returns the same frame. The load path checks the specification version and the preprocessor config. It does not call `fit`.
 - A scoring view's history, passed through `EventHistory`, matches the index path for the same draft. The view carries no labels. The index path applies the family and body-hash exclusions itself.
+- The published feature CSVs are lossless: for the first, middle, and last draft of each exported subset, a fresh in-memory transform equals the stored rows bit for bit when read with `read_features`.
+- The vectorized content-cosine centroid equals an explicit per-row mean on a fixture, skipping rows with no vocabulary term.
 
 ## Same history rules
 
@@ -46,7 +48,7 @@ Training rows and a later single-draft score use one row builder, one feature or
 - unobserved cosine is 0, and an observed cosine requires in-vocabulary draft text and at least one pair text message
 - an empty draft is not marked out of vocabulary
 
-Serving code that loads `med-features-v1` should run this check on a scored frame when a regression suite is added. A failed check is a broken transform, not a low-risk draft.
+Serving code that loads `med-features-v2` should run this check on a scored frame when a regression suite is added. A failed check is a broken transform, not a low-risk draft.
 
 ## What parity does not cover
 

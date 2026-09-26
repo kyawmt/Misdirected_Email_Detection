@@ -1,4 +1,4 @@
-"""Feature matrix contract for med-features-v1.
+"""Feature matrix contract for the feature specification in `med_features.version`.
 
 Key columns identify a recipient row. They are not model inputs.
 Feature columns are the only values a later model may read.

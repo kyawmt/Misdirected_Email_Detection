@@ -1,6 +1,6 @@
 # Phase 3 — Feature catalog
 
-Feature specification: `med-features-v1`. Dataset: `med-synth-v2`.
+Feature specification: `med-features-v2`. Dataset: `med-synth-v4`.
 
 Each addressed recipient of a draft becomes one row. The model matrix is the feature columns below, in this order. `draft_id`, `contact_id`, and `recipient_order` are join keys and are not features. A later model must not join scenario, label, split, subset, family, withheld contact, or role onto that matrix.
 
@@ -110,7 +110,7 @@ The pair profile is the mean of the L2-normalized TF-IDF vectors of kept inbound
 | `draft_subject_blank` | 1 when the subject is blank. |
 | `draft_body_blank` | 1 when the body is blank. |
 
-Zilberman et al. (2013) motivate comparing content beyond direct pair frequency. A group-topic centroid would be a later optional experiment. It is not part of `med-features-v1`, so no feature claims that kind of support.
+Zilberman et al. (2013) motivate comparing content beyond direct pair frequency. A group-topic centroid would be a later optional experiment. It is not part of `med-features-v2`, so no feature claims that kind of support.
 
 ## Preprocessing and generator slots
 

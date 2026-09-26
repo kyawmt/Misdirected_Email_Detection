@@ -1,0 +1,33 @@
+{
+  "feature_spec_version": "med-features-v2",
+  "files": {
+    "feature_schema.json": {
+      "bytes": 4978,
+      "sha256": "b6a05a5fe436a870e8aef48cae1cf7996552e948d510db36e311cac79062c117"
+    },
+    "features_train.csv": {
+      "bytes": 895724,
+      "sha256": "7c96eef737cefe7576663d713f0e569e124a7f5a20330b614c7dbb14a201de04"
+    },
+    "features_validation_diagnostic.csv": {
+      "bytes": 137091,
+      "sha256": "d3fdcc3a35b5e47e93021bf12a9e4b2d2792bc4572e44aba3feca9e547147c99"
+    },
+    "features_validation_product_like.csv": {
+      "bytes": 1124844,
+      "sha256": "d6fd579d165a3087dd50bc517cacbe3df5dae3cc36db9e6539d93d3b9ce56a80"
+    },
+    "fit_metadata.json": {
+      "bytes": 4272,
+      "sha256": "ccc07fcd048679caad82b345db1b57cee624c7364dc6e938072f1eb0035d5f4c"
+    },
+    "quality_report.json": {
+      "bytes": 68694,
+      "sha256": "418031f351a3b86023477e1c791590ccf9c225f29723dd53c5794606262c5cce"
+    },
+    "text_transformer.joblib": {
+      "bytes": 36678,
+      "sha256": "a9c59597bd46dbbcfbb1f86bf3dc9ebc1d796c5b3415e2e06e77f604665ae228"
+    }
+  }
+}

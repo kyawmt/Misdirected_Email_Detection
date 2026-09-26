@@ -35,12 +35,12 @@ Unknown snapshot (HTTP 503):
   "email_risk_score": null,
   "flagged_recipients": null,
   "recipients": null,
-  "draft_reference": "fixture-d001083",
+  "draft_reference": "fixture-d005962",
   "provenance": {
-    "model_version": "med-model-v1",
-    "feature_spec_version": "med-features-v1",
-    "policy_version": "med-policy-v1",
-    "snapshot_id": "med-synth-v2"
+    "model_version": "med-model-v2",
+    "feature_spec_version": "med-features-v2",
+    "policy_version": "med-policy-v2",
+    "snapshot_id": "med-synth-v4"
   },
   "duration_ms": "<measured>"
 }
@@ -60,12 +60,12 @@ Malformed recipient address (HTTP 422):
   "email_risk_score": null,
   "flagged_recipients": null,
   "recipients": null,
-  "draft_reference": "fixture-d001083",
+  "draft_reference": "fixture-d005962",
   "provenance": {
-    "model_version": "med-model-v1",
-    "feature_spec_version": "med-features-v1",
-    "policy_version": "med-policy-v1",
-    "snapshot_id": "med-synth-v2"
+    "model_version": "med-model-v2",
+    "feature_spec_version": "med-features-v2",
+    "policy_version": "med-policy-v2",
+    "snapshot_id": "med-synth-v4"
   },
   "duration_ms": "<measured>"
 }

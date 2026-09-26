@@ -1,0 +1,97 @@
+{
+  "policy_version": "med-policy-v2",
+  "model_version": "med-model-v2",
+  "model_run_name": "logistic_all_balanced",
+  "feature_spec_version": "med-features-v2",
+  "dataset_version": "med-synth-v4",
+  "T_warn": 0.9996767050340489,
+  "blocking_enabled": false,
+  "T_block": null,
+  "scores_are": "risk_scores",
+  "calibration": "not_fit",
+  "calibration_reason": "validation_product_like has 20 misdirected emails. Separate chronological portions for calibration and threshold selection would leave about 10 positives in each, too few to fit a calibrator and still choose a cutoff. validation_diagnostic is not the operating mix and train fit the model. A reliability table on validation_diagnostic is a shape check only.",
+  "decision_rule": {
+    "email_risk": "maximum recipient risk score",
+    "allow": "email_risk < T_warn",
+    "warn": "email_risk >= T_warn (equality warns)",
+    "block": "disabled",
+    "flagged_recipients": "every recipient with risk score >= T_warn"
+  },
+  "selection": {
+    "subset": "validation_product_like",
+    "level": "email",
+    "rule": "Candidates are the distinct email risk scores on the subset plus one cutoff above every score. Keep candidates with 0 false interventions, maximize email recall, break ties with the highest cutoff.",
+    "n_candidates": 3999,
+    "zero_false_intervention_candidates": 9,
+    "chosen": {
+      "cutoff": 0.9996767050340489,
+      "true_positives": 8,
+      "false_interventions": 0,
+      "recall": 0.4,
+      "warnings": 8
+    },
+    "tied_candidates": [
+      {
+        "cutoff": 0.9996767050340489,
+        "true_positives": 8,
+        "false_interventions": 0,
+        "recall": 0.4,
+        "warnings": 8
+      }
+    ],
+    "highest_legitimate_email_risk": 0.9973707113436169,
+    "recall_is_zero": false
+  },
+  "budget": {
+    "intervention": "a warn or a simulated block, counted once per email",
+    "rate": "false interventions per 1,000 legitimate emails",
+    "denominator": "all legitimate emails in the evaluation subset",
+    "recall_denominator": "all misdirected emails in the evaluation subset; an unassessed positive is not a detection",
+    "budget_per_1000": 1.0
+  },
+  "validation_confusion": {
+    "email": {
+      "n": 4000,
+      "positives": 20,
+      "legitimate": 3980,
+      "true_positives": 8,
+      "false_positives": 0,
+      "false_negatives": 12,
+      "true_negatives": 3980
+    },
+    "recipient": {
+      "n": 4970,
+      "positives": 22,
+      "true_positives": 9,
+      "false_positives": 0,
+      "false_negatives": 13,
+      "true_negatives": 4948
+    },
+    "warnings": 8,
+    "blocks": 0
+  },
+  "checksums": {
+    "model.joblib": "f698b69f7ff20fc9df9068ff06c1be44c9c6bc8ee6ce8cfacea851dbd7f9dfaa",
+    "artifact_manifest.json": "b9ef336f22952042cb64c61b6080a2040bec9b232848f93729b645e2e4d5fff9"
+  },
+  "scoring_path_parity": {
+    "subset": "validation_product_like",
+    "selected_on": "batch scores from the published feature CSV (lossless float round trip)",
+    "compared_with": "assess_draft on each draft with features computed in memory, the function the API calls",
+    "drafts": 4000,
+    "identical_decisions": 4000,
+    "max_abs_email_risk_difference": 3.885780586188048e-15,
+    "bound": 1e-12,
+    "drafts_at_T_warn": [
+      {
+        "draft_id": "d003028",
+        "batch": 0.9996767050340489,
+        "single": 0.9996767050340489,
+        "decision": "warn"
+      }
+    ]
+  },
+  "test_subsets_used": false,
+  "statement": "Selected on validation_product_like only. test_product_like and test_diagnostic were not read.",
+  "created_at": "2026-09-26T15:12:05Z"
+}

@@ -1,6 +1,6 @@
 # Phase 3 — Historical profiles and the transform contract
 
-Feature specification: `med-features-v1`.
+Feature specification: `med-features-v2`.
 
 Batch export and single-draft scoring call the same row builder, `build_rows`. `transform_draft` scores one draft. `transform_drafts` stacks those rows in the order of the queries. Both return the key columns followed by the feature columns in [the catalog](FEATURE_CATALOG.md).
 
@@ -34,14 +34,14 @@ The text transformer is the exception, and it is explicit. Vocabulary and IDF ar
 
 New sent mail can be incorporated by rebuilding the index from the sent-mail tables and calling `transform` on the new texts with the saved vectorizer. Do not call `fit`. Tokens that are outside the frozen vocabulary are ignored. IDF weights stay at the values stored in `text_transformer.joblib`.
 
-The index is derived from the dataset plus that transformer. It is not a second trained model. The published artifact stores the transformer, the schema, the fit metadata, and the train and validation matrices. A process that needs the index builds it again from `data/med-synth-v2` and the saved transformer.
+The index is derived from the dataset plus that transformer. It is not a second trained model. The published artifact stores the transformer, the schema, the fit metadata, and the train and validation matrices. A process that needs the index builds it again from `data/med-synth-v4` and the saved transformer.
 
 ## What the build writes
 
 From the repository root, after the package is installed:
 
 ```bash
-python -m med_features build --data data/med-synth-v2 --output artifacts/med-features-v1 \
+python -m med_features build --data data/med-synth-v4 --output artifacts/med-features-v2 \
   --quality-markdown docs/phase_3/FEATURE_QUALITY_REPORT.md
 ```
 
@@ -58,8 +58,10 @@ The command checks the dataset checksums, fits the transformer, and writes recip
 | `quality_report.json` | Descriptive statistics. Not a model score. |
 | `artifact_manifest.json` | SHA-256 of the files above. |
 
-`features_*.csv` includes the join keys so a later report can attach audit fields outside the model matrix. Training code should select the feature columns only.
+`features_*.csv` includes the join keys so a later report can attach audit fields outside the model matrix. Training code should select the feature columns only. Floats are written with 17 significant digits and read back with round-trip parsing (`med_features.build.read_features`), so a value read from the CSV is the same float the in-memory transform produced.
+
+The content-cosine centroid for a recipient takes the pair's earlier TF-IDF rows as one sparse slice of the history matrix, drops rows with no vocabulary term, and averages the rest in time order. The result is the same as averaging those rows one at a time; the slice only removes per-row overhead.
 
 ## Fit scope recorded with the transformer
 
-The fit scope names the corpus `sent_messages_before_validation_window`, records the document count, the vocabulary size, the first and last sent time in the window, and states that warmup is included and validation and test are excluded. Checksums in `fit_metadata.json` tie the artifact to the published `med-synth-v2` files.
+The fit scope names the corpus `sent_messages_before_validation_window`, records the document count, the vocabulary size, the first and last sent time in the window, and states that warmup is included and validation and test are excluded. Checksums in `fit_metadata.json` tie the artifact to the published `med-synth-v4` files.

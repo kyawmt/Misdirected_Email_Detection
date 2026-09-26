@@ -6,6 +6,8 @@ import hashlib
 import json
 from pathlib import Path
 
+import pandas as pd
+
 from med_data.calendar import FROZEN_SUBSETS
 from med_data.io import read_dataset, verify_files
 from med_features.profiles import directory_from_dataset, history_index_from_dataset
@@ -13,7 +15,22 @@ from med_features.quality import quality_report, render_quality_markdown
 from med_features.schema import EXPORT_SUBSETS, FEATURE_SPEC_VERSION, FeatureError
 from med_features.text_model import fit_on_dataset
 from med_features.transform import query_from_dataset, transform_drafts
+from med_features.version import DATASET_VERSION
 from med_features.version import FEATURE_SPEC_VERSION as SPEC_VERSION
+
+
+# Feature CSVs are lossless: 17 significant digits round-trip every float64,
+# and the reader parses with round-trip precision. Batch scores read back from
+# these files then use the same feature values the in-memory transform built.
+FLOAT_FORMAT = "%.17g"
+
+
+def write_features(frame: pd.DataFrame, path: str | Path) -> None:
+    frame.to_csv(path, index=False, lineterminator="\n", float_format=FLOAT_FORMAT)
+
+
+def read_features(path: str | Path) -> pd.DataFrame:
+    return pd.read_csv(path, float_precision="round_trip")
 
 
 def queries_for(dataset, subsets: tuple[str, ...]) -> list:
@@ -92,8 +109,8 @@ def build_artifacts(
     target.mkdir(parents=True, exist_ok=True)
     verify_files(source)
     dataset = read_dataset(source)
-    if dataset.summary.get("dataset_version") != "med-synth-v2":
-        raise FeatureError("Feature build expects dataset med-synth-v2")
+    if dataset.summary.get("dataset_version") != DATASET_VERSION:
+        raise FeatureError(f"{FEATURE_SPEC_VERSION} is fit on dataset {DATASET_VERSION}, not {dataset.summary.get('dataset_version')}")
     checksums = _checksums(source)
     transformer = fit_on_dataset(dataset)
     index = history_index_from_dataset(dataset)
@@ -103,7 +120,7 @@ def build_artifacts(
     for subset in EXPORT_SUBSETS:
         queries = queries_for(dataset, (subset,))
         frames[subset] = transform_drafts(directory, index, transformer, queries)
-        frames[subset].to_csv(target / f"features_{subset}.csv", index=False, lineterminator="\n")
+        write_features(frames[subset], target / f"features_{subset}.csv")
     report = quality_report(dataset, frames, fit_scope=transformer.fit_scope)
     (target / "quality_report.json").write_text(_dump(report), encoding="utf-8")
     if quality_markdown is not None:

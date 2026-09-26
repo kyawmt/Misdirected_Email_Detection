@@ -38,10 +38,16 @@ CODE_TEXT = {
     "EXTERNAL_RECIPIENT": "The address is outside the fictional organization; context, not proof of a mistake.",
     "LIMITED_TEXT": "Little text is available for content assessment; an evidence limitation.",
 }
-MODEL_NOTE = (
-    "Risk scores come from sender-recipient history, recency, co-recipient support, and contact similarity. "
-    "Draft-text similarity was not used by this model."
-)
+BEHAVIOR_NOTE = "Risk scores come from sender-recipient history, recency, co-recipient support, and contact similarity."
+NO_CONTENT_NOTE = "Draft-text similarity was not used by this model."
+CONTENT_NOTE = "Draft-text similarity to earlier mail with each recipient was also an input to this model."
+CONTENT_FEATURES = ("content_cosine", "content_similarity_observed", "pair_text_message_count")
+
+
+def model_note(feature_columns) -> str:
+    """Describe the inputs of the loaded model. The note never depends on the draft."""
+    uses_content = any(name in feature_columns for name in CONTENT_FEATURES)
+    return f"{BEHAVIOR_NOTE} {CONTENT_NOTE if uses_content else NO_CONTENT_NOTE}"
 SCORE_NOTE = "Scores are risk scores, not probabilities."
 ALLOW_NOTE = "Allow means no intervention under this policy. It does not guarantee that every recipient is correct."
 WARN_NOTE = "Warn asks the sender to review the flagged recipients. It is not a finding about the sender's intent."
@@ -167,7 +173,11 @@ class AssessmentService:
                 }
             )
         flagged_addresses = [item["address"] for item in recipients if item["flagged"]]
-        explanation = [MODEL_NOTE, SCORE_NOTE, WARN_NOTE if result["decision"] == "warn" else ALLOW_NOTE]
+        explanation = [
+            model_note(context.bundle.model.feature_columns),
+            SCORE_NOTE,
+            WARN_NOTE if result["decision"] == "warn" else ALLOW_NOTE,
+        ]
         body = {
             "request_id": request_id,
             "contract_version": API_CONTRACT_VERSION,

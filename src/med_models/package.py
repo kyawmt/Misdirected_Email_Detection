@@ -83,6 +83,7 @@ def artifact_metadata(features_dir: Path, data_dir: Path, selected: dict, folds:
         "seed": selected.get("seed", fit_meta.get("seed")),
         "sklearn_version": sklearn.__version__,
         "numpy_version": numpy.__version__,
+        "recency_fill_days": selected.get("recency_fill_days"),
         "scores_are": "risk_scores",
         "calibration": "not_fit",
         "thresholds": "not_selected",

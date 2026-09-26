@@ -10,6 +10,7 @@ import math
 
 import numpy as np
 import pandas as pd
+from sklearn.metrics import roc_auc_score
 
 from med_data.calendar import FROZEN_SUBSETS
 from med_features.checks import validate_feature_frame
@@ -27,6 +28,14 @@ UNDEFINED_WHEN = {
     "content_cosine": "content_similarity_observed",
     "co_focus_conditional_fraction": "co_focus_history_available",
 }
+
+# A6 shortcut checks, train only. A single feature whose train AUC for
+# unintended recipient rows is above the high bound or below the low bound is
+# flagged as a near-perfect separator. Flags are warnings to investigate.
+SHORTCUT_AUC_LOW = 0.05
+SHORTCUT_AUC_HIGH = 0.95
+FIVE_MINUTES_DAYS = 5 / 1440
+CONTENT_FEATURES = ("content_cosine", "content_similarity_observed", "pair_text_message_count")
 
 SCENARIO_FEATURES = (
     "pair_outbound_count",
@@ -57,15 +66,79 @@ def quality_report(dataset, frames_by_subset: dict[str, pd.DataFrame], *, fit_sc
         if problems:
             raise FeatureError(f"{subset} feature frame failed checks: {problems[0]}")
         subsets[subset] = _subset_report(dataset, subset, frame)
-    return {
+    shortcut = None
+    if "train" in frames_by_subset:
+        shortcut = shortcut_checks(dataset, frames_by_subset["train"])
+    report = {
         "feature_spec_version": FEATURE_SPEC_VERSION,
         "dataset_version": str(dataset.summary.get("dataset_version", "")),
         "fit_scope": fit_scope,
         "populations": list(frames_by_subset),
         "frozen_subsets_excluded": list(FROZEN_SUBSETS),
         "subsets": subsets,
+        "shortcut_checks": shortcut,
         "hypotheses": _hypotheses(),
-        "limitations": _limitations(),
+    }
+    report["table_notes"] = _table_notes(report)
+    report["limitations"] = _limitations(report, dataset)
+    return report
+
+
+def shortcut_checks(dataset, frame: pd.DataFrame) -> dict:
+    """A6: single-feature AUC and the five-minute recency share, on train rows only.
+
+    The positive class is an unintended recipient row. AUC is computed on the
+    raw feature value, fallbacks included, so a low value means low feature
+    values go with mistakes. `separation` is max(AUC, 1 - AUC).
+    """
+    ids = set(frame["draft_id"])
+    subsets = set(dataset.drafts.loc[dataset.drafts["draft_id"].isin(ids), "subset"])
+    if subsets != {"train"}:
+        raise FeatureError(f"Shortcut checks run on train only, got {sorted(subsets)}")
+    labels = dataset.labels.loc[dataset.labels["draft_id"].isin(ids), ["draft_id", "contact_id", "intended"]]
+    labeled = frame.merge(labels, on=["draft_id", "contact_id"], how="left")
+    if labeled["intended"].isna().any():
+        raise FeatureError("A train feature row has no label")
+    positive = ~labeled["intended"].astype(bool).to_numpy()
+    features = []
+    for name in FEATURE_COLUMNS:
+        values = labeled[name].to_numpy(dtype=np.float64)
+        if positive.all() or not positive.any():
+            auc = 0.5
+        elif np.unique(values).size < 2:
+            auc = 0.5
+        else:
+            auc = float(roc_auc_score(positive, values))
+        features.append(
+            {
+                "feature": name,
+                "auc": auc,
+                "separation": max(auc, 1 - auc),
+                "flagged": bool(auc > SHORTCUT_AUC_HIGH or auc < SHORTCUT_AUC_LOW),
+                "content": name in CONTENT_FEATURES,
+            }
+        )
+    features.sort(key=lambda item: -item["separation"])
+    recency = labeled["pair_recency_days"].to_numpy(dtype=np.float64)
+    observed = labeled["pair_recency_observed"].to_numpy() == 1
+    recent = observed & (recency < FIVE_MINUTES_DAYS)
+    return {
+        "population": "train recipient rows",
+        "rows": int(len(labeled)),
+        "unintended_rows": int(positive.sum()),
+        "auc_bounds": [SHORTCUT_AUC_LOW, SHORTCUT_AUC_HIGH],
+        "features": features,
+        "flagged": [item["feature"] for item in features if item["flagged"]],
+        "flagged_content": [item["feature"] for item in features if item["flagged"] and item["content"]],
+        "five_minute_recency": {
+            "intended_rows": int((~positive).sum()),
+            "intended_under_5_minutes": int((recent & ~positive).sum()),
+            "intended_share": float((recent & ~positive).sum() / max((~positive).sum(), 1)),
+            "unintended_rows": int(positive.sum()),
+            "unintended_under_5_minutes": int((recent & positive).sum()),
+            "unintended_share": float((recent & positive).sum() / max(positive.sum(), 1)),
+        },
+        "reading": "Warnings to investigate, not pass/fail on intent. A flag means one feature nearly separates the stipulated labels on train.",
     }
 
 
@@ -118,6 +191,8 @@ def render_quality_markdown(report: dict) -> str:
         lines.append("")
         lines.append(_intended_table(payload["intended_means"]))
         lines.append("")
+    if report.get("shortcut_checks"):
+        lines.extend(_shortcut_lines(report["shortcut_checks"]))
     lines.extend(
         [
             "## Hypotheses",
@@ -130,7 +205,7 @@ def render_quality_markdown(report: dict) -> str:
     for item in report["hypotheses"]:
         lines.append(f"- {item}")
     lines.extend(["", "## What the tables show", ""])
-    for item in _table_notes():
+    for item in report.get("table_notes", []):
         lines.append(f"- {item}")
     lines.extend(["", "## Limitations", ""])
     for item in report["limitations"]:
@@ -350,28 +425,113 @@ def _hypotheses() -> list[str]:
     ]
 
 
-def _table_notes() -> list[str]:
-    """Readings of the med-synth-v2 tables. Not detection results."""
-    return [
-        "Training S03 (4 drafts) is novel to the sender and not novel by domain. Training S06 (4 drafts) is novel on both. Neither scenario has an observed content cosine, because there is no pair text.",
-        "Training S01 name similarity averages about 0.83, above the 0.8 near-name threshold. The maximum in the matrix is 0.8889, one edit on a 9-character name. Training S05 averages about 0.37.",
-        "Training S04 and S07 both have low observed content cosine (about 0.02 and 0.09). Training S05 averages about 0.77. Every misdirected training row is at or below about 0.06. The only legitimate training rows in that band are cold starts and first contacts (S03, S06, S09). S07's four rows sit just above the misdirected rows, so they do not stop a content-only rule from treating a topic change as the label.",
-        "Product-like validation has 6 unintended recipient rows. The intended-versus-unintended means are descriptive on that handful of rows.",
-        "Validation diagnostic S04 does not repeat the training S04 cosine. Those rows mix variants. Use the per-scenario sample size before treating a mean as a stable description.",
+def _shortcut_lines(check: dict) -> list[str]:
+    low, high = check["auc_bounds"]
+    recency = check["five_minute_recency"]
+    lines = [
+        "## Train-only shortcut checks",
+        "",
+        f"On {check['rows']} train recipient rows ({check['unintended_rows']} unintended), each feature's AUC for an unintended row is computed on its raw value. "
+        f"A feature is flagged when its AUC is above {high} or below {low}. Flags are warnings to investigate; they do not decide intent. "
+        "Separation is the larger of AUC and 1 − AUC.",
+        "",
+        "| Feature | AUC | Separation | Flagged |",
+        "| --- | --- | --- | --- |",
     ]
+    for item in check["features"]:
+        lines.append(f"| `{item['feature']}` | {item['auc']:.3f} | {item['separation']:.3f} | {'yes' if item['flagged'] else 'no'} |")
+    flagged = ", ".join(f"`{name}`" for name in check["flagged"]) or "none"
+    lines += [
+        "",
+        f"Flagged features: {flagged}.",
+        "",
+        f"Five-minute recency: {recency['intended_under_5_minutes']} of {recency['intended_rows']} intended train rows "
+        f"({recency['intended_share']:.2%}) and {recency['unintended_under_5_minutes']} of {recency['unintended_rows']} unintended rows "
+        f"({recency['unintended_share']:.2%}) had earlier mail between the sender and that recipient, in either direction, less than five minutes before the draft "
+        "(the `pair_recency_days` feature). Dataset check Q31 counts mail to the recipient from any sender and reports its own shares.",
+        "",
+    ]
+    return lines
 
 
-def _limitations() -> list[str]:
-    return [
+def _scenario_value(report: dict, subset: str, scenario: str, name: str):
+    for row in report["subsets"].get(subset, {}).get("scenarios", []):
+        if row["scenario_id"] == scenario:
+            return row.get(name), row["drafts"]
+    return None, 0
+
+
+def _table_notes(report: dict) -> list[str]:
+    """Readings generated from the tables above. Not detection results."""
+    notes = []
+    if "train" in report["subsets"]:
+        parts = []
+        for scenario in ("S03", "S06", "S11"):
+            novel, drafts = _scenario_value(report, "train", scenario, "recipient_novel_to_sender")
+            if drafts:
+                parts.append(f"{scenario} ({drafts} drafts) has recipient novelty {_fmt(novel)}")
+        if parts:
+            notes.append("Training " + "; ".join(parts) + ". S03 and S06 are legitimate first contacts and S11 is a mistaken one, so novelty alone does not set the label.")
+        cosines = []
+        for scenario in ("S01", "S02", "S04", "S05", "S07", "S08", "S11", "routine"):
+            value, drafts = _scenario_value(report, "train", scenario, "content_cosine")
+            if drafts and value is not None:
+                cosines.append(f"{scenario} {value:.3f}")
+        if cosines:
+            notes.append("Mean observed content cosine on train by scenario: " + ", ".join(cosines) + ". Scenarios without pair text have no observed cosine.")
+        name, drafts = _scenario_value(report, "train", "S01", "name_similarity_max")
+        if drafts:
+            notes.append(f"Training S01 name similarity averages {_fmt(name)} against the 0.8 near-name threshold.")
+    for subset in ("validation_product_like", "validation_diagnostic"):
+        means = report["subsets"].get(subset, {}).get("intended_means", {})
+        if "unintended" in means:
+            notes.append(f"`{subset}` has {means['unintended']['recipient_rows']} unintended recipient rows; its intended-versus-unintended means are descriptive only.")
+    check = report.get("shortcut_checks")
+    if check:
+        top = check["features"][0]
+        notes.append(
+            f"The strongest single train separator is `{top['feature']}` (AUC {top['auc']:.3f}, separation {top['separation']:.3f}). "
+            + ("It is flagged." if top["flagged"] else f"No feature is outside [{check['auc_bounds'][0]}, {check['auc_bounds'][1]}].")
+        )
+    return notes
+
+
+def _limitations(report: dict, dataset) -> list[str]:
+    items = [
         "No classifier was trained. No risk score, threshold, precision, recall, or false-warning rate is claimed.",
-        "Content cosine separates the training classes almost completely because restricted relationships keep separate topics. A later model comparison must include a behavior-only model. A content-only result on this generator is not evidence about real mail.",
-        "No misdirected training row is a recipient the sender had never emailed. All 16 novel training rows are legitimate (S03, S06, S09). Novelty can be learned as a sign of safety. This version has no mistaken first contact.",
+    ]
+    check = report.get("shortcut_checks")
+    if check:
+        content = next(item for item in check["features"] if item["feature"] == "content_cosine")
+        items.append(
+            f"Content cosine is a real but imperfect train signal: AUC {content['auc']:.3f} (separation {content['separation']:.3f}). "
+            "Off-topic mistakes (S02, S04) sit low by their scenario definitions, while on-topic S08 mistakes, S01 lookalikes, and S11 first contacts are not separable by text. "
+            "A later model comparison must still report a behavior-only model beside any content model."
+        )
+        novel = _novel_counts(dataset, report)
+        if novel:
+            items.append(
+                f"Novel recipients in train: {novel['intended']} intended and {novel['unintended']} unintended rows. Novelty is evidence, not a label."
+            )
+    items += [
         "IDF is frozen on sent mail before the validation window. It is not re-estimated at each earlier training draft. Historical counts and text centroids still stop at that draft's cutoff.",
         "Template sentences repeat across weeks. Stripping reference, ticket, and date slots removes unique generator tokens. It does not remove shared topic wording.",
         "Group-topic profiles are not implemented. A recipient with no direct pair history has no content centroid even if a broader group has discussed the topic.",
         "Diagnostic rows that share a family are dependent. Product-like families contain one draft. Scenario means pool variants, including clean twins, and are not one story. Do not read a diagnostic rate as the 0.5% prevalence result.",
         "The fictional history is dense weekly mail, so outbound counts and per-day rates are large. That scale is a property of the generator, not a real-world volume.",
-        "On the exported subsets, contact similarity is always observed because other directory entries are already visible, and train never blanks both subject and body. The unobserved-similarity and both-fields-empty fallbacks remain part of the contract and are covered by fixture tests.",
-        "The product-like test has 10 misdirected emails and was not profiled here.",
-        "Department is a directory field and is not a v1 feature. Communication role is stored on the draft and is not a feature.",
+        "Contact similarity is always observed on the exported subsets, because other directory entries are already visible. The unobserved-similarity and both-fields-empty fallbacks remain part of the contract and are covered by fixture tests.",
+        "The frozen test subsets were not profiled here.",
+        "Department is a directory field and is not a feature. Communication role is stored on the draft and is not a feature.",
     ]
+    return items
+
+
+def _novel_counts(dataset, report: dict) -> dict | None:
+    means = report["subsets"].get("train", {}).get("intended_means", {})
+    if not means:
+        return None
+    out = {}
+    for key in ("intended", "unintended"):
+        item = means.get(key)
+        out[key] = int(round(item["recipient_rows"] * item["recipient_novel_rate"])) if item and item["recipient_novel_rate"] is not None else 0
+    return out

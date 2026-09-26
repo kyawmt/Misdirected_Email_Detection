@@ -8,12 +8,12 @@ This file is the handoff for the next session. Standing rules are in [AGENTS.md]
 
 | Phase | State | What exists |
 | --- | --- | --- |
-| 1 — Product definition | Complete | Public requirements only. No implementation and no measured product metrics. S11 added to scenario list. |
+| 1 — Product definition | Complete | Public requirements only. S11 added to the scenario list. The contract was not otherwise changed. |
 | 2 — Data, labels, and splits | Complete | Fictional dataset `med-synth-v4`, generator `1.3.0`, seed `20260926`. 31 validation checks passed. |
-| 3 — Behavioral and text features | Complete (v1 baseline on v2 data) | `med-features-v1`: shared transform, frozen TF-IDF, train/validation matrices. (v2 rebuild pending Phase 3). |
-| 4 — Baselines and model comparison | Complete (v1 baseline on v2 data) | `med-model-v1`: always-allow, rules, logistic regression, one tree, ablations. No threshold. (v2 rebuild pending Phase 4). |
-| 5 — Evaluation and threshold policy | Complete (v1 baseline on v2 data) | `med-policy-v1`: one warning cutoff on the risk score, blocking disabled, calibration not fit, one frozen test pass. (v2 rebuild pending Phase 5). |
-| 6 — Backend and scoring API | Complete (v1 baseline on v2 data) | `med-api-v1`: FastAPI service over the frozen bundle, A7 normalizer, `unable_to_assess` failures, feedback file, AC05 measured (not met). |
+| 3 — Behavioral and text features | Complete (v4) | `med-features-v2` on `med-synth-v4` train: shared transform, frozen TF-IDF, lossless train/validation matrices, A6 train-only shortcut checks in the quality report. |
+| 4 — Baselines and model comparison | Complete (v4) | `med-model-v2`: always-allow, rules, logistic regression, one tree, ablations (incl. drop-content), C3 eligibility checks, S11 diagnostics. Selected `logistic_all_balanced`. No threshold. |
+| 5 — Evaluation and threshold policy | Complete (v4) | `med-policy-v2`: one warning cutoff on the risk score, blocking disabled, calibration not fit, scoring-path parity proven on all 4,000 selection drafts, one frozen test pass. |
+| 6 — Backend and scoring API | Complete (v4) | Contract `med-api-v1` serving the v4 bundle and snapshot `med-synth-v4`. AC05 measured once: met. |
 | 7 through 10 | Not started | No UI, monitoring, or deployment. |
 
 Phase 2 dataset revision `med-synth-v4` (generator `1.3.0`, seed `20260926`) replaces `med-synth-v2`. An intermediate `med-synth-v3` (generator `1.2.0`, commit `6ff7aa6`) was reviewed and superseded before anything was built on it; its test subsets were never evaluated and `data/med-synth-v3` was removed from the working tree (it stays in git history). What v4 changes relative to v2:
@@ -25,16 +25,28 @@ Phase 2 dataset revision `med-synth-v4` (generator `1.3.0`, seed `20260926`) rep
 - 3,000 train drafts (300 misdirected), 4,000 product-like validation drafts (20 misdirected), 6,000 product-like test drafts (30 misdirected), and at least 10 families per scenario in both diagnostic subsets (240 validation diagnostic, 256 test diagnostic).
 - Frozen test subsets: `test_product_like` and `test_diagnostic` of `med-synth-v4`.
 
-Train-only shortcut audit on v4 (Phase 3 transform, computed in a scratch directory; no artifact written): content cosine alone has AUC 0.932 for misdirected recipient rows (v2: 0.991; v3: 0.98). Every other feature is between 0.31 and 0.69. Same-recipient mail in the five minutes before a draft: 1.37% of intended and 1.90% of unintended train rows (v2: 66.5% and 0%). First contacts in train: 40 legitimate and 30 misdirected (v2: 16 and 0). S02 and S04 remain low on content by their scenario definitions; on-topic S08 mistakes reach cosine 0.605 and S11 has no pair text.
+The cross-phase revision (`project_context/fixes_before_phase7.md`, Sections A, B, C) is complete. Section A produced `med-synth-v4`. Section B (code hygiene) and Section C (rerun of Phases 3–6) were done in this session; see the verified results below.
 
 ## Active work
 
 | Item | Owner |
 | --- | --- |
-| Active phase | None. Next: Section B of `project_context/fixes_before_phase7.md` |
+| Active phase | None. Next: Phase 7 (simulated draft-review UI), when the user asks for it. |
 | Owner | Unassigned |
 
-The next session should continue `project_context/fixes_before_phase7.md` at **Section B** (code hygiene), then Section C. Section A is done.
+Nothing is committed from Sections B and C yet; the user asked not to commit until they say so.
+
+## Section B (code hygiene) — what changed
+
+- **B1.** Each package has one version module with its versions and default paths: `med_data.version` (dataset), `med_features.version` (feature spec and the dataset it is fit on), `med_models.version`, `med_policy.version`, `med_api.version` (snapshot id and bundle paths follow the policy package). Every CLI and the API read from them. No `med-synth-v2` or `-v1` default remains in `src/`.
+- **B2.** Tests assert rules, not v2 numbers: quotas come from `med_data.version`, artifact row counts from `fit_metadata.json`, example drafts from `med_api.fixtures.example_draft_ids` (lowest warned mistake, median allowed routine draft, a legitimate first contact), and a late-listed contact is found by query. Leakage and frozen-subset tests stay.
+- **B3.** Feature CSVs are written with 17 significant digits and read with round-trip parsing (`med_features.build.write_features` / `read_features`). The published-artifact test now requires bit-identical rows. The v2 drift came from the default pandas parser, not the writer. `med-policy-v2` selection proves both scoring paths agree on the whole selection subset before writing the policy (see results). Tests: CSV round trip, cutoff-adjacent parity (bound 1e-12, identical decisions), full-subset record.
+- **B4.** `_content_cosine` slices the history matrix once per recipient. On 304 sampled v2 drafts the frames are bit-identical to the old per-row code; in-process transform p95 went from 317.6 ms to 26.3 ms (v2 data), and is 54.8 ms on v4.
+- **B5.** `docs/phase_4/MODEL_ARTIFACT.md` states the unobserved-recency fill from the stored model metadata (v4: 0.234375 days, 337.5 minutes).
+- **B6.** API latency is written to `artifacts/med-api-latency/<policy version>/latency.json` and the command refuses to overwrite. `artifacts/med-api-v1/latency.json` is the untouched v2 record.
+- **B7.** The latency workload is every `validation_product_like` draft (4,000 on v4) in a permutation fixed with seed `20260926`, after 20 warm-ups; recipient-count, month, and sender-history mix are recorded.
+
+Section B gate (before C1, against the v2 bundle): `pytest` 100 passed, 0 failed, 510.44 s.
 
 ## Delivered artifacts
 
@@ -47,13 +59,9 @@ Phase 1:
 
 Phase 2:
 
-- [docs/phase_2/DATA_DICTIONARY.md](docs/phase_2/DATA_DICTIONARY.md)
-- [docs/phase_2/LABELING_GUIDE.md](docs/phase_2/LABELING_GUIDE.md)
-- [docs/phase_2/DATASET_SPECIFICATION.md](docs/phase_2/DATASET_SPECIFICATION.md)
-- [docs/phase_2/DATA_QUALITY_AND_LEAKAGE.md](docs/phase_2/DATA_QUALITY_AND_LEAKAGE.md)
-- Package `src/med_data/` (`generate`, `scoring_view`, `validate`, `build` / `validate` CLI)
-- Tests in `tests/test_phase2.py`
-- Published tables in `data/med-synth-v4/` (and preserved historical baseline in `data/med-synth-v2/`)
+- [docs/phase_2/](docs/phase_2/) (data dictionary, labeling guide, dataset specification, quality and leakage checklist)
+- Package `src/med_data/`, tests in `tests/test_phase2.py`
+- Published tables in `data/med-synth-v4/` (and the preserved baseline in `data/med-synth-v2/`)
 
 Published subset counts (`med-synth-v4`):
 
@@ -79,32 +87,67 @@ Total records: 155,076 sent messages, 13,496 drafts, 17,598 recipient labels, 35
 - `invalid_fixtures.csv`: `8cb601a0e07ce51971bad4e1da750115be70042ecd927f0e9a25c29d323fc13d`
 - `quality_report.json`: `85695561792d6ac6fad6a08836ebad7f22aef7364f34d4b7924f2b4cee7d8f6a`
 
-Historical v2 baseline (preserved on disk):
-- Published tables in `data/med-synth-v2/`
-- `artifacts/med-features-v1/`
-- `artifacts/med-model-v1/`
-- `artifacts/med-policy-v1/`
-- `artifacts/med-api-v1/`
+Phases 3–6 (v4):
+
+- `artifacts/med-features-v2/`, [docs/phase_3/](docs/phase_3/) (quality report regenerated with the A6 checks)
+- `artifacts/med-model-v2/`, [docs/phase_4/](docs/phase_4/)
+- `artifacts/med-policy-v2/` (`policy.json`, `validation_scores.csv`, `validation_evaluation.json`, `test_evaluation.json`), [docs/phase_5/](docs/phase_5/)
+- `artifacts/med-api-latency/med-policy-v2/latency.json`, [docs/phase_6/](docs/phase_6/)
+
+Historical v2 baseline (preserved on disk, verified unchanged by SHA-256 at the end of this session, 28 files): `data/med-synth-v2/`, `artifacts/med-features-v1/`, `artifacts/med-model-v1/`, `artifacts/med-policy-v1/` (including `test_evaluation.json`), `artifacts/med-api-v1/latency.json`. Current code cannot load the v1 bundle (version checks refuse it); it is a record, not a served bundle.
 
 ## Verified results
 
-Verified on 2026-09-26 from the repository root with the project virtualenv:
+Verified on 2026-09-26 from the repository root with the project virtualenv (Apple M1 Pro, 10 CPUs, macOS, Python 3.11.14, scikit-learn 1.9.1, NumPy 2.4.6), in this order:
 
 | Command | Result |
 | --- | --- |
-| `python -m med_data build --output data/med-synth-v4` | Wrote `med-synth-v4` (155,076 messages, 13,496 drafts) in 67 s |
-| `python -m med_data validate --data data/med-synth-v4` | 31 checks passed (Q01 through Q31) in 54 s |
-| `pytest` | 94 passed, 1 failed in 519.34s (8m39s). The failure is `tests/test_phase3.py::test_published_artifact_matches_training_fit`, expected until B2 and C1: it compares the v2-fitted transformer with a fit on the generated v4 dataset |
-| Train-only feature audit on `data/med-synth-v4` (scratch script, Phase 3 transform) | Content-cosine AUC 0.932; all other features 0.31–0.69 |
+| `pytest` (Section B gate, v2 bundle) | 100 passed, 0 failed in 510.44 s |
+| `python -m med_features build --quality-markdown docs/phase_3/FEATURE_QUALITY_REPORT.md` | Wrote `med-features-v2` on `med-synth-v4` in 3m30s. Rows: train 3,955, validation_product_like 4,970, validation_diagnostic 582. A6: no feature flagged; content cosine AUC 0.068 (separation 0.932) |
+| `python -m med_models run` | Wrote `med-model-v2` in 4m49s. Selected `logistic_all_balanced` (C = 1000, top of grid) |
+| `python -m med_policy select` | Wrote `med-policy-v2` in 2m32s: `T_warn = 0.9996767050340489`, validation recall 8/20, 0 false interventions on 3,980. Scoring-path parity: 4,000/4,000 identical decisions, max difference 3.9e-15 (an earlier attempt failed on a code error before writing anything) |
+| `python -m med_policy evaluate-test` (run once) | `test_product_like`: warned 9/30 misdirected, 0/5,970 legitimate. `test_diagnostic`: warned 37/88, 0/168. No scoring failures |
+| `python -m med_api latency` (run once) | 4,000 calls: client p50 26.84 ms, p95 57.04 ms, p99 74.43 ms; AC05 met; 4,000/4,000 decisions match `validation_scores.csv` |
+| `python -m med_api report`, `python -m med_policy report` | Regenerated `docs/phase_6` and `docs/phase_5` from stored results |
+| `python -m med_data validate --data data/med-synth-v4` | 31 checks passed (Q01–Q31) in 54.6 s |
+| `pytest` (final, v4 bundle) | 100 passed, 0 failed in 525.10 s (8m45s) |
 
-The v4 correction also sped up validation without changing its output: Q31 uses per-recipient sorted times (68.3 s to 0.2 s), `scoring_view` builds each contact payload once and groups only visible messages (identical output), and the Phase 2 walkthrough test uses one vectorized lookup (198 s to under 1 s). Downstream Phase 3–6 tests still read the published v2 artifacts and will be reworked in Section B.
+### v4 results (current)
+
+| Item | Value |
+| --- | --- |
+| C3 eligibility | Audit: no content feature flagged (content cosine separation 0.932). Fold stability (all-features over behavior-only, min per-fold margin): logistic unweighted +0.229, balanced +0.234, tree +0.191. Not content alone (over content-only): +0.040, +0.117, +0.015. All families eligible. |
+| Selected model | `logistic_all_balanced`, product-like validation email AP 0.831 [0.676, 0.954] (20 positives); best behavior-only 0.494 |
+| S11 threshold-free (validation_diagnostic) | S11 vs legitimate first contacts AUC 0.880 (10 vs 20 rows) |
+| Validation operating point | 8/20 warned (recall 0.40, exact [0.191, 0.639]); 0/3,980 false; exact upper 0.93 per 1,000 (not independent: selection subset) |
+| Test operating point | 9/30 warned (recall 0.30, exact [0.147, 0.494]); 0/5,970 false; exact upper 0.62 per 1,000 |
+| Scenario recall at the cutoff | S01, S04, S11 0 warned in every validation and test subset; test product-like S02 2/6, S08 5/8, S09 2/2 |
+| AC01 | Met on this simulation (upper 0.62 ≤ 1) |
+| AC02 | Met for S09; partly met for S02, S08; not met for S01, S04, S11 |
+| AC03 / AC04 | Met / met (blocking disabled, 0 blocks) |
+| AC05 | Met: API client p95 57.04 ms < 300 ms, this machine only |
+| AC07 | Insufficient evidence: 0 wrong interventions on S03/S05/S06/S07, but legitimate first contacts score up to 0.99737 against `T_warn` 0.99968 |
+
+### v2 historical baseline
+
+| Item | Value |
+| --- | --- |
+| Bundle | `med-synth-v2`, `med-features-v1`, `med-model-v1` (`logistic_behavior_only_unweighted`, C = 100), `med-policy-v1` (`T_warn` 0.13455666515724893) |
+| Content cosine train AUC | 0.991; behavior-only selection forced |
+| Legitimate train rows under five minutes | 66.5% (misdirected 0%) |
+| Validation operating point | 4/5 warned; 0/995 false; exact upper 3.70 per 1,000 |
+| Test operating point | 5/10 warned; 0/1,990 false; exact upper 1.85 per 1,000 |
+| S01 / S04 | S01 0 warned everywhere; S04 1/1 on validation product-like (the cutoff draft), 0 elsewhere |
+| AC01–AC05 | Insufficient evidence; met only for S02, S08; met; met; not met (API p95 345.84 ms) |
 
 ## Known gaps and handoff
 
-- **Next:** Section B of `project_context/fixes_before_phase7.md` (version config, tests that assume v2, lossless feature CSVs, vectorized centroid, latency path and workload), then Section C on `med-synth-v4`.
-- **Content is still strong.** Content cosine alone has train AUC 0.932. S02 and S04 are off-topic by their scenario definitions, so content catches them. On-topic S08 mistakes, S01 lookalikes, and S11 first contacts are not separable by text. C3's eligibility checks decide whether content models may be selected.
-- **Timing (Q31):** 1.37% of intended and 1.90% of unintended train rows have same-recipient mail in the five minutes before the draft.
-- **Scenario S11:** mistaken first contacts are in every split and subset, labeled unintended. Train has 40 legitimate and 30 misdirected first-contact rows.
-- **Template phrasing:** template language repeats across weeks. Unique reference tokens stop exact body copies across splits.
-- **Prevalence assumption:** 0.5% product-like prevalence is a simulation assumption. Training enrichment is 10%.
-- **Frozen test subsets:** `test_product_like` (6,000 drafts) and `test_diagnostic` (256 drafts) of `med-synth-v4` are frozen. Structural checks may touch them; no performance inspection until a v4 policy exists.
+- **S01, S04, S11 are still missed.** At the zero-false-warning cutoff the policy warns only on added recipients (S02, S08) and cold senders (S09). Legitimate first contacts (S03, S06) score just below `T_warn`, so the cutoff sits above every lookalike, familiar-recipient topic mistake, and mistaken first contact. Any lower cutoff produces validation false warnings.
+- **Content is a strong signal.** Content cosine separation 0.932 is inside the 0.05–0.95 audit bounds but not far inside. S02 and S04 are off-topic by scenario definition. The C3 checks passed by clear margins for the logistic families; the tree's content-only margin was thin (+0.015) and it was not selected.
+- **C = 1000 is the top of the extended grid**; coefficients are not separate effects.
+- **AC01 is met on this simulation only**, with 0 of 5,970 false warnings. The margin between `T_warn` and the highest legitimate validation score is 2.3e-3 (0.99968 against 0.99737).
+- **Unknown addresses** in a well-formed request stay `unavailable` (Phase 1 contract). Changing that is a contract decision.
+- **`CONTENT_RELATIONSHIP_MISMATCH` is not emitted.** The served model uses content; the API says so in a model-level explanation sentence. Adding a per-recipient content code would need its own rule.
+- **Five-minute timing:** 0.0% of legitimate and 1.9% of misdirected train rows by the pair-recency feature; Q31 (mail to the recipient from any sender) reports 1.37% and 1.90%.
+- **Prevalence** 0.5% is a simulation assumption; train is enriched to 10%.
+- **Frozen test subsets** of `med-synth-v4` have now been evaluated once for `med-policy-v2`. Do not rerun `evaluate-test` or move the cutoff. A new policy needs a new version and a new frozen dataset version.

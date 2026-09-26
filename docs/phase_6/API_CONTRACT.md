@@ -20,7 +20,7 @@ Contract version `med-api-v1`. The service is a simulation over fictional `.exam
 | `to`, `cc`, `bcc` | yes | Lists, each may be empty. Entries are address strings or `{address, display_name}`. 1 to 20 unique addresses in total. |
 | `subject` | yes | String, may be empty, at most 500 characters. |
 | `body` | yes | Plain text, may be empty, at most 20,000 characters. No HTML parsing. |
-| `context_snapshot_id` | yes | Only `med-synth-v2` is accepted. The server resolves it; the caller does not upload history. |
+| `context_snapshot_id` | yes | Only `med-synth-v4` is accepted. The server resolves it; the caller does not upload history. |
 | `draft_reference` | no | Caller correlation label, returned unchanged. Not a feature. |
 
 Accepted top-level fields: `bcc`, `body`, `cc`, `context_snapshot_id`, `draft_reference`, `draft_timestamp`, `sender`, `subject`, `to`. Any other field is `invalid_input`. A field whose name contains any of `label`, `intended`, `scenario`, `split`, `subset`, `family`, `score`, `risk`, `stipulation`, `withheld`, `counterfactual`, `variant` is rejected by name, at any depth, and its value is never read.
@@ -40,13 +40,13 @@ Addresses follow assumption A7: surrounding whitespace is trimmed, matching is c
 | `email_risk_score` | Maximum recipient risk score. |
 | `flagged_recipients` | Every address whose risk score is at or above `T_warn`. |
 | `recipients` | One entry per unique address: `address`, `display_name`, `roles`, `risk_score`, `flagged`, `reason_codes`, `evidence_limitations`. |
-| `explanation` | Short sentences, including that draft-text similarity was not used. |
+| `explanation` | Short sentences, including whether draft-text similarity was an input of the served model. |
 | `provenance` | Model, feature-spec, and policy versions, `T_warn`, `blocking_enabled: false`, snapshot id, effective cutoff, and the history rule. |
 | `duration_ms` | Handler time for this assessment. |
 
 ## Codes
 
-Codes are descriptive context from the feature row. They do not change the decision and are not read from model coefficients. `CONTENT_RELATIONSHIP_MISMATCH` is never emitted, because this model does not use content cosine.
+Codes are descriptive context from the feature row. They do not change the decision and are not read from model coefficients. `CONTENT_RELATIONSHIP_MISMATCH` is not emitted by this version. When the served model uses content cosine, a model-level explanation sentence says so; no per-recipient content code is derived from the score.
 
 | Code | Kind | Emitted when | Text |
 | --- | --- | --- | --- |
@@ -62,29 +62,34 @@ Codes are descriptive context from the feature row. They do not change the decis
 
 ## Examples
 
-These bodies come from live calls on fictional validation drafts. `d001019` is the validation draft whose risk score sets `T_warn`.
+These bodies come from live calls on fictional validation drafts, chosen by rule from the policy's validation table. `d003028` is the warned validation mistake with the lowest email risk score; `d005962` is the allowed routine draft at the median score.
 
-### Warn request (`d001019`)
+### Warn request (`d003028`)
 
 ```json
 {
-  "draft_timestamp": "2025-03-31T09:30:00Z",
+  "draft_timestamp": "2025-05-01T12:56:10Z",
   "sender": {
     "address": "maya@demo.example",
     "display_name": "Maya Okonkwo"
   },
   "to": [
     {
-      "address": "blair.santos@demo.example",
-      "display_name": "Blair Santos"
+      "address": "reese.ibarra@demo.example",
+      "display_name": "Reese Ibarra"
     }
   ],
-  "cc": [],
+  "cc": [
+    {
+      "address": "lee@vendor.example",
+      "display_name": "Lee Park"
+    }
+  ],
   "bcc": [],
-  "subject": "Salary band planning 2025-03-31",
-  "body": "Hi Priya,\n\nFor the 2025-03-31 compensation cycle, salary band notes are in ticket T-18017. Please keep this within the people team and confirm the planning figures.\n\nThanks,\nMaya\nRef: m018017",
-  "context_snapshot_id": "med-synth-v2",
-  "draft_reference": "fixture-d001019"
+  "subject": "Cost center forecast 2025-05-01",
+  "body": "Hi Reese,\n\nAttached in prose: the cost center forecast for 2025-05-01. Ticket T-102085 flags one variance in the project budget. Please confirm the figure before the review.\n\nThanks,\nMaya\nRef: m102085",
+  "context_snapshot_id": "med-synth-v4",
+  "draft_reference": "fixture-d003028"
 }
 ```
 
@@ -97,44 +102,64 @@ These bodies come from live calls on fictional validation drafts. `d001019` is t
   "status": "assessed",
   "mode": "simulation",
   "decision": "warn",
-  "email_risk_score": 0.13455666515725057,
+  "email_risk_score": 0.9996767050340489,
   "flagged_recipients": [
-    "blair.santos@demo.example"
+    "lee@vendor.example"
   ],
   "recipients": [
     {
-      "address": "blair.santos@demo.example",
-      "display_name": "Blair Santos",
+      "address": "reese.ibarra@demo.example",
+      "display_name": "Reese Ibarra",
       "roles": [
         "to"
       ],
-      "risk_score": 0.13455666515725057,
-      "flagged": true,
+      "risk_score": 0.0009664412467289453,
+      "flagged": false,
       "reason_codes": [],
+      "evidence_limitations": []
+    },
+    {
+      "address": "lee@vendor.example",
+      "display_name": "Lee Park",
+      "roles": [
+        "cc"
+      ],
+      "risk_score": 0.9996767050340489,
+      "flagged": true,
+      "reason_codes": [
+        {
+          "code": "EXTERNAL_RECIPIENT",
+          "text": "The address is outside the fictional organization; context, not proof of a mistake."
+        },
+        {
+          "code": "UNUSUAL_RECIPIENT_COMBINATION",
+          "text": "These addressees have little support as a group in the available prior communication."
+        }
+      ],
       "evidence_limitations": []
     }
   ],
   "explanation": [
-    "Risk scores come from sender-recipient history, recency, co-recipient support, and contact similarity. Draft-text similarity was not used by this model.",
+    "Risk scores come from sender-recipient history, recency, co-recipient support, and contact similarity. Draft-text similarity to earlier mail with each recipient was also an input to this model.",
     "Scores are risk scores, not probabilities.",
     "Warn asks the sender to review the flagged recipients. It is not a finding about the sender's intent."
   ],
   "provenance": {
-    "model_version": "med-model-v1",
-    "feature_spec_version": "med-features-v1",
-    "policy_version": "med-policy-v1",
-    "T_warn": 0.13455666515724893,
+    "model_version": "med-model-v2",
+    "feature_spec_version": "med-features-v2",
+    "policy_version": "med-policy-v2",
+    "T_warn": 0.9996767050340489,
     "blocking_enabled": false,
-    "snapshot_id": "med-synth-v2",
-    "effective_cutoff": "2025-03-31T09:30:00.000000Z",
+    "snapshot_id": "med-synth-v4",
+    "effective_cutoff": "2025-05-01T12:56:10.000000Z",
     "history_rule": "sent mail strictly earlier than the cutoff"
   },
-  "draft_reference": "fixture-d001019",
+  "draft_reference": "fixture-d003028",
   "duration_ms": "<measured>"
 }
 ```
 
-### Allow response for `d001083` (HTTP 200)
+### Allow response for `d005962` (HTTP 200)
 
 ```json
 {
@@ -143,70 +168,37 @@ These bodies come from live calls on fictional validation drafts. `d001019` is t
   "status": "assessed",
   "mode": "simulation",
   "decision": "allow",
-  "email_risk_score": 7.281341213263422e-24,
+  "email_risk_score": 7.749000663705964e-05,
   "flagged_recipients": [],
   "recipients": [
     {
-      "address": "noah@demo.example",
-      "display_name": "Noah Kim",
+      "address": "oakley.ibarra@demo.example",
+      "display_name": "Oakley Ibarra",
       "roles": [
         "to"
       ],
-      "risk_score": 2.268058836456951e-26,
-      "flagged": false,
-      "reason_codes": [],
-      "evidence_limitations": []
-    },
-    {
-      "address": "elena@demo.example",
-      "display_name": "Elena Rossi",
-      "roles": [
-        "to"
-      ],
-      "risk_score": 5.939882372062341e-27,
-      "flagged": false,
-      "reason_codes": [],
-      "evidence_limitations": []
-    },
-    {
-      "address": "taylor@demo.example",
-      "display_name": "Taylor Brooks",
-      "roles": [
-        "to"
-      ],
-      "risk_score": 7.281341213263422e-24,
-      "flagged": false,
-      "reason_codes": [],
-      "evidence_limitations": []
-    },
-    {
-      "address": "chris@demo.example",
-      "display_name": "Chris Patel",
-      "roles": [
-        "cc"
-      ],
-      "risk_score": 3.7121972828367813e-25,
+      "risk_score": 7.749000663705964e-05,
       "flagged": false,
       "reason_codes": [],
       "evidence_limitations": []
     }
   ],
   "explanation": [
-    "Risk scores come from sender-recipient history, recency, co-recipient support, and contact similarity. Draft-text similarity was not used by this model.",
+    "Risk scores come from sender-recipient history, recency, co-recipient support, and contact similarity. Draft-text similarity to earlier mail with each recipient was also an input to this model.",
     "Scores are risk scores, not probabilities.",
     "Allow means no intervention under this policy. It does not guarantee that every recipient is correct."
   ],
   "provenance": {
-    "model_version": "med-model-v1",
-    "feature_spec_version": "med-features-v1",
-    "policy_version": "med-policy-v1",
-    "T_warn": 0.13455666515724893,
+    "model_version": "med-model-v2",
+    "feature_spec_version": "med-features-v2",
+    "policy_version": "med-policy-v2",
+    "T_warn": 0.9996767050340489,
     "blocking_enabled": false,
-    "snapshot_id": "med-synth-v2",
-    "effective_cutoff": "2025-03-31T09:02:00.000000Z",
+    "snapshot_id": "med-synth-v4",
+    "effective_cutoff": "2025-07-11T10:19:24.000000Z",
     "history_rule": "sent mail strictly earlier than the cutoff"
   },
-  "draft_reference": "fixture-d001083",
+  "draft_reference": "fixture-d005962",
   "duration_ms": "<measured>"
 }
 ```
@@ -225,12 +217,12 @@ These bodies come from live calls on fictional validation drafts. `d001019` is t
   "email_risk_score": null,
   "flagged_recipients": null,
   "recipients": null,
-  "draft_reference": "fixture-d001083",
+  "draft_reference": "fixture-d005962",
   "provenance": {
-    "model_version": "med-model-v1",
-    "feature_spec_version": "med-features-v1",
-    "policy_version": "med-policy-v1",
-    "snapshot_id": "med-synth-v2"
+    "model_version": "med-model-v2",
+    "feature_spec_version": "med-features-v2",
+    "policy_version": "med-policy-v2",
+    "snapshot_id": "med-synth-v4"
   },
   "duration_ms": "<measured>"
 }
@@ -250,12 +242,12 @@ These bodies come from live calls on fictional validation drafts. `d001019` is t
   "email_risk_score": null,
   "flagged_recipients": null,
   "recipients": null,
-  "draft_reference": "fixture-d001083",
+  "draft_reference": "fixture-d005962",
   "provenance": {
-    "model_version": "med-model-v1",
-    "feature_spec_version": "med-features-v1",
-    "policy_version": "med-policy-v1",
-    "snapshot_id": "med-synth-v2"
+    "model_version": "med-model-v2",
+    "feature_spec_version": "med-features-v2",
+    "policy_version": "med-policy-v2",
+    "snapshot_id": "med-synth-v4"
   },
   "duration_ms": "<measured>"
 }

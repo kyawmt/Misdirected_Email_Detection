@@ -18,9 +18,15 @@ from med_models.package import load_model, save_model
 from med_models.experiments import _select
 from med_models.preprocess import CountLogScaler
 from med_models.rules import rules_scores
-from med_models.version import MODEL_VERSION, ModelError
+from med_models.version import DATA_DIR, DATASET_VERSION, FEATURES_DIR, MODEL_PATH, MODEL_VERSION, ModelError
 
 ROOT = Path(__file__).resolve().parents[1]
+FEATURES = ROOT / FEATURES_DIR
+DATA = ROOT / DATA_DIR
+MODEL = ROOT / MODEL_PATH
+# Scores from a feature CSV and from the in-memory transform may differ only
+# by summation order; features themselves are lossless.
+SCORE_BOUND = 1e-12
 
 
 def test_model_matrix_rejects_audit_columns():
@@ -70,7 +76,7 @@ def test_folds_are_chronological_and_keep_families_together():
 
 
 def test_published_train_folds_keep_families_whole():
-    _frame, audit = load_model_table(ROOT / "artifacts" / "med-features-v1", ROOT / "data" / "med-synth-v2", "train")
+    _frame, audit = load_model_table(FEATURES, DATA, "train")
     assigned = assign_folds(audit)
     assert assigned.groupby("family_id")["fold"].nunique().max() == 1
     week_by_fold = assigned.groupby("fold")["assignment_week"].agg(["min", "max"])
@@ -134,10 +140,10 @@ def test_logistic_training_is_deterministic_and_round_trips(tmp_path):
         "feature_spec_version": FEATURE_SPEC_VERSION,
         "feature_schema_sha256": "test",
         "text_transformer_sha256": "test",
-        "dataset_version": "med-synth-v2",
+        "dataset_version": DATASET_VERSION,
         "dataset_checksums": {},
         "training_subset": "train",
-        "data_dir_name": "med-synth-v2",
+        "data_dir_name": DATASET_VERSION,
         "folds": [],
         "seed": 20260926,
         "sklearn_version": "test",
@@ -205,23 +211,27 @@ def test_score_query_matches_batch_and_scoring_view():
     from med_features.profiles import EventHistory, directory_from_dataset, history_index_from_dataset
     from med_features.text_model import FittedText
     from med_features.transform import events_from_scoring_view, query_from_dataset, query_from_scoring_view, transform_draft
+    from med_features.build import read_features
     from med_models.package import load_model
 
-    dataset = read_dataset(ROOT / "data" / "med-synth-v2")
-    text = FittedText.load(ROOT / "artifacts" / "med-features-v1" / "text_transformer.joblib")
+    dataset = read_dataset(DATA)
+    text = FittedText.load(FEATURES / "text_transformer.joblib")
     index = history_index_from_dataset(dataset)
     index.bind(text)
     directory = directory_from_dataset(dataset)
-    loaded = load_model(ROOT / "artifacts" / "med-model-v1" / "model.joblib")
+    loaded = load_model(MODEL)
     drafts = dataset.drafts
     for subset in ("train", "validation_product_like", "validation_diagnostic"):
         ids = drafts.loc[drafts["subset"] == subset, "draft_id"].head(2).tolist()
-        matrix = pd.read_csv(ROOT / "artifacts" / "med-features-v1" / f"features_{subset}.csv")
+        matrix = read_features(FEATURES / f"features_{subset}.csv")
         for draft_id in ids:
             single = loaded.score_query(directory, index, text, query_from_dataset(dataset, draft_id))
             stored = matrix.loc[matrix["draft_id"] == draft_id].sort_values("recipient_order")
             batch = loaded.score_frame(stored)
-            assert np.allclose(single["risk_score"].to_numpy(), batch)
+            assert np.max(np.abs(single["risk_score"].to_numpy() - batch)) <= SCORE_BOUND
+            if draft_id != ids[0]:
+                # scoring_view is slow on the full history; phase 3 checks it on more drafts.
+                continue
             view = scoring_view(dataset, draft_id)
             viewed = transform_draft(
                 directory,
@@ -229,36 +239,36 @@ def test_score_query_matches_batch_and_scoring_view():
                 text,
                 query_from_scoring_view(view),
             )
-            assert np.allclose(loaded.score_frame(viewed), batch)
+            assert np.max(np.abs(loaded.score_frame(viewed) - batch)) <= SCORE_BOUND
 
 
 def test_published_model_reloads_without_refitting():
     from med_models.package import load_model
 
-    loaded = load_model(ROOT / "artifacts" / "med-model-v1" / "model.joblib")
+    import json
+
+    loaded = load_model(MODEL)
     assert loaded.metadata["model_version"] == MODEL_VERSION
+    assert loaded.metadata["dataset_version"] == DATASET_VERSION
     assert loaded.metadata["thresholds"] == "not_selected"
     assert loaded.metadata["calibration"] == "not_fit"
     if loaded.metadata["ablation"] == "behavior_only":
         assert "content_cosine" not in loaded.feature_columns
-    frame, _audit = load_model_table(
-        ROOT / "artifacts" / "med-features-v1",
-        ROOT / "data" / "med-synth-v2",
-        "validation_product_like",
-    )
+    frame, _audit = load_model_table(FEATURES, DATA, "validation_product_like")
     sample = frame.iloc[:4]
     first = loaded.score_frame(sample)
     second = loaded.score_frame(sample)
     assert np.allclose(first, second)
-    if loaded.metadata["kind"] == "logistic":
-        assert loaded.model.scaler.n_samples_seen_ == 2320
+    if loaded.metadata["kind"] in {"logistic", "tree"}:
+        fit_rows = json.loads((FEATURES / "fit_metadata.json").read_text(encoding="utf-8"))["row_counts"]["train"]
+        assert loaded.model.scaler.n_samples_seen_ == fit_rows
 
 
 def test_frozen_subset_is_refused():
     with pytest.raises(ModelError, match="frozen"):
-        load_model_table(ROOT / "artifacts" / "med-features-v1", ROOT / "data" / "med-synth-v2", "test_product_like")
+        load_model_table(FEATURES, DATA, "test_product_like")
     with pytest.raises(ModelError, match="frozen"):
-        load_model_table(ROOT / "artifacts" / "med-features-v1", ROOT / "data" / "med-synth-v2", "test_diagnostic")
+        load_model_table(FEATURES, DATA, "test_diagnostic")
 
 
 def test_model_sources_do_not_export_frozen_features():

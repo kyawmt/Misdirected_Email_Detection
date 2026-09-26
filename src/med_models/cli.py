@@ -9,17 +9,17 @@ from pathlib import Path
 from med_models.experiments import run_experiments
 from med_models.package import artifact_metadata, save_model
 from med_models.report import write_documents
-from med_models.version import MODEL_VERSION, SEED
+from med_models.version import ARTIFACT_DIR, DATA_DIR, DOCS_DIR, FEATURES_DIR, MODEL_VERSION, SEED
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="med-models", description="Train the recorded misdirection baselines.")
     sub = parser.add_subparsers(dest="command", required=True)
-    run = sub.add_parser("run", help="Refit every recorded configuration and write med-model-v1")
-    run.add_argument("--features", default="artifacts/med-features-v1", type=Path)
-    run.add_argument("--data", default="data/med-synth-v2", type=Path)
-    run.add_argument("--output", default="artifacts/med-model-v1", type=Path)
-    run.add_argument("--docs", default="docs/phase_4", type=Path)
+    run = sub.add_parser("run", help=f"Refit every recorded configuration and write {MODEL_VERSION}")
+    run.add_argument("--features", default=FEATURES_DIR, type=Path)
+    run.add_argument("--data", default=DATA_DIR, type=Path)
+    run.add_argument("--output", default=ARTIFACT_DIR, type=Path)
+    run.add_argument("--docs", default=DOCS_DIR, type=Path)
     args = parser.parse_args(argv)
     if args.command != "run":
         return 1

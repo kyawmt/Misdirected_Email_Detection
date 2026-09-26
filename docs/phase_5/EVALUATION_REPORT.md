@@ -1,6 +1,6 @@
 # Phase 5 — Evaluation report
 
-This report evaluates the frozen behavior-only logistic **risk score** (`med-model-v1`, run `logistic_behavior_only_unweighted`) under warning policy `med-policy-v1`. Scores are risk scores, not probabilities: no calibrator was fit. `T_warn = 0.134557` was chosen on `validation_product_like` only. The frozen test subsets were scored once, after `policy.json` was written.
+This report evaluates the frozen logistic **risk score** (`med-model-v2`, run `logistic_all_balanced`, all features, content cosine included) on dataset `med-synth-v4` with features `med-features-v2`, under warning policy `med-policy-v2`. Scores are risk scores, not probabilities: no calibrator was fit. `T_warn = 0.999677` was chosen on `validation_product_like` only. The frozen test subsets were scored once, after `policy.json` was written.
 
 Email risk is the maximum recipient risk score. An email warns when its risk score is at or above `T_warn`. Blocking is disabled.
 
@@ -8,51 +8,53 @@ Email risk is the maximum recipient risk score. An email warns when its risk sco
 
 | Criterion | Status | Evidence |
 | --- | --- | --- |
-| AC01 | **insufficient evidence** | The point estimate is 0.00 per 1,000 (0 of 1990), which meets the budget only provisionally. The exact upper 95% bound is 1.85 per 1,000, above 1. With 1990 legitimate emails, even zero false warnings cannot put the upper bound at or below the budget. |
-| AC02 | **met only for S02, S08; not met for S01, S04** | On this simulation only, on `test_product_like`: 5 of 10 misdirected emails warned (S02 3, S08 2; 5 to 6 recipients; risk scores 0.999 to 1) with 0 false interventions; exact 95% recall interval [0.187, 0.813]. Missed: S01 3, S04 2; 1 recipient each; risk scores 0.00331 to 0.0149. Always-allow warns on none. The rules policy under the same validation rule warned 2 with 3 false interventions (1.51 per 1,000), which is outside the budget on this test. |
+| AC01 | **met** | On this simulation only: 0 false interventions on 5970 legitimate `test_product_like` emails, 0.00 per 1,000, with an exact upper 95% bound of 0.62 per 1,000, within the budget of 1. Warnings 9, blocks 0, coverage 100.0%, assumed prevalence 0.5%. The validation bound is not independent evidence, because validation chose the cutoff. |
+| AC02 | **met for S09; partly met for S02, S08; not met for S01, S04, S11** | On this simulation only, on `test_product_like`: 9 of 30 misdirected emails warned (S02 2, S08 5, S09 2; 1 to 7 recipients; risk scores 0.9997 to 1) with 0 false interventions; exact 95% recall interval [0.147, 0.494]. Missed: S01 6, S02 4, S04 5, S08 3, S11 3; 1 to 5 recipients; risk scores 0.1514 to 0.9985. Always-allow warns on none. The rules policy under the same validation rule warned 0 with 0 false interventions (0.00 per 1,000), within the budget on this test. |
 | AC03 | **met** | T_warn was chosen on validation_product_like only, written to policy.json before any test label was read, and applied once to the frozen test. The policy checksum is stored in test_evaluation.json. |
 | AC04 | **met** | Blocking is disabled. T_block is null and the block count is 0 on every subset. |
 
-AC05, AC08, and AC09 are **not met** in this phase. AC05 has only an in-process preliminary below. AC06 is partial: maximum aggregation, threshold equality, and flagging every recipient at or above `T_warn` are implemented and tested; duplicate-address merging is not. AC07 is **not met**: the report cannot separate "novelty is not treated as proof" from "missing history is filled with a one-minute gap", because the same scorer gives a rewritten mistake a risk score near 0.
+AC05 is measured at the API boundary in Phase 6; see [latency](#latency-ac05). AC06 is partial here: maximum aggregation, threshold equality, and flagging every recipient at or above `T_warn` are implemented and tested; duplicate-address merging is in the Phase 6 request normalizer. AC07: **insufficient evidence**. Wrong interventions on the legitimate-novelty scenarios: `validation_product_like` 0 of 349 S03/S05/S06/S07 emails warned, S11 0 of 2 warned; `validation_diagnostic` 0 of 50 S03/S05/S06/S07 emails warned, S11 0 of 10 warned; `test_product_like` 0 of 541 S03/S05/S06/S07 emails warned, S11 0 of 3 warned; `test_diagnostic` 0 of 55 S03/S05/S06/S07 emails warned, S11 0 of 11 warned. Those allows are the desired outcome, but legitimate first contacts score close to the cutoff (highest 0.99737 on `validation_product_like` against `T_warn` 0.99968), and removing pair history from a familiar mistake raises its risk score. The report cannot show that novelty is weighed only with other signals rather than setting a score near the cutoff by itself. AC08 and AC09 are Phase 6 behaviors and are not assessed in this report.
 
 ## Operating points at the frozen cutoff
 
 | Subset | Scorer | Warned mistakes | Email recall | Email precision | False interventions | Warnings | Blocks | Flagged unintended recipients | Mistakes with a flagged unintended recipient | Coverage |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `validation_product_like` | policy | 4 / 5 | 0.800 | 1.000 | 0 / 995 = 0.00 per 1,000 | 4 | 0 | 5 / 6 | 80.0% | 100.0% |
-| `validation_product_like` | rules, same validation rule | 2 / 5 | 0.400 | 1.000 | 0 / 995 = 0.00 per 1,000 | 2 | 0 | 2 / 6 | 40.0% | 100.0% |
-| `validation_product_like` | always-allow | 0 / 5 | 0.000 | n/a | 0 / 995 = 0.00 per 1,000 | 0 | 0 | 0 / 6 | 0.0% | 100.0% |
-| `validation_diagnostic` | policy | 20 / 28 | 0.714 | 1.000 | 0 / 36 = 0.00 per 1,000 | 20 | 0 | 24 / 32 | 71.4% | 100.0% |
-| `validation_diagnostic` | rules, same validation rule | 6 / 28 | 0.214 | 1.000 | 0 / 36 = 0.00 per 1,000 | 6 | 0 | 6 / 32 | 21.4% | 100.0% |
-| `validation_diagnostic` | always-allow | 0 / 28 | 0.000 | n/a | 0 / 36 = 0.00 per 1,000 | 0 | 0 | 0 / 32 | 0.0% | 100.0% |
-| `test_product_like` | policy | 5 / 10 | 0.500 | 1.000 | 0 / 1990 = 0.00 per 1,000 | 5 | 0 | 6 / 11 | 50.0% | 100.0% |
-| `test_product_like` | rules, same validation rule | 2 / 10 | 0.200 | 0.400 | 3 / 1990 = 1.51 per 1,000 | 5 | 0 | 2 / 11 | 20.0% | 100.0% |
-| `test_product_like` | always-allow | 0 / 10 | 0.000 | n/a | 0 / 1990 = 0.00 per 1,000 | 0 | 0 | 0 / 11 | 0.0% | 100.0% |
-| `test_diagnostic` | policy | 25 / 35 | 0.714 | 1.000 | 0 / 44 = 0.00 per 1,000 | 25 | 0 | 30 / 40 | 71.4% | 100.0% |
-| `test_diagnostic` | rules, same validation rule | 8 / 35 | 0.229 | 1.000 | 0 / 44 = 0.00 per 1,000 | 8 | 0 | 8 / 40 | 22.9% | 100.0% |
-| `test_diagnostic` | always-allow | 0 / 35 | 0.000 | n/a | 0 / 44 = 0.00 per 1,000 | 0 | 0 | 0 / 40 | 0.0% | 100.0% |
+| `validation_product_like` | policy | 8 / 20 | 0.400 | 1.000 | 0 / 3980 = 0.00 per 1,000 | 8 | 0 | 9 / 22 | 40.0% | 100.0% |
+| `validation_product_like` | rules, same validation rule | 0 / 20 | 0.000 | n/a | 0 / 3980 = 0.00 per 1,000 | 0 | 0 | 0 / 22 | 0.0% | 100.0% |
+| `validation_product_like` | always-allow | 0 / 20 | 0.000 | n/a | 0 / 3980 = 0.00 per 1,000 | 0 | 0 | 0 / 22 | 0.0% | 100.0% |
+| `validation_diagnostic` | policy | 33 / 80 | 0.412 | 1.000 | 0 / 160 = 0.00 per 1,000 | 33 | 0 | 38 / 90 | 41.2% | 100.0% |
+| `validation_diagnostic` | rules, same validation rule | 0 / 80 | 0.000 | n/a | 0 / 160 = 0.00 per 1,000 | 0 | 0 | 0 / 90 | 0.0% | 100.0% |
+| `validation_diagnostic` | always-allow | 0 / 80 | 0.000 | n/a | 0 / 160 = 0.00 per 1,000 | 0 | 0 | 0 / 90 | 0.0% | 100.0% |
+| `test_product_like` | policy | 9 / 30 | 0.300 | 1.000 | 0 / 5970 = 0.00 per 1,000 | 9 | 0 | 11 / 33 | 30.0% | 100.0% |
+| `test_product_like` | rules, same validation rule | 0 / 30 | 0.000 | n/a | 0 / 5970 = 0.00 per 1,000 | 0 | 0 | 0 / 33 | 0.0% | 100.0% |
+| `test_product_like` | always-allow | 0 / 30 | 0.000 | n/a | 0 / 5970 = 0.00 per 1,000 | 0 | 0 | 0 / 33 | 0.0% | 100.0% |
+| `test_diagnostic` | policy | 37 / 88 | 0.420 | 1.000 | 0 / 168 = 0.00 per 1,000 | 37 | 0 | 44 / 99 | 42.0% | 100.0% |
+| `test_diagnostic` | rules, same validation rule | 0 / 88 | 0.000 | n/a | 0 / 168 = 0.00 per 1,000 | 0 | 0 | 0 / 99 | 0.0% | 100.0% |
+| `test_diagnostic` | always-allow | 0 / 88 | 0.000 | n/a | 0 / 168 = 0.00 per 1,000 | 0 | 0 | 0 / 99 | 0.0% | 100.0% |
 
-Email precision of 1.000 on the policy rows is forced by zero observed false warnings; it is not an estimate of precision in use. At the exact upper 95% false-positive rate and the assumed 0.5% prevalence, precision would be 0.521 on `validation_product_like` and 0.576 on `test_product_like`. See [uncertainty and prevalence](UNCERTAINTY_AND_PREVALENCE.md).
+Email precision of 1.000 on a policy row is forced by zero observed false warnings; it is not an estimate of precision in use. At the exact upper 95% false-positive rate and the assumed 0.5% prevalence, precision would be 0.685 on `validation_product_like` and 0.709 on `test_product_like`. See [uncertainty and prevalence](UNCERTAINTY_AND_PREVALENCE.md).
 
-The rules policy uses the same selection rule on `validation_product_like` and gets cutoff 0.6667. That rule gives it 0 validation false interventions but does not keep it within the budget on test. It is a comparison for AC02 only. Always-allow is the floor.
+The confidence bound on `validation_product_like` is not independent confirmation of the budget, because that subset selected the cutoff. Only the one `test_product_like` pass can support or fail AC01.
+
+The rules policy uses the same selection rule on `validation_product_like` and gets cutoff 0.6667. It is a comparison for AC02 only. Always-allow is the floor.
 
 ## Confusion counts
 
 | Subset | Email TP | Email FP | Email FN | Email TN | Recipient TP | Recipient FP | Recipient FN | Recipient TN | Recipient recall |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `validation_product_like` | 4 | 0 | 1 | 995 | 5 | 0 | 1 | 2259 | 0.833 |
-| `validation_diagnostic` | 20 | 0 | 8 | 36 | 24 | 0 | 8 | 160 | 0.750 |
-| `test_product_like` | 5 | 0 | 5 | 1990 | 6 | 0 | 5 | 4482 | 0.545 |
-| `test_diagnostic` | 25 | 0 | 10 | 44 | 30 | 0 | 10 | 195 | 0.750 |
+| `validation_product_like` | 8 | 0 | 12 | 3980 | 9 | 0 | 13 | 4948 | 0.409 |
+| `validation_diagnostic` | 33 | 0 | 47 | 160 | 38 | 0 | 52 | 492 | 0.422 |
+| `test_product_like` | 9 | 0 | 21 | 5970 | 11 | 0 | 22 | 7441 | 0.333 |
+| `test_diagnostic` | 37 | 0 | 51 | 168 | 44 | 0 | 55 | 518 | 0.444 |
 
 ## Intervals
 
 | Subset | False interventions per 1,000, exact 95% | Same, family bootstrap | Email recall, exact 95% | Email recall, family bootstrap |
 | --- | --- | --- | --- | --- |
-| `validation_product_like` | [0.00, 3.70] | no upper bound: a zero count resamples to [0.00, 0.00] in all 1000 draws | [0.284, 0.995] | [0.333, 1.000] (993 draws kept) |
-| `validation_diagnostic` | not valid (shared families) | no upper bound: a zero count resamples to [0.00, 0.00] in all 1000 draws | not valid (shared families) | [0.536, 0.880] (1000 draws kept) |
-| `test_product_like` | [0.00, 1.85] | no upper bound: a zero count resamples to [0.00, 0.00] in all 1000 draws | [0.187, 0.813] | [0.143, 0.800] (1000 draws kept) |
-| `test_diagnostic` | not valid (shared families) | no upper bound: a zero count resamples to [0.00, 0.00] in all 1000 draws | not valid (shared families) | [0.552, 0.852] (1000 draws kept) |
+| `validation_product_like` | [0.00, 0.93] | no upper bound: a zero count resamples to [0.00, 0.00] in all 1000 draws | [0.191, 0.639] | [0.176, 0.632] (1000 draws kept) |
+| `validation_diagnostic` | not valid (shared families) | no upper bound: a zero count resamples to [0.00, 0.00] in all 1000 draws | not valid (shared families) | [0.303, 0.519] (1000 draws kept) |
+| `test_product_like` | [0.00, 0.62] | no upper bound: a zero count resamples to [0.00, 0.00] in all 1000 draws | [0.147, 0.494] | [0.130, 0.476] (1000 draws kept) |
+| `test_diagnostic` | not valid (shared families) | no upper bound: a zero count resamples to [0.00, 0.00] in all 1000 draws | not valid (shared families) | [0.321, 0.528] (1000 draws kept) |
 
 The family bootstrap of a zero count is always [0, 0]. It says nothing about an upper bound. The exact interval treats emails as independent, which holds on product-like subsets because each family has one draft. See [uncertainty and prevalence](UNCERTAINTY_AND_PREVALENCE.md).
 
@@ -62,10 +64,10 @@ Average precision is carried forward from the frozen risk score. The marked poin
 
 | Subset | Email AP | Email AP, family bootstrap | Recipient AP | Curve |
 | --- | --- | --- | --- | --- |
-| `validation_product_like` | 0.891 | [0.583, 1.000] | 0.917 | ![PR curve](figures/pr_validation_product_like.svg) |
-| `validation_diagnostic` | 0.977 | [0.948, 0.998] | 0.983 | ![PR curve](figures/pr_validation_diagnostic.svg) |
-| `test_product_like` | 0.622 | [0.293, 0.887] | 0.666 | ![PR curve](figures/pr_test_product_like.svg) |
-| `test_diagnostic` | 0.959 | [0.913, 0.988] | 0.967 | ![PR curve](figures/pr_test_diagnostic.svg) |
+| `validation_product_like` | 0.831 | [0.676, 0.954] | 0.820 | ![PR curve](figures/pr_validation_product_like.svg) |
+| `validation_diagnostic` | 0.949 | [0.911, 0.977] | 0.948 | ![PR curve](figures/pr_validation_diagnostic.svg) |
+| `test_product_like` | 0.741 | [0.582, 0.867] | 0.748 | ![PR curve](figures/pr_test_product_like.svg) |
+| `test_diagnostic` | 0.938 | [0.902, 0.968] | 0.936 | ![PR curve](figures/pr_test_diagnostic.svg) |
 
 ## Slices
 
@@ -75,154 +77,172 @@ Counts are at the frozen cutoff. A warning on S03, S05, S06, or S07 is a false p
 
 | Recipient slice | Rows | Unintended | Flagged unintended | Intended | Flagged intended |
 | --- | --- | --- | --- | --- | --- |
-| internal: external | 138 | 2 | 2 | 136 | 0 |
-| internal: internal | 2127 | 4 | 3 | 2123 | 0 |
-| contact: familiar | 2255 | 6 | 5 | 2249 | 0 |
-| contact: new | 10 | 0 | 0 | 10 | 0 |
+| internal: external | 237 | 6 | 5 | 231 | 0 |
+| internal: internal | 4733 | 16 | 4 | 4717 | 0 |
+| contact: familiar | 4938 | 20 | 9 | 4918 | 0 |
+| contact: new | 32 | 2 | 0 | 30 | 0 |
 
 | Email slice | Emails | Misdirected | Warned misdirected | Legitimate | Warned legitimate | Families |
 | --- | --- | --- | --- | --- | --- | --- |
-| recipients: 1 | 526 | 2 | 1 | 524 | 0 | 526 |
-| recipients: 2 | 64 | 0 | 0 | 64 | 0 | 64 |
-| recipients: 3-4 | 371 | 0 | 0 | 371 | 0 | 371 |
-| recipients: 5+ | 39 | 3 | 3 | 36 | 0 | 39 |
-| unintended recipients: 0 | 995 | 0 | 0 | 995 | 0 | 995 |
-| unintended recipients: 1 | 4 | 4 | 3 | 0 | 0 | 4 |
-| unintended recipients: 2+ | 1 | 1 | 1 | 0 | 0 | 1 |
+| recipients: 1 | 3600 | 11 | 1 | 3589 | 0 | 3600 |
+| recipients: 2 | 100 | 3 | 2 | 97 | 0 | 100 |
+| recipients: 3-4 | 264 | 0 | 0 | 264 | 0 | 264 |
+| recipients: 5+ | 36 | 6 | 5 | 30 | 0 | 36 |
+| unintended recipients: 0 | 3980 | 0 | 0 | 3980 | 0 | 3980 |
+| unintended recipients: 1 | 18 | 18 | 6 | 0 | 0 | 18 |
+| unintended recipients: 2+ | 2 | 2 | 2 | 0 | 0 | 2 |
+
+| Scenario | Emails | Misdirected | Warned misdirected (scenario recall) | Legitimate | Warned legitimate | Families |
+| --- | --- | --- | --- | --- | --- | --- |
+| S01 | 4 | 4 | 0 / 4 | 0 | 0 | 4 |
+| S02 | 4 | 4 | 3 / 4 | 0 | 0 | 4 |
+| S03 | 10 | 0 | — | 10 | 0 | 10 |
+| S04 | 4 | 4 | 0 / 4 | 0 | 0 | 4 |
+| S05 | 319 | 0 | — | 319 | 0 | 319 |
+| S06 | 10 | 0 | — | 10 | 0 | 10 |
+| S07 | 10 | 0 | — | 10 | 0 | 10 |
+| S08 | 5 | 5 | 4 / 5 | 0 | 0 | 5 |
+| S09 | 11 | 1 | 1 / 1 | 10 | 0 | 11 |
+| S11 | 2 | 2 | 0 / 2 | 0 | 0 | 2 |
+| routine | 3621 | 0 | — | 3621 | 0 | 3621 |
 
 ### `validation_diagnostic`
 
 | Recipient slice | Rows | Unintended | Flagged unintended | Intended | Flagged intended |
 | --- | --- | --- | --- | --- | --- |
-| internal: external | 14 | 12 | 12 | 2 | 0 |
-| internal: internal | 178 | 20 | 12 | 158 | 0 |
-| contact: familiar | 188 | 32 | 24 | 156 | 0 |
-| contact: new | 4 | 0 | 0 | 4 | 0 |
+| internal: external | 45 | 25 | 16 | 20 | 0 |
+| internal: internal | 537 | 65 | 22 | 472 | 0 |
+| contact: familiar | 532 | 80 | 38 | 452 | 0 |
+| contact: new | 50 | 10 | 0 | 40 | 0 |
 
 | Email slice | Emails | Misdirected | Warned misdirected | Legitimate | Warned legitimate | Families |
 | --- | --- | --- | --- | --- | --- | --- |
-| recipients: 1 | 25 | 12 | 4 | 13 | 0 | 17 |
-| recipients: 2 | 5 | 0 | 0 | 5 | 0 | 5 |
-| recipients: 3-4 | 17 | 0 | 0 | 17 | 0 | 17 |
-| recipients: 5+ | 17 | 16 | 16 | 1 | 0 | 17 |
-| unintended recipients: 0 | 36 | 0 | 0 | 36 | 0 | 36 |
-| unintended recipients: 1 | 24 | 24 | 16 | 0 | 0 | 24 |
-| unintended recipients: 2+ | 4 | 4 | 4 | 0 | 0 | 4 |
+| recipients: 1 | 129 | 40 | 10 | 89 | 0 | 99 |
+| recipients: 2 | 26 | 9 | 0 | 17 | 0 | 26 |
+| recipients: 3-4 | 39 | 0 | 0 | 39 | 0 | 39 |
+| recipients: 5+ | 46 | 31 | 23 | 15 | 0 | 41 |
+| unintended recipients: 0 | 160 | 0 | 0 | 160 | 0 | 160 |
+| unintended recipients: 1 | 70 | 70 | 23 | 0 | 0 | 70 |
+| unintended recipients: 2+ | 10 | 10 | 10 | 0 | 0 | 10 |
 
-| Scenario | Emails | Misdirected | Warned misdirected | Legitimate | Warned legitimate | Families |
+| Scenario | Emails | Misdirected | Warned misdirected (scenario recall) | Legitimate | Warned legitimate | Families |
 | --- | --- | --- | --- | --- | --- | --- |
-| S01 | 8 | 4 | 0 | 4 | 0 | 4 |
-| S02 | 8 | 4 | 4 | 4 | 0 | 4 |
-| S03 | 1 | 0 | 0 | 1 | 0 | 1 |
-| S04 | 8 | 4 | 0 | 4 | 0 | 4 |
-| S05 | 2 | 0 | 0 | 2 | 0 | 2 |
-| S06 | 1 | 0 | 0 | 1 | 0 | 1 |
-| S07 | 1 | 0 | 0 | 1 | 0 | 1 |
-| S08 | 25 | 12 | 12 | 13 | 0 | 13 |
-| S09 | 10 | 4 | 4 | 6 | 0 | 6 |
+| S01 | 20 | 10 | 0 / 10 | 10 | 0 | 10 |
+| S02 | 20 | 10 | 1 / 10 | 10 | 0 | 10 |
+| S03 | 10 | 0 | — | 10 | 0 | 10 |
+| S04 | 20 | 10 | 0 / 10 | 10 | 0 | 10 |
+| S05 | 20 | 0 | — | 20 | 0 | 20 |
+| S06 | 10 | 0 | — | 10 | 0 | 10 |
+| S07 | 10 | 0 | — | 10 | 0 | 10 |
+| S08 | 70 | 30 | 22 / 30 | 40 | 0 | 40 |
+| S09 | 40 | 10 | 10 / 10 | 30 | 0 | 30 |
+| S11 | 20 | 10 | 0 / 10 | 10 | 0 | 10 |
 
 ### `test_product_like`
 
 | Recipient slice | Rows | Unintended | Flagged unintended | Intended | Flagged intended |
 | --- | --- | --- | --- | --- | --- |
-| internal: external | 263 | 4 | 4 | 259 | 0 |
-| internal: internal | 4230 | 7 | 2 | 4223 | 0 |
-| contact: familiar | 4479 | 11 | 6 | 4468 | 0 |
-| contact: new | 14 | 0 | 0 | 14 | 0 |
+| internal: external | 377 | 10 | 6 | 367 | 0 |
+| internal: internal | 7097 | 23 | 5 | 7074 | 0 |
+| contact: familiar | 7421 | 30 | 11 | 7391 | 0 |
+| contact: new | 53 | 3 | 0 | 50 | 0 |
 
 | Email slice | Emails | Misdirected | Warned misdirected | Legitimate | Warned legitimate | Families |
 | --- | --- | --- | --- | --- | --- | --- |
-| recipients: 1 | 1067 | 5 | 0 | 1062 | 0 | 1067 |
-| recipients: 2 | 110 | 0 | 0 | 110 | 0 | 110 |
-| recipients: 3-4 | 764 | 0 | 0 | 764 | 0 | 764 |
-| recipients: 5+ | 59 | 5 | 5 | 54 | 0 | 59 |
-| unintended recipients: 0 | 1990 | 0 | 0 | 1990 | 0 | 1990 |
-| unintended recipients: 1 | 9 | 9 | 4 | 0 | 0 | 9 |
-| unintended recipients: 2+ | 1 | 1 | 1 | 0 | 0 | 1 |
+| recipients: 1 | 5388 | 16 | 2 | 5372 | 0 | 5388 |
+| recipients: 2 | 156 | 5 | 1 | 151 | 0 | 156 |
+| recipients: 3-4 | 406 | 0 | 0 | 406 | 0 | 406 |
+| recipients: 5+ | 50 | 9 | 6 | 41 | 0 | 50 |
+| unintended recipients: 0 | 5970 | 0 | 0 | 5970 | 0 | 5970 |
+| unintended recipients: 1 | 27 | 27 | 6 | 0 | 0 | 27 |
+| unintended recipients: 2+ | 3 | 3 | 3 | 0 | 0 | 3 |
+
+| Scenario | Emails | Misdirected | Warned misdirected (scenario recall) | Legitimate | Warned legitimate | Families |
+| --- | --- | --- | --- | --- | --- | --- |
+| S01 | 6 | 6 | 0 / 6 | 0 | 0 | 6 |
+| S02 | 6 | 6 | 2 / 6 | 0 | 0 | 6 |
+| S03 | 15 | 0 | — | 15 | 0 | 15 |
+| S04 | 5 | 5 | 0 / 5 | 0 | 0 | 5 |
+| S05 | 496 | 0 | — | 496 | 0 | 496 |
+| S06 | 15 | 0 | — | 15 | 0 | 15 |
+| S07 | 15 | 0 | — | 15 | 0 | 15 |
+| S08 | 8 | 8 | 5 / 8 | 0 | 0 | 8 |
+| S09 | 22 | 2 | 2 / 2 | 20 | 0 | 22 |
+| S11 | 3 | 3 | 0 / 3 | 0 | 0 | 3 |
+| routine | 5409 | 0 | — | 5409 | 0 | 5409 |
 
 ### `test_diagnostic`
 
 | Recipient slice | Rows | Unintended | Flagged unintended | Intended | Flagged intended |
 | --- | --- | --- | --- | --- | --- |
-| internal: external | 19 | 15 | 15 | 4 | 0 |
-| internal: internal | 216 | 25 | 15 | 191 | 0 |
-| contact: familiar | 227 | 40 | 30 | 187 | 0 |
-| contact: new | 8 | 0 | 0 | 8 | 0 |
+| internal: external | 50 | 28 | 19 | 22 | 0 |
+| internal: internal | 567 | 71 | 25 | 496 | 0 |
+| contact: familiar | 562 | 88 | 44 | 474 | 0 |
+| contact: new | 55 | 11 | 0 | 44 | 0 |
 
 | Email slice | Emails | Misdirected | Warned misdirected | Legitimate | Warned legitimate | Families |
 | --- | --- | --- | --- | --- | --- | --- |
-| recipients: 1 | 33 | 15 | 5 | 18 | 0 | 25 |
-| recipients: 2 | 6 | 0 | 0 | 6 | 0 | 6 |
-| recipients: 3-4 | 18 | 0 | 0 | 18 | 0 | 18 |
-| recipients: 5+ | 22 | 20 | 20 | 2 | 0 | 19 |
-| unintended recipients: 0 | 44 | 0 | 0 | 44 | 0 | 44 |
-| unintended recipients: 1 | 30 | 30 | 20 | 0 | 0 | 29 |
-| unintended recipients: 2+ | 5 | 5 | 5 | 0 | 0 | 5 |
+| recipients: 1 | 141 | 44 | 11 | 97 | 0 | 108 |
+| recipients: 2 | 26 | 9 | 0 | 17 | 0 | 26 |
+| recipients: 3-4 | 39 | 0 | 0 | 39 | 0 | 39 |
+| recipients: 5+ | 50 | 35 | 26 | 15 | 0 | 43 |
+| unintended recipients: 0 | 168 | 0 | 0 | 168 | 0 | 168 |
+| unintended recipients: 1 | 77 | 77 | 26 | 0 | 0 | 76 |
+| unintended recipients: 2+ | 11 | 11 | 11 | 0 | 0 | 11 |
 
-| Scenario | Emails | Misdirected | Warned misdirected | Legitimate | Warned legitimate | Families |
+| Scenario | Emails | Misdirected | Warned misdirected (scenario recall) | Legitimate | Warned legitimate | Families |
 | --- | --- | --- | --- | --- | --- | --- |
-| S01 | 9 | 5 | 0 | 4 | 0 | 5 |
-| S02 | 9 | 5 | 5 | 4 | 0 | 5 |
-| S03 | 2 | 0 | 0 | 2 | 0 | 2 |
-| S04 | 9 | 5 | 0 | 4 | 0 | 5 |
-| S05 | 4 | 0 | 0 | 4 | 0 | 4 |
-| S06 | 2 | 0 | 0 | 2 | 0 | 2 |
-| S07 | 2 | 0 | 0 | 2 | 0 | 2 |
-| S08 | 29 | 15 | 15 | 14 | 0 | 14 |
-| S09 | 13 | 5 | 5 | 8 | 0 | 9 |
+| S01 | 21 | 11 | 0 / 11 | 10 | 0 | 11 |
+| S02 | 21 | 11 | 2 / 11 | 10 | 0 | 11 |
+| S03 | 11 | 0 | — | 11 | 0 | 11 |
+| S04 | 21 | 11 | 0 / 11 | 10 | 0 | 11 |
+| S05 | 22 | 0 | — | 22 | 0 | 22 |
+| S06 | 11 | 0 | — | 11 | 0 | 11 |
+| S07 | 11 | 0 | — | 11 | 0 | 11 |
+| S08 | 74 | 33 | 24 / 33 | 41 | 0 | 41 |
+| S09 | 43 | 11 | 11 / 11 | 32 | 0 | 33 |
+| S11 | 21 | 11 | 0 / 11 | 10 | 0 | 11 |
 
 ## Legitimate first contacts and the paired check
 
 | Subset | Intended first-contact rows | Flagged | Max risk score | Unintended rows | Flagged as stored | Flagged after first-contact rewrite | Median before | Median after |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `validation_product_like` | 10 | 0 | 0.00006 | 6 | 5 | 0 | 0.9998 | 5.3e-08 |
-| `validation_diagnostic` | 4 | 0 | 0.00009 | 32 | 24 | 0 | 0.9998 | 1.9e-08 |
-| `test_product_like` | 14 | 0 | 0.00009 | 11 | 6 | 0 | 0.9986 | 3.1e-10 |
-| `test_diagnostic` | 8 | 0 | 0.00016 | 40 | 30 | 0 | 0.9985 | 2.5e-10 |
+| `validation_product_like` | 30 | 0 | 0.99737 | 22 | 9 | 9 | 0.9940 | 0.9986 |
+| `validation_diagnostic` | 40 | 0 | 0.99853 | 90 | 38 | 51 | 0.9980 | 1.0000 |
+| `test_product_like` | 50 | 0 | 0.99563 | 33 | 11 | 14 | 0.9927 | 0.9985 |
+| `test_diagnostic` | 44 | 0 | 0.99705 | 99 | 44 | 57 | 0.9990 | 1.0000 |
 
-Allowing S03 and S06 is the desired outcome for those stories, and the policy did allow them. That is not evidence that the scorer understands a legitimate first contact: the same scorer gives a mistake rewritten as a first contact a risk score near 0. AC07 stays unmet.
+The rewrite removes pair history and pair text from each unintended row. AC07: **insufficient evidence**. Wrong interventions on the legitimate-novelty scenarios: `validation_product_like` 0 of 349 S03/S05/S06/S07 emails warned, S11 0 of 2 warned; `validation_diagnostic` 0 of 50 S03/S05/S06/S07 emails warned, S11 0 of 10 warned; `test_product_like` 0 of 541 S03/S05/S06/S07 emails warned, S11 0 of 3 warned; `test_diagnostic` 0 of 55 S03/S05/S06/S07 emails warned, S11 0 of 11 warned. Those allows are the desired outcome, but legitimate first contacts score close to the cutoff (highest 0.99737 on `validation_product_like` against `T_warn` 0.99968), and removing pair history from a familiar mistake raises its risk score. The report cannot show that novelty is weighed only with other signals rather than setting a score near the cutoff by itself.
 
 ## Calibration
 
-`calibration: not_fit`. validation_product_like has 5 misdirected emails, too few to fit or to split for a calibrator. validation_diagnostic is not the operating mix and train fit the model. A reliability table on validation_diagnostic is a shape check only.
+`calibration: not_fit`. validation_product_like has 20 misdirected emails. Separate chronological portions for calibration and threshold selection would leave about 10 positives in each, too few to fit a calibrator and still choose a cutoff. validation_diagnostic is not the operating mix and train fit the model. A reliability table on validation_diagnostic is a shape check only.
 
 | Risk score bin | Rows | Mean risk score | Observed unintended fraction |
 | --- | --- | --- | --- |
-| 0.0–0.1 | 167 | 0.003 | 0.042 |
-| 0.1–0.2 | 1 | 0.106 | 1.000 |
-| 0.2–0.3 | 0 | n/a | n/a |
-| 0.3–0.4 | 0 | n/a | n/a |
-| 0.4–0.5 | 0 | n/a | n/a |
-| 0.5–0.6 | 0 | n/a | n/a |
-| 0.6–0.7 | 0 | n/a | n/a |
-| 0.7–0.8 | 0 | n/a | n/a |
-| 0.8–0.9 | 0 | n/a | n/a |
-| 0.9–1.0 | 24 | 1.000 | 1.000 |
+| 0.0–0.1 | 463 | 0.001 | 0.002 |
+| 0.1–0.2 | 6 | 0.148 | 0.500 |
+| 0.2–0.3 | 6 | 0.259 | 0.000 |
+| 0.3–0.4 | 6 | 0.350 | 0.333 |
+| 0.4–0.5 | 1 | 0.485 | 1.000 |
+| 0.5–0.6 | 1 | 0.548 | 1.000 |
+| 0.6–0.7 | 2 | 0.656 | 1.000 |
+| 0.7–0.8 | 2 | 0.710 | 0.500 |
+| 0.8–0.9 | 4 | 0.852 | 0.500 |
+| 0.9–1.0 | 91 | 0.987 | 0.846 |
 
-This table is on `validation_diagnostic`, which is not the 0.5% operating mix. It is a shape check. Scores cluster near 0 and near 1, so most bins are empty.
+This table is on `validation_diagnostic`, which is not the 0.5% operating mix. It is a shape check. Most rows fall in the lowest and highest bins; read each bin's row count before its fraction.
 
-## Latency preliminary (AC05 not met)
+## Latency (AC05)
 
-In-process only. Timing boundary: assess_draft: transform_draft on the loaded history index, loaded model, policy decision. Excluded: request parsing, HTTP, query construction, dataset loading. Assumption A10 starts timing at backend receipt, and no backend exists yet, so this does not decide whether the 300 ms target is met or missed.
-
-| Measure | Value |
-| --- | --- |
-| Calls measured | 1000 on `validation_product_like` after 20 unmeasured warm-up calls, concurrency 1 |
-| p50 | 24.63 ms |
-| p95 | 333.35 ms |
-| Max | 432.94 ms |
-| Cold start | 1.2 s (read dataset, load transformer, load policy and model with checksum checks, build directory and history index, vectorize history) |
-| Statuses | assessed: 1000 |
-| Request mix | 1 recipients: 526, 2 recipients: 64, 3 recipients: 69, 4 recipients: 302, 5 recipients: 38, 6 recipients: 1; median 201 characters, max 243 |
-| Hardware and OS | macOS-27.0-arm64-arm-64bit, arm64, 10 CPUs, Python 3.11.14 |
-| Versions | model_version med-model-v1, feature_spec_version med-features-v1, policy_version med-policy-v1, dataset_version med-synth-v2, numpy 2.4.6, scikit_learn 1.9.1 |
+Measured once at the API boundary for this policy bundle (`artifacts/med-api-latency/med-policy-v2/latency.json`): 4000 `POST /assess` calls on `validation_product_like` after 20 warm-up calls, one in flight. Client p50 26.84 ms, p95 57.04 ms against a 300 ms target: AC05 **met** on this machine. Details, workload, and hardware are in [the Phase 6 scoring flow](../phase_6/SCORING_FLOW.md#latency-ac05).
 
 ## Synthetic shortcuts
 
 Read every recall figure in this phase next to these limits of the synthetic data and the frozen scorer:
 
-- **Content shortcut.** An all-features logistic model reaches email average precision 1.000 on `validation_product_like` because content cosine restates the generator's per-relationship topics. The frozen scorer is behavior-only and does not use it, so lookalike replacements (S01) and familiar-recipient, unusual-topic mistakes (S04) are mostly missed: `validation_product_like`: S01 0 warned / 1 missed, S04 1 warned / 0 missed; `validation_diagnostic`: S01 0 warned / 4 missed, S04 0 warned / 4 missed; `test_product_like`: S01 0 warned / 3 missed, S04 0 warned / 2 missed; `test_diagnostic`: S01 0 warned / 5 missed, S04 0 warned / 5 missed. The drafts are listed in the [error analysis](ERROR_ANALYSIS.md).
-- **Five-minute burst.** 1543 of 2259 legitimate recipient rows on `validation_product_like` had earlier mail to the same recipient under five minutes before the draft; 0 of 6 unintended rows did. Part of the behavior-only risk score is that generator timing.
-- **First contact near 0.** Rewriting the 6 unintended `validation_product_like` rows as first contacts moves their median risk score from 0.9998 to 5.3e-08; 0 of them would still be flagged. This version cannot warn on a mistaken first contact.
-- **Few positives.** `validation_product_like` has 5 misdirected emails and `test_product_like` has 10. Recall intervals are wide.
-- **Unregularized fit.** The scorer is logistic regression with `C = 100`, the top of its training grid. Coefficients on overlapping counts are not separate effects.
+- **Content signal.** The scorer uses all features, content cosine included. On train, content cosine alone separates mistakes from ordinary mail with separation 0.932 (the eligibility audit flags a feature only beyond 0.95). The same-family behavior-only model has product-like validation email average precision 0.467 against 0.831 for the scorer. S01, S04, and S11 outcomes by subset: `validation_product_like`: S01 0 of 4 warned, S04 0 of 4 warned, S11 0 of 2 warned; `validation_diagnostic`: S01 0 of 10 warned, S04 0 of 10 warned, S11 0 of 10 warned; `test_product_like`: S01 0 of 6 warned, S04 0 of 5 warned, S11 0 of 3 warned; `test_diagnostic`: S01 0 of 11 warned, S04 0 of 11 warned, S11 0 of 11 warned. The drafts are listed in the [error analysis](ERROR_ANALYSIS.md).
+- **Five-minute recency.** 0 of 4948 legitimate recipient rows on `validation_product_like` had earlier mail between the sender and that recipient under five minutes before the draft; 1 of 22 unintended rows did.
+- **First contacts.** Rewriting the 22 unintended `validation_product_like` rows as first contacts (no pair history, no pair text) moves their median risk score from 0.9940 to 0.9986; 9 are flagged as stored and 9 after the rewrite. The 30 intended first-contact rows reach a highest risk score of 0.99737, just below `T_warn`, and none is flagged. Legitimate first contacts are among the highest-scoring legitimate rows; the high cutoff, not the score, keeps them allowed.
+- **Few positives.** `validation_product_like` has 20 misdirected emails and `test_product_like` has 30. Recall intervals are wide.
+- **Weak regularization.** The scorer is logistic regression with `C = 1000`, the top edge of its training grid. Coefficients on overlapping counts are not separate effects.

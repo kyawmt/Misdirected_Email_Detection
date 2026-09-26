@@ -7,16 +7,16 @@ from pathlib import Path
 
 from med_data.io import build_to, read_dataset, verify_files
 from med_data.validate import assert_valid
-from med_data.version import DATASET_VERSION
+from med_data.version import DATA_DIR, DATASET_VERSION
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="med-data", description="Build or validate the fictional email dataset.")
     sub = parser.add_subparsers(dest="command", required=True)
     build = sub.add_parser("build", help="Generate the versioned dataset")
-    build.add_argument("--output", default=f"data/{DATASET_VERSION}", type=Path)
+    build.add_argument("--output", default=DATA_DIR, type=Path)
     validate = sub.add_parser("validate", help="Check a generated dataset and its checksums")
-    validate.add_argument("--data", default=f"data/{DATASET_VERSION}", type=Path)
+    validate.add_argument("--data", default=DATA_DIR, type=Path)
     args = parser.parse_args(argv)
     if args.command == "build":
         path = build_to(args.output)

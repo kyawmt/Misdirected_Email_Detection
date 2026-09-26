@@ -1,8 +1,9 @@
 """Feature groups for the recorded ablations.
 
 Column order always follows FEATURE_COLUMNS. Behavior-only drops the three
-content-shortcut columns named in the phase contract. Draft-length indicators
-stay, because they are evidence limits rather than the cosine itself.
+content-cosine columns. Draft-length indicators stay, because they are evidence
+limits rather than the cosine itself. Drop-content removes every text-derived
+column, the draft-length indicators included.
 """
 
 from med_features.schema import FEATURE_COLUMNS
@@ -71,7 +72,9 @@ LOG_COUNTS = (
     "draft_raw_token_count",
 )
 
-C_GRID = (0.01, 0.1, 1.0, 10.0, 100.0)
+# Extended in med-model-v2 so a selected C is not stopped by the grid edge.
+# A larger C weakens regularization; it does not fix collinearity.
+C_GRID = (0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0)
 TREE_GRID = (
     {"max_depth": 2, "min_samples_leaf": 20},
     {"max_depth": 2, "min_samples_leaf": 50},
@@ -97,6 +100,8 @@ def ablation_columns(ablation: str) -> list[str]:
         return [column for column in FEATURE_COLUMNS if column not in RELATIONSHIP]
     if ablation == "drop_similarity":
         return [column for column in FEATURE_COLUMNS if column not in SIMILARITY]
+    if ablation == "drop_content":
+        return [column for column in FEATURE_COLUMNS if column not in CONTENT_CORE + TEXT_FLAGS]
     if ablation == "content_only":
         return ordered(CONTENT_CORE + TEXT_FLAGS)
     raise KeyError(ablation)
@@ -105,6 +110,7 @@ def ablation_columns(ablation: str) -> list[str]:
 ABLATIONS = (
     "all",
     "behavior_only",
+    "drop_content",
     "drop_relationship",
     "drop_similarity",
     "content_only",

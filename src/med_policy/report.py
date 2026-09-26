@@ -12,10 +12,16 @@ from pathlib import Path
 
 import pandas as pd
 
-from med_policy.version import BUDGET_PER_1000, DIAGNOSTIC_SUBSET, SELECTION_SUBSET, TEST_SUBSETS
+from med_policy.version import (
+    ARTIFACT_ROOT,
+    BUDGET_PER_1000,
+    DIAGNOSTIC_SUBSET,
+    MODEL_DIR,
+    SELECTION_SUBSET,
+    TEST_SUBSETS,
+)
 
 TEST_PRODUCT, TEST_DIAGNOSTIC = TEST_SUBSETS
-MODEL_DIR = Path("artifacts/med-model-v1")
 
 
 def write_documents(policy_dir: Path, docs_dir: Path) -> list[Path]:
@@ -43,6 +49,16 @@ def write_documents(policy_dir: Path, docs_dir: Path) -> list[Path]:
     return written
 
 
+def stored_results(policy_dir: Path) -> dict:
+    """The policy and its one-shot frozen result, as stored. Reads files only."""
+    policy_dir = Path(policy_dir)
+    frozen = policy_dir / "test_evaluation.json"
+    return {
+        "policy": json.loads((policy_dir / "policy.json").read_text(encoding="utf-8")),
+        "test": json.loads(frozen.read_text(encoding="utf-8")) if frozen.exists() else None,
+    }
+
+
 def _context(policy_dir: Path) -> dict:
     load = lambda name: json.loads((policy_dir / name).read_text(encoding="utf-8"))  # noqa: E731
     ctx = {
@@ -53,6 +69,9 @@ def _context(policy_dir: Path) -> dict:
         "model": json.loads((MODEL_DIR / "model_metadata.json").read_text(encoding="utf-8")),
         "experiments": json.loads((MODEL_DIR / "experiments.json").read_text(encoding="utf-8")),
     }
+    api_latency = ARTIFACT_ROOT / "med-api-latency" / ctx["policy"]["policy_version"] / "latency.json"
+    ctx["api_latency"] = json.loads(api_latency.read_text(encoding="utf-8")) if api_latency.exists() else None
+    ctx["api_latency_path"] = str(api_latency)
     scores_path = policy_dir / "validation_scores.csv"
     ctx["validation_scores"] = pd.read_csv(scores_path, float_precision="round_trip") if scores_path.exists() else None
     ctx["blocks"] = dict(ctx["validation"]["subsets"])
@@ -108,6 +127,31 @@ def _fi(point: dict) -> str:
     return f"{fi['false_interventions']} / {fi['legitimate_emails']} = {_f(fi['per_1000_legitimate'], 2)} per 1,000"
 
 
+def _features_phrase(ctx: dict) -> str:
+    ablation = ctx["model"]["ablation"]
+    if ablation == "all":
+        return "all features, content cosine included"
+    if ablation == "behavior_only":
+        return "behavior-only features, no content cosine"
+    return f"`{ablation}` features"
+
+
+def _scenario_counts(ctx: dict, subset: str, scenario: str) -> tuple[int, int]:
+    for cell in ctx["blocks"][subset]["slices"]["email_by_scenario"]:
+        if cell["slice"] == scenario:
+            return cell["warned_misdirected"], cell["misdirected"]
+    return 0, 0
+
+
+def _legit_warned(ctx: dict, subset: str, scenarios=("S03", "S05", "S06", "S07")) -> tuple[int, int]:
+    warned = total = 0
+    for cell in ctx["blocks"][subset]["slices"]["email_by_scenario"]:
+        if cell["slice"] in scenarios:
+            warned += cell["warned_legitimate"]
+            total += cell["legitimate"]
+    return warned, total
+
+
 # ---------------------------------------------------------------- status
 
 
@@ -126,14 +170,20 @@ def _ac_status(ctx: dict) -> dict:
         if rate > BUDGET_PER_1000:
             status["AC01"] = ("not met", f"The point estimate {_f(rate, 2)} per 1,000 exceeds the budget.")
         elif upper <= BUDGET_PER_1000:
-            status["AC01"] = ("met", f"The upper 95% bound {_f(upper, 2)} per 1,000 is within the budget.")
+            status["AC01"] = (
+                "met",
+                f"On this simulation only: {fi['false_interventions']} false interventions on {fi['legitimate_emails']} legitimate "
+                f"`{TEST_PRODUCT}` emails, {_f(rate, 2)} per 1,000, with an exact upper 95% bound of {_f(upper, 2)} per 1,000, within "
+                f"the budget of {_f(BUDGET_PER_1000, 0)}. Warnings {fi['warnings']}, blocks {fi['blocks']}, coverage "
+                f"{_pct(point['coverage']['fraction'])}, assumed prevalence 0.5%. The validation bound is not independent evidence, "
+                "because validation chose the cutoff.",
+            )
         else:
             status["AC01"] = (
                 "insufficient evidence",
                 f"The point estimate is {_f(rate, 2)} per 1,000 ({fi['false_interventions']} of {fi['legitimate_emails']}), "
                 f"which meets the budget only provisionally. The exact upper 95% bound is {_f(upper, 2)} per 1,000, above "
-                f"{_f(BUDGET_PER_1000, 0)}. With {fi['legitimate_emails']} legitimate emails, even zero false warnings "
-                f"cannot put the upper bound at or below the budget.",
+                f"{_f(BUDGET_PER_1000, 0)}.",
             )
         email = point["email"]
         rules = test["subsets"][TEST_PRODUCT]["rules_same_budget"]
@@ -142,15 +192,25 @@ def _ac_status(ctx: dict) -> dict:
             outcomes = test["subsets"][TEST_PRODUCT]["outcomes"]
             warned, missed = _scenario_summary(outcomes["warned_mistakes"]), _scenario_summary(outcomes["missed_mistakes"])
             rules_fi = rules["interventions"]
+            within = rules_fi["per_1000_legitimate"] <= BUDGET_PER_1000
+            full = sorted(set(warned["scenarios"]) - set(missed["scenarios"]))
+            partial = sorted(set(warned["scenarios"]) & set(missed["scenarios"]))
+            never = sorted(set(missed["scenarios"]) - set(warned["scenarios"]))
+            words = []
+            if full:
+                words.append(f"met for {', '.join(full)}")
+            if partial:
+                words.append(f"partly met for {', '.join(partial)}")
+            if never:
+                words.append(f"not met for {', '.join(never)}")
             status["AC02"] = (
-                f"met only for {', '.join(sorted(warned['scenarios']))}; not met for {', '.join(sorted(missed['scenarios']))}"
-                if missed["scenarios"]
-                else "met",
+                "; ".join(words) if missed["scenarios"] else "met",
                 f"On this simulation only, on `{TEST_PRODUCT}`: {email['true_positives']} of {email['positives']} misdirected emails warned "
                 f"({warned['text']}) with {email['false_positives']} false interventions; exact 95% recall interval "
                 f"{_ci(email['recall_interval_exact'])}. Missed: {missed['text']}. Always-allow warns on none. The rules policy under "
                 f"the same validation rule warned {rules['email']['true_positives']} with {rules_fi['false_interventions']} false "
-                f"interventions ({_f(rules_fi['per_1000_legitimate'], 2)} per 1,000), which is outside the budget on this test.",
+                f"interventions ({_f(rules_fi['per_1000_legitimate'], 2)} per 1,000), "
+                + ("within the budget on this test." if within else "which is outside the budget on this test."),
             )
         else:
             status["AC02"] = ("not met", "The frozen policy did not show recall above always-allow within the budget.")
@@ -161,9 +221,6 @@ def _ac_status(ctx: dict) -> dict:
         )
     status["AC04"] = ("met", "Blocking is disabled. T_block is null and the block count is 0 on every subset.")
     return status
-
-
-# ---------------------------------------------------------------- figures
 
 
 def _curves(ctx: dict):
@@ -228,41 +285,59 @@ def _scenario_summary(rows: list[dict]) -> dict:
     else:
         size = f"{min(sizes)} to {max(sizes)} recipients"
     scores = [row["email_risk"] for row in rows]
-    low, high = f"{min(scores):.3g}", f"{max(scores):.3g}"
+    low, high = f"{min(scores):.4g}", f"{max(scores):.4g}"
     score = f"risk score {low}" if low == high else f"risk scores {low} to {high}"
     listed = ", ".join(f"{key} {value}" for key, value in sorted(counts.items()))
     return {"scenarios": list(counts), "text": f"{listed}; {size}; {score}"}
 
 
 def _s01_s04_line(ctx: dict) -> str:
-    """Per-subset warned/missed counts for S01 and S04, from the stored outcome lists."""
+    """Per-subset warned/missed counts for S01, S04, and S11, from the stored slices."""
     pieces = []
     for subset in _subsets(ctx):
-        outcomes = ctx["blocks"][subset]["outcomes"]
         cells = []
-        for scenario in ("S01", "S04"):
-            warned = sum(1 for row in outcomes["warned_mistakes"] if row["scenario_id"] == scenario)
-            missed = sum(1 for row in outcomes["missed_mistakes"] if row["scenario_id"] == scenario)
-            if warned or missed:
-                cells.append(f"{scenario} {warned} warned / {missed} missed")
-        pieces.append(f"`{subset}`: {', '.join(cells) if cells else 'no S01 or S04 mistakes'}")
+        for scenario in ("S01", "S04", "S11"):
+            warned, total = _scenario_counts(ctx, subset, scenario)
+            if total:
+                cells.append(f"{scenario} {warned} of {total} warned")
+        pieces.append(f"`{subset}`: {', '.join(cells) if cells else 'none present'}")
     return "; ".join(pieces)
 
 
 def _shortcut_block(ctx: dict) -> str:
     runs = {run["name"]: run for run in ctx["experiments"]["runs"]}
-    all_features = runs.get("logistic_all_unweighted")
-    ap_all = all_features["validation_product_like"]["email"]["average_precision"] if all_features else None
+    model = ctx["model"]
+    selected = runs.get(model["run_name"], {})
+    behavior = runs.get(f"logistic_behavior_only_{model['config'].get('class_weight', 'unweighted')}") or runs.get("logistic_behavior_only_unweighted")
+    audit = (ctx["experiments"].get("eligibility") or {}).get("audit") or {}
+    cosine = (audit.get("content_separation") or {}).get("content_cosine")
     burst = ctx["blocks"][SELECTION_SUBSET]["recency_burst"]
     fc = ctx["blocks"][SELECTION_SUBSET]["first_contact"]
+    product_pos = ctx["blocks"][SELECTION_SUBSET]["policy"]["email"]["positives"]
+    test_pos = ctx["blocks"][TEST_PRODUCT]["policy"]["email"]["positives"] if TEST_PRODUCT in ctx["blocks"] else None
+    content_line = (
+        f"- **Content signal.** The scorer uses {_features_phrase(ctx)}. On train, content cosine alone separates mistakes from ordinary mail with separation {_f(cosine)} (the eligibility audit flags a feature only beyond 0.95). "
+        if cosine is not None
+        else "- **Content signal.** "
+    )
+    if behavior and model["ablation"] == "all":
+        content_line += (
+            f"The same-family behavior-only model has product-like validation email average precision {_f(behavior['validation_product_like']['email']['average_precision'])} "
+            f"against {_f(selected.get('validation_product_like', {}).get('email', {}).get('average_precision'))} for the scorer. "
+        )
+    content_line += f"S01, S04, and S11 outcomes by subset: {_s01_s04_line(ctx)}. The drafts are listed in the [error analysis](ERROR_ANALYSIS.md)."
     lines = [
         "Read every recall figure in this phase next to these limits of the synthetic data and the frozen scorer:",
         "",
-        f"- **Content shortcut.** An all-features logistic model reaches email average precision {_f(ap_all)} on `validation_product_like` because content cosine restates the generator's per-relationship topics. The frozen scorer is behavior-only and does not use it, so lookalike replacements (S01) and familiar-recipient, unusual-topic mistakes (S04) are mostly missed: {_s01_s04_line(ctx)}. The drafts are listed in the [error analysis](ERROR_ANALYSIS.md).",
-        f"- **Five-minute burst.** {burst['legitimate_under_5_minutes']} of {burst['legitimate_rows']} legitimate recipient rows on `validation_product_like` had earlier mail to the same recipient under five minutes before the draft; {burst['unintended_under_5_minutes']} of {burst['unintended_rows']} unintended rows did. Part of the behavior-only risk score is that generator timing.",
-        f"- **First contact near 0.** Rewriting the {fc['unintended_rows']} unintended `validation_product_like` rows as first contacts moves their median risk score from {_f(fc['median_before'], 4)} to {fc['median_after']:.1e}; {fc['flagged_after_rewrite']} of them would still be flagged. This version cannot warn on a mistaken first contact.",
-        "- **Few positives.** `validation_product_like` has 5 misdirected emails and `test_product_like` has 10. Recall intervals are wide.",
-        f"- **Unregularized fit.** The scorer is logistic regression with `C = {ctx['model']['config']['C']:g}`, the top of its training grid. Coefficients on overlapping counts are not separate effects.",
+        content_line,
+        f"- **Five-minute recency.** {burst['legitimate_under_5_minutes']} of {burst['legitimate_rows']} legitimate recipient rows on `{SELECTION_SUBSET}` had earlier mail between the sender and that recipient under five minutes before the draft; {burst['unintended_under_5_minutes']} of {burst['unintended_rows']} unintended rows did.",
+        f"- **First contacts.** Rewriting the {fc['unintended_rows']} unintended `{SELECTION_SUBSET}` rows as first contacts (no pair history, no pair text) moves their median risk score from {_f(fc['median_before'], 4)} to {_f(fc['median_after'], 4)}; {fc['flagged_before']} are flagged as stored and {fc['flagged_after_rewrite']} after the rewrite. The {fc['novel_intended_rows']} intended first-contact rows reach a highest risk score of {_f(fc['novel_intended_max_score'], 5)}, just below `T_warn`, and none is flagged. Legitimate first contacts are among the highest-scoring legitimate rows; the high cutoff, not the score, keeps them allowed.",
+        f"- **Few positives.** `{SELECTION_SUBSET}` has {product_pos} misdirected emails"
+        + (f" and `{TEST_PRODUCT}` has {test_pos}" if test_pos is not None else "")
+        + ". Recall intervals are wide.",
+        f"- **Weak regularization.** The scorer is logistic regression with `C = {model['config']['C']:g}`"
+        + (", the top edge of its training grid" if selected.get("grid_edge") == "top" else "")
+        + ". Coefficients on overlapping counts are not separate effects.",
     ]
     return "\n".join(lines)
 
@@ -280,7 +355,7 @@ def _evaluation_report(ctx: dict) -> str:
     parts = [
         "# Phase 5 — Evaluation report",
         "",
-        f"This report evaluates the frozen behavior-only logistic **risk score** (`{policy['model_version']}`, run `{policy['model_run_name']}`) under warning policy `{policy['policy_version']}`. Scores are risk scores, not probabilities: no calibrator was fit. `T_warn = {policy['T_warn']:.6f}` was chosen on `{SELECTION_SUBSET}` only. The frozen test subsets were scored once, after `policy.json` was written.",
+        f"This report evaluates the frozen logistic **risk score** (`{policy['model_version']}`, run `{policy['model_run_name']}`, {_features_phrase(ctx)}) on dataset `{policy['dataset_version']}` with features `{policy['feature_spec_version']}`, under warning policy `{policy['policy_version']}`. Scores are risk scores, not probabilities: no calibrator was fit. `T_warn = {policy['T_warn']:.6f}` was chosen on `{SELECTION_SUBSET}` only. The frozen test subsets were scored once, after `policy.json` was written.",
         "",
         "Email risk is the maximum recipient risk score. An email warns when its risk score is at or above `T_warn`. Blocking is disabled.",
         "",
@@ -288,7 +363,7 @@ def _evaluation_report(ctx: dict) -> str:
         "",
         _status_table(ctx),
         "",
-        "AC05, AC08, and AC09 are **not met** in this phase. AC05 has only an in-process preliminary below. AC06 is partial: maximum aggregation, threshold equality, and flagging every recipient at or above `T_warn` are implemented and tested; duplicate-address merging is not. AC07 is **not met**: the report cannot separate \"novelty is not treated as proof\" from \"missing history is filled with a one-minute gap\", because the same scorer gives a rewritten mistake a risk score near 0.",
+        f"AC05 is measured at the API boundary in Phase 6; see [latency](#latency-ac05). AC06 is partial here: maximum aggregation, threshold equality, and flagging every recipient at or above `T_warn` are implemented and tested; duplicate-address merging is in the Phase 6 request normalizer. AC07: {_ac07_text(ctx)} AC08 and AC09 are Phase 6 behaviors and are not assessed in this report.",
         "",
         "## Operating points at the frozen cutoff",
         "",
@@ -327,9 +402,11 @@ def _evaluation_report(ctx: dict) -> str:
         caveats.append(f"{_f(row['precision_at_fpr_upper'])} on `{subset}`")
     parts += [
         "",
-        f"Email precision of 1.000 on the policy rows is forced by zero observed false warnings; it is not an estimate of precision in use. At the exact upper 95% false-positive rate and the assumed 0.5% prevalence, precision would be {' and '.join(caveats)}. See [uncertainty and prevalence](UNCERTAINTY_AND_PREVALENCE.md).",
+        f"Email precision of 1.000 on a policy row is forced by zero observed false warnings; it is not an estimate of precision in use. At the exact upper 95% false-positive rate and the assumed 0.5% prevalence, precision would be {' and '.join(caveats)}. See [uncertainty and prevalence](UNCERTAINTY_AND_PREVALENCE.md).",
         "",
-        f"The rules policy uses the same selection rule on `{SELECTION_SUBSET}` and gets cutoff {_f(rules_cutoff, 4)}. That rule gives it 0 validation false interventions but does not keep it within the budget on test. It is a comparison for AC02 only. Always-allow is the floor.",
+        f"The confidence bound on `{SELECTION_SUBSET}` is not independent confirmation of the budget, because that subset selected the cutoff. Only the one `{TEST_PRODUCT}` pass can support or fail AC01.",
+        "",
+        f"The rules policy uses the same selection rule on `{SELECTION_SUBSET}` and gets cutoff {_f(rules_cutoff, 4)}. It is a comparison for AC02 only. Always-allow is the floor.",
         "",
         "## Confusion counts",
         "",
@@ -389,24 +466,23 @@ def _evaluation_report(ctx: dict) -> str:
                 [[f"{name}: {c['slice']}", c["emails"], c["misdirected"], c["warned_misdirected"], c["legitimate"], c["warned_legitimate"], c["families"]] for name, key in (("recipients", "email_by_recipient_count"), ("unintended recipients", "email_by_unintended_count")) for c in sl[key]],
             )
         )
-        if subset in (DIAGNOSTIC_SUBSET, TEST_DIAGNOSTIC):
-            parts.append("")
-            parts.append(
-                _table(
-                    ["Scenario", "Emails", "Misdirected", "Warned misdirected", "Legitimate", "Warned legitimate", "Families"],
-                    [[c["slice"], c["emails"], c["misdirected"], c["warned_misdirected"], c["legitimate"], c["warned_legitimate"], c["families"]] for c in sl["email_by_scenario"]],
-                )
+        parts.append("")
+        parts.append(
+            _table(
+                ["Scenario", "Emails", "Misdirected", "Warned misdirected (scenario recall)", "Legitimate", "Warned legitimate", "Families"],
+                [[c["slice"], c["emails"], c["misdirected"], f"{c['warned_misdirected']} / {c['misdirected']}" if c["misdirected"] else "—", c["legitimate"], c["warned_legitimate"], c["families"]] for c in sl["email_by_scenario"]],
             )
+        )
         parts.append("")
     parts += ["## Legitimate first contacts and the paired check", ""]
     rows = []
     for subset in _subsets(ctx):
         fc = ctx["blocks"][subset]["first_contact"]
-        rows.append([f"`{subset}`", fc["novel_intended_rows"], fc["novel_intended_flagged"], _f(fc["novel_intended_max_score"], 5), fc["unintended_rows"], fc["flagged_before"], fc["flagged_after_rewrite"], _f(fc["median_before"], 4), f"{fc['median_after']:.1e}"])
+        rows.append([f"`{subset}`", fc["novel_intended_rows"], fc["novel_intended_flagged"], _f(fc["novel_intended_max_score"], 5), fc["unintended_rows"], fc["flagged_before"], fc["flagged_after_rewrite"], _f(fc["median_before"], 4), _f(fc["median_after"], 4)])
     parts.append(_table(["Subset", "Intended first-contact rows", "Flagged", "Max risk score", "Unintended rows", "Flagged as stored", "Flagged after first-contact rewrite", "Median before", "Median after"], rows))
     parts += [
         "",
-        "Allowing S03 and S06 is the desired outcome for those stories, and the policy did allow them. That is not evidence that the scorer understands a legitimate first contact: the same scorer gives a mistake rewritten as a first contact a risk score near 0. AC07 stays unmet.",
+        f"The rewrite removes pair history and pair text from each unintended row. AC07: {_ac07_text(ctx)}",
         "",
         "## Calibration",
         "",
@@ -417,9 +493,9 @@ def _evaluation_report(ctx: dict) -> str:
             [[f"{_f(b['bin_low'], 1)}–{_f(b['bin_high'], 1)}", b["rows"], _f(b["mean_risk_score"]), _f(b["observed_unintended_fraction"])] for b in ctx["validation"]["reliability_validation_diagnostic"]],
         ),
         "",
-        "This table is on `validation_diagnostic`, which is not the 0.5% operating mix. It is a shape check. Scores cluster near 0 and near 1, so most bins are empty.",
+        "This table is on `validation_diagnostic`, which is not the 0.5% operating mix. It is a shape check. Most rows fall in the lowest and highest bins; read each bin's row count before its fraction.",
         "",
-        "## Latency preliminary (AC05 not met)",
+        "## Latency (AC05)",
         "",
         _latency_text(ctx),
         "",
@@ -432,30 +508,29 @@ def _evaluation_report(ctx: dict) -> str:
 
 
 def _latency_text(ctx: dict) -> str:
-    lat = ctx["latency"]
+    lat = ctx.get("api_latency")
     if not lat:
-        return "Latency was not measured."
-    env = lat["environment"]
-    mix = ", ".join(f"{k} recipients: {v}" for k, v in lat["request_mix"]["recipients_per_draft"].items())
-    return "\n".join(
-        [
-            f"In-process only. Timing boundary: {lat['timing_boundary']}. Excluded: {lat['excluded']}. Assumption A10 starts timing at backend receipt, and no backend exists yet, so this does not decide whether the 300 ms target is met or missed.",
-            "",
-            _table(
-                ["Measure", "Value"],
-                [
-                    ["Calls measured", f"{lat['measured_calls']} on `{lat['subset']}` after {lat['warmup_calls']} unmeasured warm-up calls, concurrency {lat['concurrency']}"],
-                    ["p50", f"{_f(lat['p50_ms'], 2)} ms"],
-                    ["p95", f"{_f(lat['p95_ms'], 2)} ms"],
-                    ["Max", f"{_f(lat['max_ms'], 2)} ms"],
-                    ["Cold start", f"{_f(lat['cold_start_seconds'], 1)} s ({lat['cold_start_includes']})"],
-                    ["Statuses", ", ".join(f"{k}: {v}" for k, v in lat["statuses"].items())],
-                    ["Request mix", f"{mix}; median {lat['request_mix']['characters_p50']:.0f} characters, max {lat['request_mix']['characters_max']}"],
-                    ["Hardware and OS", f"{env['platform']}, {env['machine']}, {env['cpu_count']} CPUs, Python {env['python']}"],
-                    ["Versions", ", ".join(f"{k} {v}" for k, v in lat["versions"].items())],
-                ],
-            ),
-        ]
+        return f"Not measured for this policy yet. The API boundary measurement is written to `{ctx['api_latency_path']}` by `python -m med_api latency`."
+    return (
+        f"Measured once at the API boundary for this policy bundle (`{ctx['api_latency_path']}`): {lat['measured_calls']} `POST /assess` calls "
+        f"on `{lat['subset']}` after {lat['warmup_calls']} warm-up calls, one in flight. Client p50 {_f(lat['client_p50_ms'], 2)} ms, "
+        f"p95 {_f(lat['client_p95_ms'], 2)} ms against a {lat['target_p95_ms']:.0f} ms target: AC05 **{lat['ac05']}** on this machine. "
+        "Details, workload, and hardware are in [the Phase 6 scoring flow](../phase_6/SCORING_FLOW.md#latency-ac05)."
+    )
+
+
+def _ac07_text(ctx: dict) -> str:
+    parts = []
+    for subset in _subsets(ctx):
+        warned, total = _legit_warned(ctx, subset)
+        s11_warned, s11_total = _scenario_counts(ctx, subset, "S11")
+        parts.append(f"`{subset}` {warned} of {total} S03/S05/S06/S07 emails warned, S11 {s11_warned} of {s11_total} warned")
+    fc = ctx["blocks"][SELECTION_SUBSET]["first_contact"]
+    return (
+        "**insufficient evidence**. Wrong interventions on the legitimate-novelty scenarios: "
+        + "; ".join(parts)
+        + f". Those allows are the desired outcome, but legitimate first contacts score close to the cutoff (highest {_f(fc['novel_intended_max_score'], 5)} on `{SELECTION_SUBSET}` against `T_warn` {_f(ctx['policy']['T_warn'], 5)}), "
+        "and removing pair history from a familiar mistake raises its risk score. The report cannot show that novelty is weighed only with other signals rather than setting a score near the cutoff by itself."
     )
 
 
@@ -493,13 +568,21 @@ def _threshold_policy(ctx: dict) -> str:
                 ],
             ),
             "",
-            f"`T_warn` equals the risk score of the lowest-scoring warned mistake on validation. The highest legitimate email sits just below it, at {_f(selection['highest_legitimate_email_risk'], 6)}. The margin is thin: a small shift in legitimate scores on new data would add false warnings.",
+            f"`T_warn` equals the risk score of the lowest-scoring warned mistake on validation. The highest legitimate email scores {_f(selection['highest_legitimate_email_risk'], 6)}, {policy['T_warn'] - selection['highest_legitimate_email_risk']:.2e} below it. A small shift in legitimate scores on new data would add false warnings.",
             "",
             "## Budget",
             "",
             _table(["Item", "Definition"], [[key, value] for key, value in policy["budget"].items()]),
             "",
-            f"`{SELECTION_SUBSET}` has {conf['email']['legitimate']} legitimate emails, so one false warning is already {_f(1000 / conf['email']['legitimate'], 3)} per 1,000. Zero false warnings is the only point estimate within the budget there.",
+            f"`{SELECTION_SUBSET}` has {conf['email']['legitimate']} legitimate emails, so one false warning is {_f(1000 / conf['email']['legitimate'], 3)} per 1,000. Its confidence bound is not independent confirmation of the budget, because this subset selected the cutoff.",
+            "",
+            "## Calibration",
+            "",
+            f"`calibration: {policy['calibration']}`. {policy['calibration_reason']}",
+            "",
+            "## Scoring-path parity",
+            "",
+            _parity_text(policy),
             "",
             "## Validation confusion at the cutoff",
             "",
@@ -527,10 +610,32 @@ def _threshold_policy(ctx: dict) -> str:
             "",
             f"{policy['statement']}",
             "",
-            "`validation_scores.csv` stores email risk scores with 17 significant digits. Read it with round-trip float parsing (for pandas, `float_precision=\"round_trip\"`). One warned validation mistake scores exactly `T_warn`, and a lossy parse moves it below the cutoff.",
+            "`validation_scores.csv` stores email risk scores with 17 significant digits and a `warned` column computed from the in-memory comparison. Read it with round-trip float parsing (for pandas, `float_precision=\"round_trip\"`): the lowest warned validation mistake scores exactly `T_warn`, and a lossy parse can move it below the cutoff.",
             "",
         ]
     )
+
+
+def _parity_text(policy: dict) -> str:
+    parity = policy.get("scoring_path_parity")
+    if not parity:
+        return "No scoring-path parity record is stored with this policy."
+    lines = [
+        f"`T_warn` was selected on {parity['selected_on']}. Before `policy.json` was written, every `{parity['subset']}` draft was scored again with {parity['compared_with']}.",
+        "",
+        _table(
+            ["Item", "Value"],
+            [
+                ["Drafts compared", parity["drafts"]],
+                ["Identical decisions", f"{parity['identical_decisions']} / {parity['drafts']}"],
+                ["Largest email risk score difference", f"{parity['max_abs_email_risk_difference']:.2e} (bound {parity['bound']:g})"],
+            ]
+            + [[f"Draft at `T_warn`: `{item['draft_id']}`", f"batch {item['batch']!r}, single-draft {item['single']!r}, {item['decision']}"] for item in parity["drafts_at_T_warn"]],
+        ),
+        "",
+        "Scores are not required to be bit-identical across the two paths, because summation order can differ. Decisions are required to match on every draft, and they do.",
+    ]
+    return "\n".join(lines)
 
 
 def _example_rows(examples: dict) -> list[list]:
@@ -546,7 +651,7 @@ def _example_rows(examples: dict) -> list[list]:
         if item is None:
             rows.append([label, "none in this subset", "", "", "", ""])
             continue
-        rows.append([label, f"`{item['draft_id']}`", item["scenario_id"], f"{item['email_risk']:.3g}", item["decision"], f"\"{item['subject']}\""])
+        rows.append([label, f"`{item['draft_id']}`", item["scenario_id"], f"{item['email_risk']:.6g}", item["decision"], f"\"{item['subject']}\""])
     return rows
 
 
@@ -561,13 +666,21 @@ def _missed_note(ctx: dict) -> str:
         worst = max(row["email_risk"] for row in product_missed)
         above = int(((scores["email_risk"] > worst) & ~scores["misdirected"].astype(bool)).sum())
         lines.append(
-            f"- On `{SELECTION_SUBSET}` the highest missed mistake scores {worst:.4g}, and {above} legitimate emails score above it. The selection rule cannot warn on it without a false warning."
+            f"- On `{SELECTION_SUBSET}` the highest missed mistake scores {worst:.6g}, and {above} legitimate emails score above it. The selection rule cannot warn on it without a false warning."
         )
+    fc = ctx["blocks"][SELECTION_SUBSET]["first_contact"]
     lines += [
         "",
-        "S01 and S04 hinge on content: the wrong recipient is a known correspondent, so relationship and co-recipient features look ordinary. The behavior-only scorer leaves content out on purpose, because content cosine is the generator shortcut. The one S04 warning on `validation_product_like` scores exactly `T_warn`; it set the cutoff.",
+        f"The zero-false-warning rule puts `T_warn` at {ctx['policy']['T_warn']:.6g}, above every legitimate validation email. Legitimate first contacts are among the highest-scoring legitimate emails (up to {fc['novel_intended_max_score']:.6g}), so they set how high the cutoff must go. Mistakes that score below that band, including every S01, S04, and S11 validation mistake, are allowed.",
     ]
     return "\n".join(lines)
+
+
+def _validation_warned(ctx: dict) -> set[str]:
+    found = set()
+    for subset in (SELECTION_SUBSET, DIAGNOSTIC_SUBSET):
+        found.update(row["scenario_id"] for row in ctx["blocks"][subset]["outcomes"]["warned_mistakes"])
+    return found
 
 
 def _error_analysis(ctx: dict) -> str:
@@ -588,8 +701,8 @@ def _error_analysis(ctx: dict) -> str:
     for subset in _subsets(ctx):
         outcomes = ctx["blocks"][subset]["outcomes"]
         parts += [f"### Missed and false warnings, `{subset}`", ""]
-        rows = [["missed", f"`{r['draft_id']}`", r["scenario_id"], f"{r['email_risk']:.3g}", r["n_recipients"]] for r in outcomes["missed_mistakes"]]
-        rows += [["false warning", f"`{r['draft_id']}`", r["scenario_id"], f"{r['email_risk']:.3g}", r["n_recipients"]] for r in outcomes["false_warnings"]]
+        rows = [["missed", f"`{r['draft_id']}`", r["scenario_id"], f"{r['email_risk']:.6g}", r["n_recipients"]] for r in outcomes["missed_mistakes"]]
+        rows += [["false warning", f"`{r['draft_id']}`", r["scenario_id"], f"{r['email_risk']:.6g}", r["n_recipients"]] for r in outcomes["false_warnings"]]
         parts.append(_table(["Outcome", "Draft", "Scenario", "Email risk score", "Recipients"], rows) if rows else "No missed mistakes and no false warnings.")
         parts.append("")
     if ctx["test"]:
@@ -605,11 +718,23 @@ def _error_analysis(ctx: dict) -> str:
         parts += [
             "## Note on the single test pass",
             "",
-            f"This is inspection after the one test pass. It does not permit moving the cutoff. Across `{TEST_PRODUCT}` and `{TEST_DIAGNOSTIC}`, missed mistakes by scenario: {', '.join(f'{k} {v}' for k, v in sorted(missed.items())) or 'none'}. Warned mistakes by scenario: {', '.join(f'{k} {v}' for k, v in sorted(warned.items())) or 'none'}. False warnings: {fw}. The pattern matches validation: added recipients (S02, S08) and cold-sender cases (S09) warn; lookalike replacements (S01) and familiar-recipient topic mistakes (S04) do not.",
+            f"This is inspection after the one test pass. It does not permit moving the cutoff. Across `{TEST_PRODUCT}` and `{TEST_DIAGNOSTIC}`, missed mistakes by scenario: {', '.join(f'{k} {v}' for k, v in sorted(missed.items())) or 'none'}. Warned mistakes by scenario: {', '.join(f'{k} {v}' for k, v in sorted(warned.items())) or 'none'}. False warnings: {fw}. Scenarios warned on test but never warned on validation: {', '.join(sorted(set(warned) - _validation_warned(ctx))) or 'none'}. Scenarios missed on test and never warned on validation: {', '.join(sorted(set(missed) - set(warned) - _validation_warned(ctx))) or 'none'}.",
             "",
         ]
     parts += ["## Synthetic shortcuts", "", _shortcut_block(ctx), ""]
     return "\n".join(parts)
+
+
+def _bound_reach(ctx: dict) -> str:
+    pieces = []
+    for subset in _product_subsets(ctx):
+        fi = ctx["blocks"][subset]["policy"]["interventions"]
+        reach = fi["zero_count_upper_per_1000"] <= BUDGET_PER_1000
+        pieces.append(
+            f"With {fi['legitimate_emails']} legitimate emails on `{subset}`, zero false warnings give an upper bound of {_f(fi['zero_count_upper_per_1000'], 2)} per 1,000, "
+            + ("within the budget." if reach else "above the budget, so no result on that subset could support the claim.")
+        )
+    return " ".join(pieces)
 
 
 def _uncertainty(ctx: dict) -> str:
@@ -631,7 +756,7 @@ def _uncertainty(ctx: dict) -> str:
     parts.append(_table(["Subset", "Legitimate emails", "One false warning, per 1,000", "False warnings", "Rate per 1,000", "Exact upper 95%", "Upper 95% if zero"], rows))
     parts += [
         "",
-        f"The budget is {_f(BUDGET_PER_1000, 0)} false intervention per 1,000 legitimate emails. Even zero false warnings on these sample sizes leave the upper bound above it, so the strong AC01 claim cannot be supported by this data. A point estimate within the budget is provisional. The subsets were not enlarged.",
+        f"The budget is {_f(BUDGET_PER_1000, 0)} false intervention per 1,000 legitimate emails. A point estimate within the budget is provisional; the strong AC01 claim needs the exact upper bound at or below the budget. {_bound_reach(ctx)} Only the `{TEST_PRODUCT}` pass counts for AC01, because `{SELECTION_SUBSET}` chose the cutoff.",
         "",
         "## Prevalence sensitivity",
         "",
@@ -675,7 +800,7 @@ def _model_card(ctx: dict) -> str:
                 [
                     ["Dataset", f"`{policy['dataset_version']}`"],
                     ["Features", f"`{policy['feature_spec_version']}`"],
-                    ["Model", f"`{policy['model_version']}` (`{policy['model_run_name']}`, logistic regression, `C = {model['config']['C']:g}`, {model['config']['class_weight']}, behavior-only)"],
+                    ["Model", f"`{policy['model_version']}` (`{policy['model_run_name']}`, logistic regression, `C = {model['config']['C']:g}`, {model['config']['class_weight']}, {_features_phrase(ctx)})"],
                     ["Policy", f"`{policy['policy_version']}`, `T_warn = {policy['T_warn']:.6f}`, blocking disabled, calibration not fit"],
                     ["Seed", model["seed"]],
                 ],
@@ -693,11 +818,11 @@ def _model_card(ctx: dict) -> str:
             "",
             "## Failure modes",
             "",
-            "- A mistaken first contact scores near 0 and is allowed.",
-            "- Lookalike replacements (S01) and familiar-recipient, unusual-topic mistakes (S04) are missed, because the scorer leaves content out.",
-            "- The cutoff sits just above the highest legitimate validation score, so a small drift in legitimate scores adds false warnings.",
-            "- Part of the score reflects generator timing (sub-five-minute repeat mail).",
-            "- A missing or mismatched policy or model returns `unable_to_assess`; it never allows.",
+            f"- Mistaken first contacts (S11), lookalike replacements (S01), and familiar-recipient, unusual-topic mistakes (S04) are allowed at the frozen cutoff: {_s01_s04_line(ctx)}.",
+            "- Legitimate first contacts score just below the cutoff. A small drift in legitimate scores, or a new kind of legitimate first contact, would add false warnings.",
+            "- The cutoff sits just above the highest legitimate validation score, so it is tight by construction.",
+            "- Content cosine is an input. Off-topic mistakes are partly caught because the generator wrote them off-topic.",
+            "- An address that is not in the directory is `unable_to_assess`, not a warning. A missing or mismatched policy or model also returns `unable_to_assess`; it never allows.",
             "",
             _shortcut_block(ctx),
             "",
