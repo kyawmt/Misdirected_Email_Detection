@@ -2,9 +2,13 @@
 
 Examples come from the validation subsets only and are chosen by the rules in
 `med_ui.config.EXAMPLE_RULES`, applied to the policy's stored validation
-decisions. Draft text is read only for validation drafts: the frozen test
-subsets, which hold every walkthrough draft, are dropped as soon as the drafts
-table is read, and asking for one of their drafts raises before any lookup.
+decisions. Validation draft ids come first from the structural split
+manifest (ids and subset names only). The drafts, recipients, and labels
+tables are then streamed one record at a time, and only records with a
+validation id are kept, so no frozen test record (including every
+walkthrough draft) ever enters a table in memory. The CSV parser still has to
+read past each frozen record to find the next one; it is dropped at once.
+Asking for a frozen-subset draft raises before any lookup.
 
 Scenario, variant, and label columns select examples and fill the "About this
 example" story. They never enter the compose form or a request.
@@ -12,6 +16,7 @@ example" story. They never enter the compose form or a request.
 
 from __future__ import annotations
 
+import csv
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -110,6 +115,28 @@ def _read(path: Path, **kwargs) -> pd.DataFrame:
     return pd.read_csv(path, dtype=str, keep_default_na=False, **kwargs)
 
 
+def stream_rows(path: Path, keep_ids: set[str]) -> pd.DataFrame:
+    """Records of a draft-keyed table whose `draft_id` is in `keep_ids`, read one record at a time.
+
+    Other records are discarded as soon as they are parsed; they never enter
+    the returned table or any other retained structure.
+    """
+    with Path(path).open(encoding="utf-8", newline="") as handle:
+        reader = csv.reader(handle)
+        header = next(reader)
+        position = header.index("draft_id")
+        kept = [row for row in reader if row[position] in keep_ids]
+    return pd.DataFrame(kept, columns=header, dtype=str)
+
+
+def validation_ids(data_dir: Path) -> tuple[dict[str, str], set[str]]:
+    """Subset of every draft id from the structural manifest, and the validation ids to keep."""
+    manifest = _read(Path(data_dir) / "split_manifest.csv", usecols=["draft_id", "subset"])
+    subset_of = dict(zip(manifest["draft_id"], manifest["subset"], strict=True))
+    keep = {draft for draft, subset in subset_of.items() if subset in EXAMPLE_SUBSETS and subset not in FROZEN_SUBSETS}
+    return subset_of, keep
+
+
 def load_contacts(data_dir: Path) -> pd.DataFrame:
     contacts = _read(Path(data_dir) / "contacts.csv")
     contacts["is_internal"] = contacts["is_internal"].map({"true": True, "false": False})
@@ -120,18 +147,15 @@ def load_contacts(data_dir: Path) -> pd.DataFrame:
 def load_catalog(data_dir: Path, policy_dir: Path) -> Catalog:
     data_dir, policy_dir = Path(data_dir), Path(policy_dir)
     contacts = load_contacts(data_dir)
-    manifest = _read(data_dir / "split_manifest.csv", usecols=["draft_id", "subset"])
-    subset_of = dict(zip(manifest["draft_id"], manifest["subset"], strict=True))
-    drafts = _read(data_dir / "drafts.csv")
-    # Keep validation drafts only. Frozen test text is never kept or shown.
-    drafts = drafts.loc[drafts["subset"].isin(EXAMPLE_SUBSETS)].reset_index(drop=True)
+    subset_of, keep = validation_ids(data_dir)
+    # Only validation records are kept; frozen test records never enter a table.
+    drafts = stream_rows(data_dir / "drafts.csv", keep)
+    if not set(drafts["subset"]) <= set(EXAMPLE_SUBSETS):
+        raise ExampleError("The drafts table disagrees with the split manifest")
     drafts["sent_at"] = pd.to_datetime(drafts["sent_at"], utc=True)
-    keep = set(drafts["draft_id"])
-    recipients = _read(data_dir / "draft_recipients.csv")
-    recipients = recipients.loc[recipients["draft_id"].isin(keep)].copy()
+    recipients = stream_rows(data_dir / "draft_recipients.csv", keep)
     recipients["recipient_order"] = recipients["recipient_order"].astype(int)
-    labels = _read(data_dir / "labels.csv")
-    labels = labels.loc[labels["draft_id"].isin(keep)].copy()
+    labels = stream_rows(data_dir / "labels.csv", keep)
     scores = pd.read_csv(policy_dir / EXPLORATION_SCORES_FILE, float_precision="round_trip")
     evaluation = json.loads((policy_dir / VALIDATION_EVALUATION_FILE).read_text(encoding="utf-8"))
     catalog = Catalog(

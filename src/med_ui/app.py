@@ -91,8 +91,9 @@ def main() -> None:
     exploration = _exploration(str(settings.policy_dir))
     names = ex.display_names(catalog.contacts)
     known = set(names)
+    expected = xp.expected_bundle(exploration)
     client = api_client.make_client(settings)
-    readiness = pres.readiness_view(client.ready())
+    readiness = pres.readiness_view(client.ready(), expected)
     state = st.session_state
 
     if "record" not in state:
@@ -130,7 +131,7 @@ def main() -> None:
     )
 
     st.header("Result")
-    view = pres.result_view(state["record"], current_fingerprint)
+    view = pres.result_view(state["record"], current_fingerprint, expected)
     _result(view, client)
 
     with st.expander(xp.exploration_title(exploration), expanded=False):

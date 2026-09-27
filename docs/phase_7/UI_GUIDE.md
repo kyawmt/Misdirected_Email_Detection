@@ -34,7 +34,7 @@ python -m med_ui
 
 ### Readiness banner
 
-On every page load the UI calls `GET /ready` and shows the contract, snapshot, model, feature, and policy versions, `T_warn`, and "Blocking: disabled". If the service does not answer, is not ready, serves a different contract or snapshot, or does not report blocking as disabled, the banner says the service is unavailable and the **Assess draft** button is disabled.
+On every page load the UI calls `GET /ready` and shows the contract, snapshot, model, feature, and policy versions, `T_warn`, and "Blocking: disabled". The service must report exactly the contract and snapshot this screen speaks, and the model, feature, and policy versions and the exact `T_warn` of the local policy file that the exploration view reads. If the service does not answer, is not ready, reports anything else, or does not report blocking as disabled, the banner says so and the **Assess draft** button is disabled.
 
 ### Compose
 
@@ -42,7 +42,7 @@ Draft timestamp (ISO 8601 with a timezone; it is the history cutoff), sender, To
 
 ### Curated examples and "About this example"
 
-The sidebar loads a curated example into the form. Examples are validation drafts chosen by rule from the policy's stored validation decisions, never by draft id, and never from the frozen test subsets:
+The sidebar loads a curated example into the form. Examples are validation drafts chosen by rule from the policy's stored validation decisions, never by draft id, and never from the frozen test subsets. Validation ids come from the split manifest first; the drafts, recipients, and labels tables are then streamed one record at a time and only validation records are kept, so no frozen test record (including the dataset's walkthrough drafts) enters memory as a table:
 
 | Example | Rule |
 | --- | --- |
@@ -62,6 +62,7 @@ The sidebar loads a curated example into the form. Examples are validation draft
 ### Result
 
 - **Assessed:** "Simulated decision: allow" or "Simulated decision: warn" (the API's decision), the email risk score, `T_warn`, and their difference. Then one table row and one card per unique recipient: address, name, roles, risk score, flagged or not, the API's codes with the API's text, and evidence limitations. `CONTENT_RELATIONSHIP_MISMATCH` is labeled a reason; `EXTERNAL_RECIPIENT`, `LOOKALIKE_CONTACT_CONTEXT`, and `UNUSUAL_RECIPIENT_COMBINATION` are labeled context; `LIMITED_RELATIONSHIP_HISTORY` and `LIMITED_TEXT` are evidence limitations. Codes appear only where the API sent them, and an unknown code is shown as sent. Below the cards come the API's explanation sentences and, in a collapsed panel, the provenance.
+- **Unexpected response:** an assessed response is displayed only if it is complete and consistent: simulation mode, blocking reported disabled, a finite `T_warn`, risk scores from 0 to 1, valid roles, well-formed codes, a flagged list that matches the flagged recipients, `warn` only with flagged recipients, and the same versions and cutoff that readiness checked. Anything else is shown as unable to assess with no decision, no risk score, and no recipient table.
 - **Unable to assess:** the category (`invalid_input` or `unavailable`) in plain language, plus the service message, with no decision, no risk score, and no recipient table. A well-formed address that is not in the directory snapshot shows "This address is not in the directory snapshot, so the draft could not be assessed." A service that cannot be reached is shown the same way.
 - **Stale:** any change to any field or recipient hides the previous result and says the draft changed. Nothing from the old result is shown until the edited draft is assessed as a new request. Removing a flagged recipient and reassessing may still warn.
 

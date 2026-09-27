@@ -185,6 +185,40 @@ def test_frozen_subset_drafts_are_refused(catalog):
         select_draft(rule, catalog.drafts, catalog.draft_recipients, pd.DataFrame(columns=["draft_id", "email_risk", "misdirected", "warned"]))
 
 
+def test_catalog_never_materializes_frozen_records(monkeypatch):
+    """At the file-read boundary: the draft-keyed tables are streamed, and only validation records are kept."""
+    import med_ui.examples as examples_module
+
+    frozen = set(pd.read_csv(DATA / "split_manifest.csv", usecols=["draft_id", "subset"]).query("subset in @FROZEN_SUBSETS")["draft_id"])
+    assert frozen
+    read_paths = []
+    original_read_csv = examples_module.pd.read_csv
+
+    def spy_read_csv(path, *args, **kwargs):
+        read_paths.append(Path(path).name)
+        return original_read_csv(path, *args, **kwargs)
+
+    kept = []
+    original_stream = examples_module.stream_rows
+
+    def spy_stream(path, keep_ids):
+        assert not (keep_ids & frozen)
+        frame = original_stream(path, keep_ids)
+        kept.append((Path(path).name, set(frame["draft_id"])))
+        return frame
+
+    monkeypatch.setattr(examples_module.pd, "read_csv", spy_read_csv)
+    monkeypatch.setattr(examples_module, "stream_rows", spy_stream)
+    catalog = examples_module.load_catalog(DATA, POLICY_DIR)
+    # No whole-table read of a draft-keyed table, which would hold frozen rows.
+    assert not {"drafts.csv", "draft_recipients.csv", "labels.csv"} & set(read_paths)
+    assert sorted(name for name, _ in kept) == ["draft_recipients.csv", "drafts.csv", "labels.csv"]
+    for name, ids in kept:
+        assert ids and not (ids & frozen), name
+    assert not (set(catalog.drafts["draft_id"]) & frozen)
+    assert set(catalog.drafts["subset"]) <= set(EXAMPLE_SUBSETS)
+
+
 def test_ui_source_has_no_draft_ids_or_version_strings():
     for path in UI_SRC.glob("*.py"):
         text = path.read_text(encoding="utf-8")
@@ -303,7 +337,7 @@ def test_rendered_text_never_says_probability_or_block_as_an_outcome(assessed, c
     lines = []
     for _, response in assessed.values():
         lines += pres.view_lines(pres.response_view(response))
-    lines += [label + " " + value for label, value in pres.readiness_view(client.ready()).items]
+    lines += [label + " " + value for label, value in pres.readiness_view(client.ready(), xp.expected_bundle(exploration)).items]
     lines += xp.exploration_notes(exploration) + [xp.counts_sentence(row) for row in xp.tradeoff_rows(exploration)]
     _assert_clean_wording(lines)
     # A response claiming a block is not rendered as a decision.
@@ -312,6 +346,89 @@ def test_rendered_text_never_says_probability_or_block_as_an_outcome(assessed, c
     view = pres.response_view(ApiResponse(200, body))
     assert view.kind == "unable" and view.decision is None
     _assert_clean_wording(pres.view_lines(view))
+
+
+def _ready_body(expected, **changes) -> dict:
+    body = {
+        "ready": True,
+        "contract_version": expected.contract_version,
+        "snapshot_id": expected.snapshot_id,
+        "model_version": expected.model_version,
+        "feature_spec_version": expected.feature_spec_version,
+        "policy_version": expected.policy_version,
+        "T_warn": expected.t_warn,
+        "blocking_enabled": False,
+    }
+    body.update(changes)
+    return body
+
+
+def test_readiness_requires_the_local_bundle_and_cutoff(client, exploration):
+    expected = xp.expected_bundle(exploration)
+    assert pres.readiness_view(client.ready(), expected).ok
+    assert pres.readiness_view(ApiResponse(200, _ready_body(expected)), expected).ok
+    for changes in (
+        {"policy_version": "other-policy"},
+        {"model_version": "other-model"},
+        {"feature_spec_version": "other-features"},
+        {"T_warn": 0.5},
+        {"T_warn": expected.t_warn - 1e-12},
+        {"snapshot_id": "other-snapshot"},
+        {"contract_version": "other-contract"},
+        {"blocking_enabled": True},
+        {"ready": False},
+    ):
+        view = pres.readiness_view(ApiResponse(200, _ready_body(expected, **changes)), expected)
+        assert not view.ok, changes
+
+
+def test_response_from_another_bundle_shows_no_decision(assessed, exploration):
+    expected = xp.expected_bundle(exploration)
+    body = assessed["added_recipient"][1].body
+    assert pres.response_view(ApiResponse(200, body), expected).kind == "assessed"
+    for key, value in (("policy_version", "other-policy"), ("T_warn", 0.5), ("model_version", "other-model")):
+        changed = json.loads(json.dumps(body))
+        changed["provenance"][key] = value
+        view = pres.response_view(ApiResponse(200, changed), expected)
+        assert view.kind == "unable" and view.decision is None and view.email_risk_score is None
+
+
+def _malformed_bodies(body: dict) -> dict:
+    def change(fn):
+        copy = json.loads(json.dumps(body))
+        fn(copy)
+        return copy
+
+    return {
+        "blocking enabled": change(lambda b: b["provenance"].update(blocking_enabled=True)),
+        "blocking missing": change(lambda b: b["provenance"].pop("blocking_enabled")),
+        "not simulation": change(lambda b: b.update(mode="live")),
+        "recipient score text": change(lambda b: b["recipients"][0].update(risk_score="high")),
+        "recipient score above one": change(lambda b: b["recipients"][0].update(risk_score=1.5)),
+        "email score missing": change(lambda b: b.pop("email_risk_score")),
+        "warn without flagged": change(lambda b: (b.update(flagged_recipients=[]), [r.update(flagged=False) for r in b["recipients"]])),
+        "flagged list mismatch": change(lambda b: b.update(flagged_recipients=[b["recipients"][0]["address"]])),
+        "flagged not boolean": change(lambda b: b["recipients"][0].update(flagged="yes")),
+        "bad roles": change(lambda b: b["recipients"][0].update(roles=["reply-to"])),
+        "codes not objects": change(lambda b: b["recipients"][1].update(reason_codes=["EXTERNAL_RECIPIENT"])),
+        "recipient not object": change(lambda b: b["recipients"].__setitem__(0, "someone")),
+        "no recipients": change(lambda b: b.update(recipients=[])),
+        "explanation missing": change(lambda b: b.pop("explanation")),
+        "provenance missing": change(lambda b: b.pop("provenance")),
+        "block decision": change(lambda b: b.update(decision="block")),
+    }
+
+
+def test_malformed_assessed_responses_show_no_decision_and_never_raise(assessed, exploration):
+    expected = xp.expected_bundle(exploration)
+    body = assessed["added_recipient"][1].body
+    for name, bad in _malformed_bodies(body).items():
+        for view in (pres.response_view(ApiResponse(200, bad), expected), pres.response_view(ApiResponse(200, bad))):
+            assert view.kind == "unable" and view.category == "unexpected_response", name
+            assert view.decision is None and view.email_risk_score is None and view.recipients == (), name
+            assert "allow" not in " ".join(pres.view_lines(view)).casefold(), name
+    unknown = {"status": "unable_to_assess", "category": "maybe", "message": "?"}
+    assert pres.response_view(ApiResponse(503, unknown)).category == "unexpected_response"
 
 
 # -------------------------------------------------------------- exploration
@@ -370,12 +487,20 @@ def test_ui_modules_do_not_import_scoring_internals():
                 continue
             for name in names:
                 assert not any(name == bad or name.startswith(bad + ".") for bad in FORBIDDEN_IMPORTS), f"{path.name} imports {name}"
+    # Every module the UI loads from the scoring packages must be a package
+    # marker or a version module. Any other module (scoring, estimators,
+    # transforms, the API app or service) fails this check.
     probe = (
         "import sys, med_ui.client, med_ui.config, med_ui.examples, med_ui.exploration, med_ui.presentation, med_ui.walkthrough, med_ui.cli\n"
-        "print(','.join(sorted(m for m in sys.modules if m.startswith(('med_policy.decision','med_features.transform','med_models.package','med_api.service','med_api.app')))))"
+        "print('\\n'.join(sorted(m for m in sys.modules if m.split('.')[0] in ('med_models', 'med_features', 'med_policy', 'med_api'))))"
     )
     result = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, cwd=ROOT, check=True)
-    assert result.stdout.strip() == ""
+    loaded = set(result.stdout.split())
+    allowed = {
+        "med_models", "med_models.version", "med_features", "med_features.version",
+        "med_policy", "med_policy.version", "med_api", "med_api.version", "med_api.fixtures",
+    }
+    assert loaded and loaded <= allowed, sorted(loaded - allowed)
 
 
 def test_package_version_and_ui_extra():
@@ -458,3 +583,36 @@ def test_app_assesses_marks_stale_and_posts_feedback_once(monkeypatch, api, cata
     assert any(pres.STALE_HEADLINE in text for text in texts)
     assert not any("Simulated decision" in text for text in texts)
     assert spy.count("POST", "/assess") == assessments
+
+
+def test_app_shows_no_decision_for_a_malformed_response(monkeypatch, assessed, exploration):
+    expected = xp.expected_bundle(exploration)
+    bad = _malformed_bodies(assessed["added_recipient"][1].body)["blocking enabled"]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/ready":
+            return httpx.Response(200, json=_ready_body(expected))
+        return httpx.Response(200, json=bad)
+
+    at = _app(monkeypatch, httpx.Client(transport=httpx.MockTransport(handler), base_url="http://stub"))
+    at.run()
+    assert not at.exception and not at.button(key="assess").disabled
+    at.button(key="assess").click().run()
+    assert not at.exception
+    texts = _app_texts(at)
+    assert any(pres.UNABLE_HEADLINE in text for text in texts)
+    assert not any("Simulated decision" in text for text in texts)
+    assert not at.metric
+
+
+def test_app_disables_assessment_for_another_bundle(monkeypatch, exploration):
+    expected = xp.expected_bundle(exploration)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=_ready_body(expected, policy_version="other-policy", T_warn=0.5))
+
+    at = _app(monkeypatch, httpx.Client(transport=httpx.MockTransport(handler), base_url="http://stub"))
+    at.run()
+    assert not at.exception
+    assert at.button(key="assess").disabled
+    assert any("different contract, snapshot, or bundle" in element.value for element in at.error)

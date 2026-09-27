@@ -16,12 +16,16 @@ import numpy as np
 import pandas as pd
 
 from med_ui.config import (
+    EXPECTED_CONTRACT_VERSION,
+    EXPECTED_POLICY_VERSION,
+    EXPECTED_SNAPSHOT_ID,
     EXPLORATION_MAX_FALSE_WARNINGS,
     EXPLORATION_POLICY_FILE,
     EXPLORATION_ROUND_CUTOFFS,
     EXPLORATION_SCORES_FILE,
     TRADEOFF_MAX_FALSE_WARNINGS,
 )
+from med_ui.presentation import ExpectedBundle
 
 
 @dataclass(frozen=True)
@@ -30,6 +34,8 @@ class ExplorationData:
     misdirected: np.ndarray
     t_warn: float
     policy_version: str
+    model_version: str
+    feature_spec_version: str
     subset: str
 
     @property
@@ -44,6 +50,8 @@ class ExplorationData:
 def load_exploration(policy_dir: Path) -> ExplorationData:
     policy_dir = Path(policy_dir)
     policy = json.loads((policy_dir / EXPLORATION_POLICY_FILE).read_text(encoding="utf-8"))
+    if policy.get("policy_version") != EXPECTED_POLICY_VERSION:
+        raise ValueError(f"Local policy {policy.get('policy_version')} is not {EXPECTED_POLICY_VERSION}")
     scores = pd.read_csv(
         policy_dir / EXPLORATION_SCORES_FILE,
         float_precision="round_trip",
@@ -54,7 +62,22 @@ def load_exploration(policy_dir: Path) -> ExplorationData:
         misdirected=scores["misdirected"].astype(bool).to_numpy(),
         t_warn=float(policy["T_warn"]),
         policy_version=str(policy["policy_version"]),
+        model_version=str(policy["model_version"]),
+        feature_spec_version=str(policy["feature_spec_version"]),
         subset=str(policy["selection"]["subset"]),
+    )
+
+
+def expected_bundle(data: ExplorationData) -> ExpectedBundle:
+    """What /ready must report before assessment is enabled: this contract and
+    snapshot, and the versions and exact cutoff of the local policy file."""
+    return ExpectedBundle(
+        contract_version=EXPECTED_CONTRACT_VERSION,
+        snapshot_id=EXPECTED_SNAPSHOT_ID,
+        model_version=data.model_version,
+        feature_spec_version=data.feature_spec_version,
+        policy_version=data.policy_version,
+        t_warn=data.t_warn,
     )
 
 
@@ -111,7 +134,7 @@ def exploration_title(data: ExplorationData) -> str:
 
 def exploration_notes(data: ExplorationData) -> list[str]:
     return [
-        f"Default policy {data.policy_version}: T_warn = {data.t_warn!r}. The decision above always uses it.",
+        f"Default policy {data.policy_version}: T_warn = {data.t_warn!r}. Assessment is enabled only when the service reports this same bundle and cutoff.",
         "A what-if cutoff changes only the counts in this section. It does not change the decision above and is not a policy.",
         f"Counts come from the stored {data.subset} scores, the same subset that chose T_warn, so they are not independent evidence. "
         "The warning budget is recorded as insufficient evidence.",

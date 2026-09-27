@@ -21,7 +21,6 @@ import pandas as pd
 from med_ui.client import ApiResponse
 from med_ui.config import (
     CODE_KINDS,
-    EXPECTED_CONTRACT_VERSION,
     EXPECTED_SNAPSHOT_ID,
     ROLES,
 )
@@ -40,6 +39,7 @@ CATEGORY_TEXT = {
 }
 DIRECTORY_MESSAGES = ("not in the context snapshot directory", "not in the directory at the draft timestamp")
 DECISION_LABELS = {"allow": "allow", "warn": "warn"}
+UNABLE_CATEGORIES = ("invalid_input", "unavailable")
 
 
 # ------------------------------------------------------------------ the form
@@ -101,6 +101,31 @@ def parse_timestamp(text: str) -> pd.Timestamp | None:
 
 
 @dataclass(frozen=True)
+class ExpectedBundle:
+    """The bundle this screen was built against: the contract and snapshot it
+    speaks, and the versions and cutoff in the local policy file that the
+    exploration view reads. The service must report exactly these."""
+
+    contract_version: str
+    snapshot_id: str
+    model_version: str
+    feature_spec_version: str
+    policy_version: str
+    t_warn: float
+
+    def mismatches(self, reported: dict) -> list[str]:
+        expected = {
+            "contract_version": self.contract_version,
+            "snapshot_id": self.snapshot_id,
+            "model_version": self.model_version,
+            "feature_spec_version": self.feature_spec_version,
+            "policy_version": self.policy_version,
+            "T_warn": self.t_warn,
+        }
+        return [f"{key} {reported.get(key)!r}, expected {value!r}" for key, value in expected.items() if reported.get(key) != value]
+
+
+@dataclass(frozen=True)
 class ReadinessView:
     ok: bool
     headline: str
@@ -108,7 +133,7 @@ class ReadinessView:
     problem: str | None = None
 
 
-def readiness_view(response: ApiResponse) -> ReadinessView:
+def readiness_view(response: ApiResponse, expected: ExpectedBundle) -> ReadinessView:
     body = response.body or {}
     if not response.reached:
         return ReadinessView(False, "Scoring service unavailable. Assessment is disabled.", problem=response.error)
@@ -116,20 +141,21 @@ def readiness_view(response: ApiResponse) -> ReadinessView:
         return ReadinessView(
             False, "Scoring service is not ready. Assessment is disabled.", problem=str(body.get("reason") or f"HTTP {response.status_code}")
         )
-    if body.get("contract_version") != EXPECTED_CONTRACT_VERSION or body.get("snapshot_id") != EXPECTED_SNAPSHOT_ID:
+    mismatches = expected.mismatches(body)
+    if mismatches:
         return ReadinessView(
             False,
-            "The service serves a different contract or snapshot than this UI expects. Assessment is disabled.",
-            problem=f"contract {body.get('contract_version')}, snapshot {body.get('snapshot_id')}",
+            "The service serves a different contract, snapshot, or bundle than this screen was built for. Assessment is disabled.",
+            problem="; ".join(mismatches),
         )
     if body.get("blocking_enabled") is not False:
         return ReadinessView(False, "The service does not report blocking as disabled. Assessment is disabled.")
     items = (
         ("Contract", str(body["contract_version"])),
         ("Snapshot", str(body["snapshot_id"])),
-        ("Model", str(body.get("model_version"))),
-        ("Features", str(body.get("feature_spec_version"))),
-        ("Policy", str(body.get("policy_version"))),
+        ("Model", str(body["model_version"])),
+        ("Features", str(body["feature_spec_version"])),
+        ("Policy", str(body["policy_version"])),
         ("T_warn (risk score cutoff)", repr(float(body["T_warn"]))),
         ("Blocking", "disabled"),
     )
@@ -190,25 +216,33 @@ def format_score(value: float) -> str:
     return f"{value:.7f}" if value >= 1e-3 else f"{value:.3e}"
 
 
-def result_view(record: AssessmentRecord | None, current_fingerprint: str | None) -> ResultView:
+def result_view(record: AssessmentRecord | None, current_fingerprint: str | None, expected: ExpectedBundle | None = None) -> ResultView:
     """What the result section shows for this record and the draft now in the form."""
     if record is None:
         return ResultView(kind="empty", headline="No assessment yet.")
     if current_fingerprint != record.fingerprint:
         return ResultView(kind="stale", headline=STALE_HEADLINE, detail=(STALE_DETAIL,))
-    return response_view(record.response)
+    return response_view(record.response, expected)
 
 
-def response_view(response: ApiResponse) -> ResultView:
+def response_view(response: ApiResponse, expected: ExpectedBundle | None = None) -> ResultView:
+    """Display a response. Anything that is not a complete, consistent assessment from the expected bundle shows no decision."""
     body = response.body
     if not response.reached:
         return _unable("unavailable", f"The scoring service could not be reached ({response.error}).", None)
     if body is None:
         return _unable("unexpected_response", f"HTTP {response.status_code} with no JSON body.", None)
+    request_id = body.get("request_id")
     if body.get("status") == "unable_to_assess":
-        return _unable(str(body.get("category")), str(body.get("message") or ""), body.get("request_id"))
-    if not _valid_assessed(response):
-        return _unable("unexpected_response", f"HTTP {response.status_code}.", body.get("request_id"))
+        category = body.get("category")
+        if category not in UNABLE_CATEGORIES or response.status_code not in (422, 503):
+            return _unable("unexpected_response", f"HTTP {response.status_code}, unrecognized failure category.", request_id)
+        return _unable(str(category), str(body.get("message") or ""), request_id)
+    problems = assessed_problems(response)
+    if not problems and expected is not None:
+        problems = [f"bundle differs from readiness: {item}" for item in expected.mismatches({**body["provenance"], "contract_version": body["contract_version"]})]
+    if problems:
+        return _unable("unexpected_response", f"HTTP {response.status_code}; " + "; ".join(problems[:3]), request_id)
     recipients = tuple(_recipient_row(item) for item in body["recipients"])
     email_risk = float(body["email_risk_score"])
     provenance = body["provenance"]
@@ -227,27 +261,82 @@ def response_view(response: ApiResponse) -> ResultView:
         t_warn=t_warn,
         margin_text=f"{email_risk - t_warn:+.2e}",
         recipients=recipients,
-        flagged=tuple(str(item) for item in body["flagged_recipients"]),
-        explanation=tuple(str(item) for item in body.get("explanation") or ()),
+        flagged=tuple(body["flagged_recipients"]),
+        explanation=tuple(body["explanation"]),
         provenance=_provenance(provenance),
-        request_id=body.get("request_id"),
+        request_id=request_id if isinstance(request_id, str) else None,
         notes=tuple(notes),
     )
 
 
-def _valid_assessed(response: ApiResponse) -> bool:
+def _score(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and 0.0 <= value <= 1.0
+
+
+def _codes_ok(items) -> bool:
+    return isinstance(items, list) and all(
+        isinstance(item, dict) and isinstance(item.get("code"), str) and isinstance(item.get("text"), str) for item in items
+    )
+
+
+def assessed_problems(response: ApiResponse) -> list[str]:
+    """Why a response is not a complete, consistent simulated assessment (empty when it is).
+
+    Checks the shape the screen displays and the API's own consistency
+    (flagged list against flagged recipients, warn against a non-empty flagged
+    list). It does not compare any score with the cutoff.
+    """
     body = response.body or {}
+    problems = []
     if response.status_code != 200 or body.get("status") != "assessed":
-        return False
+        return ["not an assessed response"]
+    if not isinstance(body.get("contract_version"), str):
+        problems.append("no contract version")
+    if body.get("mode") != "simulation":
+        problems.append("mode is not simulation")
     if body.get("decision") not in DECISION_LABELS:
-        return False
-    score = body.get("email_risk_score")
-    if isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(score):
-        return False
+        problems.append("decision is not a recognized simulated decision")
+    if not _score(body.get("email_risk_score")):
+        problems.append("email risk score is not a number from 0 to 1")
     provenance = body.get("provenance")
-    if not isinstance(provenance, dict) or not isinstance(provenance.get("T_warn"), (int, float)):
-        return False
-    return isinstance(body.get("recipients"), list) and isinstance(body.get("flagged_recipients"), list)
+    if not isinstance(provenance, dict):
+        return problems + ["no provenance"]
+    if provenance.get("blocking_enabled") is not False:
+        problems.append("provenance does not report blocking as disabled")
+    t_warn = provenance.get("T_warn")
+    if not isinstance(t_warn, (int, float)) or isinstance(t_warn, bool) or not math.isfinite(t_warn):
+        problems.append("T_warn is not a finite number")
+    explanation = body.get("explanation")
+    if not isinstance(explanation, list) or not all(isinstance(item, str) for item in explanation):
+        problems.append("explanation is not a list of sentences")
+    recipients = body.get("recipients")
+    if not isinstance(recipients, list) or not recipients:
+        return problems + ["no recipients"]
+    for index, item in enumerate(recipients):
+        if not isinstance(item, dict):
+            problems.append(f"recipient {index} is not an object")
+            continue
+        if not isinstance(item.get("address"), str) or not item["address"]:
+            problems.append(f"recipient {index} has no address")
+        if not isinstance(item.get("display_name", ""), (str, type(None))):
+            problems.append(f"recipient {index} display name is not text")
+        roles = item.get("roles")
+        if not isinstance(roles, list) or not roles or not all(role in ROLES for role in roles):
+            problems.append(f"recipient {index} roles are invalid")
+        if not _score(item.get("risk_score")):
+            problems.append(f"recipient {index} risk score is not a number from 0 to 1")
+        if not isinstance(item.get("flagged"), bool):
+            problems.append(f"recipient {index} flagged is not true or false")
+        if not _codes_ok(item.get("reason_codes")) or not _codes_ok(item.get("evidence_limitations")):
+            problems.append(f"recipient {index} codes are malformed")
+    if problems:
+        return problems
+    flagged = body.get("flagged_recipients")
+    if not isinstance(flagged, list) or flagged != [item["address"] for item in recipients if item["flagged"]]:
+        problems.append("flagged list does not match the flagged recipients")
+    elif (body["decision"] == "warn") != bool(flagged):
+        problems.append("decision does not match the flagged recipients")
+    return problems
 
 
 def _unable(category: str, message: str, request_id) -> ResultView:
