@@ -15,7 +15,7 @@ from med_ui import exploration as xp
 from med_ui import presentation as pres
 from med_ui.config import FEEDBACK_LABELS, ROLES, UiSettings
 
-FORM_KEYS = ("f_timestamp", "f_sender", "f_to", "f_cc", "f_bcc", "f_to_other", "f_cc_other", "f_bcc_other", "f_subject", "f_body")
+ROLE_LABELS = {"to": "To", "cc": "Cc", "bcc": "Bcc"}
 
 
 @st.cache_resource(show_spinner="Loading the fictional directory and curated examples")
@@ -31,14 +31,12 @@ def _exploration(policy_dir: str) -> xp.ExplorationData:
 # ------------------------------------------------------------------ state
 
 
-def _set_form(form: pres.DraftForm, names: dict[str, str], known: set[str]) -> None:
+def _set_form(form: pres.DraftForm) -> None:
     state = st.session_state
     state["f_timestamp"] = form.draft_timestamp
     state["f_sender"] = form.sender
     for role in ROLES:
-        addresses = getattr(form, role)
-        state[f"f_{role}"] = [item for item in addresses if item.casefold() in known]
-        state[f"f_{role}_other"] = ", ".join(item for item in addresses if item.casefold() not in known)
+        state[f"f_{role}"] = list(getattr(form, role))
     state["f_subject"] = form.subject
     state["f_body"] = form.body
 
@@ -48,25 +46,25 @@ def _current_form() -> pres.DraftForm:
     return pres.DraftForm(
         draft_timestamp=state["f_timestamp"],
         sender=state["f_sender"] or "",
-        to=tuple(state["f_to"]) + pres.split_addresses(state["f_to_other"]),
-        cc=tuple(state["f_cc"]) + pres.split_addresses(state["f_cc_other"]),
-        bcc=tuple(state["f_bcc"]) + pres.split_addresses(state["f_bcc_other"]),
+        to=tuple(state["f_to"]),
+        cc=tuple(state["f_cc"]),
+        bcc=tuple(state["f_bcc"]),
         subject=state["f_subject"],
         body=state["f_body"],
     )
 
 
-def _load_example(catalog: ex.Catalog, key: str, names: dict[str, str], known: set[str]) -> None:
+def _load_example(catalog: ex.Catalog, key: str, names: dict[str, str]) -> None:
     example = catalog.examples[key]
-    _set_form(example.form, names, known)
+    _set_form(example.form)
     st.session_state["loaded_example"] = key
     st.session_state["loaded_fingerprint"] = pres.fingerprint(pres.build_request(example.form, names))
     st.session_state["record"] = None
     st.session_state["feedback"] = {}
 
 
-def _load_selected(catalog: ex.Catalog, names: dict[str, str], known: set[str]) -> None:
-    _load_example(catalog, st.session_state["example_choice"], names, known)
+def _load_selected(catalog: ex.Catalog, names: dict[str, str]) -> None:
+    _load_example(catalog, st.session_state["example_choice"], names)
 
 
 def _assess(client: api_client.ApiClient, names: dict[str, str]) -> None:
@@ -90,7 +88,6 @@ def main() -> None:
     catalog = _catalog(str(settings.data_dir), str(settings.policy_dir))
     exploration = _exploration(str(settings.policy_dir))
     names = ex.display_names(catalog.contacts)
-    known = set(names)
     expected = xp.expected_bundle(exploration)
     client = api_client.make_client(settings)
     readiness = pres.readiness_view(client.ready(), expected)
@@ -102,62 +99,85 @@ def main() -> None:
         state["loaded_example"] = None
         first = next(iter(catalog.examples))
         state["example_choice"] = first
-        _load_example(catalog, first, names, known)
+        _load_example(catalog, first, names)
         params = st.query_params
         if params.get("example") in catalog.examples:
             state["example_choice"] = params["example"]
-            _load_example(catalog, params["example"], names, known)
+            _load_example(catalog, params["example"], names)
             if params.get("assess") == "1" and readiness.ok:
                 _assess(client, names)
 
-    st.title("Draft review")
+    if not readiness.ok:
+        _readiness_problem(readiness)
+    _sidebar(catalog, names)
+
+    st.markdown("## Draft review")
     st.caption(pres.SIMULATION_NOTE + " " + pres.RISK_NOTE)
-    _readiness(readiness)
-    _sidebar(catalog, names, known)
+    message_column, review_column = st.columns([3, 2], gap="large")
+    with message_column:
+        _compose(catalog, names, pres.parse_timestamp(state["f_timestamp"]))
+    with review_column:
+        # Computed after the compose widgets, so any edit hides the earlier result.
+        view = pres.result_view(state["record"], pres.fingerprint(pres.build_request(_current_form(), names)), expected)
+        with st.container(border=True, key="review_panel"):
+            st.markdown("#### Review before sending")
+            st.button(
+                "Assess draft",
+                key="assess",
+                type="primary",
+                width="stretch",
+                disabled=not readiness.ok,
+                on_click=_assess,
+                args=(client, names),
+                help=None if readiness.ok else "The scoring service is not ready.",
+            )
+            _action(pres.action_message(view))
 
-    st.header("Compose")
-    moment = pres.parse_timestamp(state["f_timestamp"])
-    _compose(catalog, names, moment)
-    current = pres.build_request(_current_form(), names)
-    current_fingerprint = pres.fingerprint(current)
-    st.button(
-        "Assess draft",
-        key="assess",
-        type="primary",
-        disabled=not readiness.ok,
-        on_click=_assess,
-        args=(client, names),
-        help=None if readiness.ok else "The scoring service is not ready.",
-    )
-
-    st.header("Result")
-    view = pres.result_view(state["record"], current_fingerprint, expected)
+    st.divider()
+    st.header("Assessment details")
     _result(view, client)
 
     with st.expander(xp.exploration_title(exploration), expanded=False):
         _exploration_section(exploration, view)
+    with st.expander("Service status and versions", expanded=False):
+        _readiness_details(readiness)
 
 
-def _readiness(readiness: pres.ReadinessView) -> None:
-    if readiness.ok:
-        st.success(readiness.headline)
-        st.caption(" · ".join(f"{label}: {value}" for label, value in readiness.items))
-    else:
-        st.error(readiness.headline)
-        if readiness.problem:
-            st.caption(readiness.problem)
+def _readiness_problem(readiness: pres.ReadinessView) -> None:
+    """At the top only when something is wrong, because it explains why assessment is disabled."""
+    st.error(readiness.headline)
+    if readiness.problem:
+        st.caption(readiness.problem)
 
 
-def _sidebar(catalog: ex.Catalog, names: dict[str, str], known: set[str]) -> None:
+def _readiness_details(readiness: pres.ReadinessView) -> None:
+    """The /ready check and the served versions, collapsed at the bottom when the service is ready."""
+    if not readiness.ok:
+        st.write("Not ready. See the message at the top of the page.")
+        return
+    st.write(readiness.headline)
+    st.table({"Item": [label for label, _ in readiness.items], "Value": [value for _, value in readiness.items]})
+
+
+def _sidebar(catalog: ex.Catalog, names: dict[str, str]) -> None:
     state = st.session_state
     with st.sidebar:
         st.header("Curated examples")
         st.caption("Fictional validation drafts chosen by rule. Loading one replaces the draft in the form.")
         keys = list(catalog.examples)
         st.selectbox("Example", keys, key="example_choice", format_func=lambda key: catalog.examples[key].rule.title)
-        st.button("Load example", key="load_example", on_click=_load_selected, args=(catalog, names, known))
+        st.button("Load example", key="load_example", on_click=_load_selected, args=(catalog, names))
         for key, reason in catalog.unmatched.items():
             st.caption(f"Example {key} is not available: {reason}")
+
+        st.header("Simulation settings")
+        st.text_input(
+            "Simulated send time",
+            key="f_timestamp",
+            help="ISO 8601 with a timezone, for example 2025-05-01T12:56:10Z. The service uses only mail sent before this time.",
+        )
+        if pres.parse_timestamp(state["f_timestamp"]) is None:
+            st.caption("This time does not parse with a timezone, so the directory is not filtered. The service will reject it.")
 
         st.header("About this example")
         st.caption("The fictional story behind the loaded example. It is not part of the request, and the model never sees it.")
@@ -188,44 +208,60 @@ def _sidebar(catalog: ex.Catalog, names: dict[str, str], known: set[str]) -> Non
 
 
 def _compose(catalog: ex.Catalog, names: dict[str, str], moment) -> None:
+    """The message as a sender sees it: From, To, Cc, Bcc, Subject, Body."""
     state = st.session_state
-    st.text_input(
-        "Draft timestamp",
-        key="f_timestamp",
-        help="ISO 8601 with a timezone, for example 2025-05-01T12:56:10Z. History strictly before it is used.",
-    )
-    if moment is None:
-        st.caption("The timestamp does not parse with a timezone, so the directory below is not filtered. The service will reject it.")
     senders = ex.internal_senders(catalog.contacts, moment)["email_address"].tolist()
     if state["f_sender"] and state["f_sender"] not in senders:
         senders = [state["f_sender"]] + senders
-    st.selectbox("Sender", senders, key="f_sender", format_func=lambda address: ex.contact_label(address, names))
+    st.selectbox("From", senders, key="f_sender", format_func=lambda address: ex.contact_label(address, names))
     visible = ex.visible_contacts(catalog.contacts, moment)["email_address"].tolist()
-    st.caption(f"The directory lists {len(visible)} fictional contacts visible at the draft timestamp.")
-    columns = st.columns(3)
-    for column, role in zip(columns, ROLES, strict=True):
-        with column:
-            selected = list(state[f"f_{role}"])
-            options = selected + [item for item in visible if item not in selected]
-            st.multiselect(role.capitalize(), options, key=f"f_{role}", format_func=lambda address: ex.contact_label(address, names))
-            st.text_input(f"Other {role.capitalize()} addresses", key=f"f_{role}_other", help="Comma-separated. Typed addresses go to the service as written.")
+    for role in ROLES:
+        selected = list(state[f"f_{role}"])
+        options = selected + [item for item in visible if item not in selected]
+        st.multiselect(
+            ROLE_LABELS[role],
+            options,
+            key=f"f_{role}",
+            format_func=lambda address: ex.contact_label(address, names),
+            accept_new_options=True,
+            # No "select all": one Enter must never add a whole filtered list of recipients.
+            select_all=False,
+            filter_mode="contains",
+            placeholder="Choose a contact or type an address",
+            help=f"{len(visible)} fictional contacts are in the directory at the send time. A typed address is sent as written.",
+        )
     st.text_input("Subject", key="f_subject")
-    st.text_area("Body", key="f_body", height=180)
+    st.text_area("Body", key="f_body", height=220)
+
+
+def _action(message: pres.ActionMessage) -> None:
+    """The next step, directly under the Assess button. Built from the API response only."""
+    if message.kind == "empty":
+        st.caption(message.headline)
+        return
+    callout = {"warn": st.warning, "allow": st.info, "unable": st.error, "stale": st.warning}[message.kind]
+    with st.container(border=True, key="action_message"):
+        callout(f"**{message.headline}**")
+        if message.items_heading:
+            st.markdown(f"**{message.items_heading}**")
+        for item in message.items:
+            name = f" ({item.display_name})" if item.display_name else ""
+            lines = [f"- [`{item.address}`](#{item.anchor}){name}, in **{item.fields}**"]
+            # Plain-language text from the service for the sender; code names stay in the details below.
+            lines += [f"    - {line.kind.capitalize()}: {line.text}" for line in item.lines]
+            if not item.lines and message.kind == "warn":
+                lines.append(f"    - {pres.NO_CODE_TEXT}")
+            st.markdown("\n".join(lines))
+        for note in message.notes:
+            st.caption(note)
 
 
 def _result(view: pres.ResultView, client: api_client.ApiClient) -> None:
     if view.kind == "empty":
         st.info(view.headline)
         return
-    if view.kind == "stale":
-        st.warning(f"**{view.headline}** " + " ".join(view.detail))
-        return
-    if view.kind == "unable":
-        st.error(f"**{view.headline}**")
-        for line in view.detail:
-            st.write(line)
-        for note in view.notes:
-            st.caption(note)
+    if view.kind in ("stale", "unable"):
+        st.caption("No decision, risk score, or recipient table for the current draft. See the message above.")
         return
 
     banner = st.warning if view.decision == "warn" else st.info
@@ -243,8 +279,10 @@ def _result(view: pres.ResultView, client: api_client.ApiClient) -> None:
     for index, row in enumerate(view.recipients):
         with st.container(border=True):
             flag = "flagged" if row.flagged else "not flagged"
-            name = f" ({row.display_name})" if row.display_name else ""
-            st.markdown(f"**`{row.address}`**{name} · {', '.join(row.roles)} · risk score {row.risk_text} · {flag}")
+            # The anchor lets the action message link straight to this card.
+            st.subheader(f"`{row.address}`", anchor=pres.recipient_anchor(index))
+            name = f"{row.display_name} · " if row.display_name else ""
+            st.markdown(f"{name}{', '.join(row.roles)} · risk score {row.risk_text} · {flag}")
             for line in row.codes + row.limitations:
                 st.markdown(f"- {line.kind.capitalize()} `{line.code}`: {line.text}")
             if view.request_id:

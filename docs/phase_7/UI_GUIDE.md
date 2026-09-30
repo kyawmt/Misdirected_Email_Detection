@@ -32,13 +32,19 @@ python -m med_ui
 
 ## The screen
 
-### Readiness banner
+The page has two parts. The **sidebar** is for testing: curated examples, the simulated send time, and the story behind the loaded example. The **main area** is what a sender sees: the message on the left and, beside it, a **Review before sending** panel with the **Assess draft** button and the result in plain language. On a laptop-sized window both are visible without scrolling. Details for reviewers (scores, recipient cards, feedback, exploration, service status) are below.
 
-On every page load the UI calls `GET /ready` and shows the contract, snapshot, model, feature, and policy versions, `T_warn`, and "Blocking: disabled". The service must report exactly the contract and snapshot this screen speaks, and the model, feature, and policy versions and the exact `T_warn` of the local policy file that the exploration view reads. If the service does not answer, is not ready, reports anything else, or does not report blocking as disabled, the banner says so and the **Assess draft** button is disabled.
+### Readiness check
 
-### Compose
+On every page load the UI calls `GET /ready`. The service must report exactly the contract and snapshot this screen speaks, and the model, feature, and policy versions and the exact `T_warn` of the local policy file that the exploration view reads. If the service does not answer, is not ready, reports anything else, or does not report blocking as disabled, a red banner at the top of the page says so and the **Assess draft** button is disabled.
 
-Draft timestamp (ISO 8601 with a timezone; it is the history cutoff), sender, To, Cc, Bcc, subject, and body. The sender list holds internal `demo.example` contacts, and the recipient lists hold every fictional contact visible in the directory at the draft timestamp, both from the published `med-synth-v4` contacts table. The **Other ... addresses** fields accept typed addresses, sent as written; the API normalizes and validates them. The form shows no labels, scenarios, splits, or families. The request carries only the Phase 1 fields; it has no draft reference.
+When the service is ready, nothing appears above the message. The status, the served versions, `T_warn`, and "Blocking: disabled" are in the collapsed **Service status and versions** section at the bottom of the page. Each assessment's own versions are in its **Provenance** panel.
+
+### Message
+
+From, To, Cc, Bcc, Subject, and Body, as in a mail client. The From list holds internal `demo.example` contacts. Each of To, Cc, and Bcc is one box: pick a contact from the directory (every fictional contact visible at the send time, from the published `med-synth-v4` contacts table) or type an address and choose "Add: …". A typed address is sent as written; the API normalizes and validates it, so an unknown or malformed address is shown as unable to assess. The boxes have no "select all", so one Enter never adds a whole filtered list. The form shows no labels, scenarios, splits, or families. The request carries only the Phase 1 fields; it has no draft reference.
+
+The **Simulated send time** (ISO 8601 with a timezone) is in the sidebar under **Simulation settings**. It is part of the request: the service uses only mail sent before it, and the directory lists only contacts visible at it.
 
 ### Curated examples and "About this example"
 
@@ -59,12 +65,27 @@ The sidebar loads a curated example into the form. Examples are validation draft
 
 `?example=<key>&assess=1` in the URL loads an example and assesses it on first load (keys: `routine`, `added_recipient`, `first_contact`, `lookalike_miss`, `topic_miss`, `first_contact_miss`, `topic_change`, `cold_start`). The screenshots use this.
 
-### Result
+### Action message
+
+In the **Review before sending** panel, directly under **Assess draft**, the screen answers "should I pause, and where do I look?" It is built only from the API response, never from the curated example's story, scenario, or labels. It names no score, ranks nothing by score, and adds no reason.
+
+| State | Message | What follows |
+| --- | --- | --- |
+| Warn | "Pause and review before sending." | "Check these recipients and the field they are in:", then every flagged recipient in the API's order. Each shows its address (a link that jumps to its recipient card), its name, the field it is in (To, Cc, or Bcc, from the API's roles), and the API's plain-language text for each code, labeled reason or context. The code names themselves (for example `EXTERNAL_RECIPIENT`) are shown in the recipient cards under **Assessment details**. "A warning asks you to check these addresses. It is not proof of a mistake." |
+| Allow | "No warning from this policy." | "This is not a check that every recipient is correct, and the policy misses some kinds of mistakes. Review the recipients yourself before sending." When the API returned evidence limitations: "Less evidence for:", those recipients with their field and the API's limitation text (code names are in the recipient cards), and "Less evidence is an evidence limitation from the service, not a warning." |
+| Unable to assess | "Assessment unavailable. Check recipients manually before sending." | The category (`invalid_input`, `unavailable`, or `unexpected_response` for a response the screen does not accept), the plain-language category text, the directory sentence for an address outside the snapshot, and the service message. No decision and no risk score. An unreachable service is shown the same way. |
+| Stale | "The draft changed after the last assessment. Assess the edited draft again; the earlier result no longer applies." | Nothing from the earlier result. |
+| Not assessed | "Not assessed yet. Assess the draft to see whether the service asks you to pause." | Nothing. |
+
+The known-limitation notice for curated mistakes the policy misses stays in the "About this example" panel, because it comes from the example's story, not from the API.
+
+### Assessment details
 
 - **Assessed:** "Simulated decision: allow" or "Simulated decision: warn" (the API's decision), the email risk score, `T_warn`, and their difference. Then one table row and one card per unique recipient: address, name, roles, risk score, flagged or not, the API's codes with the API's text, and evidence limitations. `CONTENT_RELATIONSHIP_MISMATCH` is labeled a reason; `EXTERNAL_RECIPIENT`, `LOOKALIKE_CONTACT_CONTEXT`, and `UNUSUAL_RECIPIENT_COMBINATION` are labeled context; `LIMITED_RELATIONSHIP_HISTORY` and `LIMITED_TEXT` are evidence limitations. Codes appear only where the API sent them, and an unknown code is shown as sent. Below the cards come the API's explanation sentences and, in a collapsed panel, the provenance.
 - **Unexpected response:** an assessed response is displayed only if it is complete and consistent: simulation mode, blocking reported disabled, a finite `T_warn`, risk scores from 0 to 1, valid roles, well-formed codes, a flagged list that matches the flagged recipients, `warn` only with flagged recipients, and the same versions and cutoff that readiness checked. Anything else is shown as unable to assess with no decision, no risk score, and no recipient table.
-- **Unable to assess:** the category (`invalid_input` or `unavailable`) in plain language, plus the service message, with no decision, no risk score, and no recipient table. A well-formed address that is not in the directory snapshot shows "This address is not in the directory snapshot, so the draft could not be assessed." A service that cannot be reached is shown the same way.
-- **Stale:** any change to any field or recipient hides the previous result and says the draft changed. Nothing from the old result is shown until the edited draft is assessed as a new request. Removing a flagged recipient and reassessing may still warn.
+- **Unable to assess:** the action message carries the category and the service message. The result section shows no decision, no risk score, and no recipient table. A well-formed address that is not in the directory snapshot shows "This address is not in the directory snapshot, so the draft could not be assessed."
+- **Stale:** any change to any field or recipient hides the previous result and its action message. Nothing from the old result is shown until the edited draft is assessed as a new request. Removing a flagged recipient and reassessing may still warn.
+- **Recipient cards:** each card's heading is the address, shown as text (not a mail link), with an anchor the action message links to.
 
 ### Feedback
 
@@ -78,15 +99,15 @@ Each recipient card has **Mark intended** and **Mark unintended**. One click sen
 
 Captured with headless Chrome over the DevTools protocol from the running app, using the `?example=...&assess=1` links. All data is fictional.
 
-Step 1, routine mail allows:
+Step 1, routine mail: "No warning from this policy."
 
 ![Routine example, simulated allow](screenshots/step1_routine_allow.png)
 
-Step 2, an added external recipient is warned with the API's codes:
+Step 2, an added external recipient: "Pause and review before sending.", with the recipient, its field (Cc), and the API's codes:
 
 ![Added-recipient example, simulated warn](screenshots/step2_added_recipient_warn.png)
 
-Step 4, a lookalike mistake the policy allows, labeled as a known limitation:
+Step 4, a lookalike mistake the policy allows. The action message shows no warning, and the "About this example" panel labels it a known limitation:
 
 ![Lookalike example, simulated allow, known limitation](screenshots/step4_known_miss_lookalike.png)
 

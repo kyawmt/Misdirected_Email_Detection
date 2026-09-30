@@ -431,6 +431,109 @@ def test_malformed_assessed_responses_show_no_decision_and_never_raise(assessed,
     assert pres.response_view(ApiResponse(503, unknown)).category == "unexpected_response"
 
 
+# ------------------------------------------------------------ action message
+
+
+def _action_text(message) -> str:
+    return "\n".join(pres.action_lines(message))
+
+
+def test_warn_action_lists_every_flagged_recipient_with_its_field_and_api_codes(assessed):
+    body = assessed["added_recipient"][1].body
+    message = pres.action_message(pres.response_view(assessed["added_recipient"][1]))
+    assert message.kind == "warn" and message.headline == pres.WARN_ACTION
+    flagged = [(index, item) for index, item in enumerate(body["recipients"]) if item["flagged"]]
+    assert [item.address for item in message.items] == [item["address"] for _, item in flagged] == body["flagged_recipients"]
+    for action_item, (index, item) in zip(message.items, flagged, strict=True):
+        assert action_item.fields == " and ".join(role.capitalize() for role in item["roles"])
+        assert action_item.anchor == pres.recipient_anchor(index)
+        assert [(line.code, line.text) for line in action_item.lines] == [(code["code"], code["text"]) for code in item["reason_codes"]]
+    text = _action_text(message)
+    assert pres.WARN_NOTE_ACTION in text
+    sent = {code["code"] for item in body["recipients"] for code in item["reason_codes"] + item["evidence_limitations"]}
+    assert set(re.findall(r"\b[A-Z]{3,}(?:_[A-Z]+)+\b", text)) <= sent
+    unflagged = [item["address"] for item in body["recipients"] if not item["flagged"]]
+    assert unflagged and not any(address in text for address in unflagged)
+    _assert_clean_wording(pres.action_lines(message))
+
+
+def test_warn_action_keeps_api_order_and_every_role(assessed):
+    """Two flagged recipients; the later one scores lower. The list follows the API, not the scores."""
+    body = json.loads(json.dumps(assessed["added_recipient"][1].body))
+    first, second = body["recipients"][0], body["recipients"][1]
+    first.update(flagged=True, roles=["to", "bcc"], risk_score=0.9999999, reason_codes=[{"code": "UNUSUAL_RECIPIENT_COMBINATION", "text": "Group text."}])
+    second.update(risk_score=0.99999)
+    body["flagged_recipients"] = [first["address"], second["address"]]
+    message = pres.action_message(pres.response_view(ApiResponse(200, body)))
+    assert [item.address for item in message.items] == [first["address"], second["address"]]
+    assert message.items[0].fields == "To and Bcc" and message.items[1].fields == "Cc"
+    assert [line.text for line in message.items[0].lines] == ["Group text."]
+    # A flagged recipient without codes is still listed, with no invented reason.
+    second["reason_codes"] = []
+    message = pres.action_message(pres.response_view(ApiResponse(200, body)))
+    assert message.items[1].lines == () and pres.NO_CODE_TEXT in _action_text(message)
+
+
+def test_allow_action_never_calls_the_email_safe(assessed):
+    routine = pres.action_message(pres.response_view(assessed["routine"][1]))
+    assert routine.kind == "allow" and routine.headline == pres.ALLOW_ACTION
+    assert routine.items == () and routine.items_heading is None
+    assert pres.ALLOW_NOTE_ACTION in routine.notes
+    for key in ("routine", "first_contact", "lookalike_miss", "cold_start"):
+        text = _action_text(pres.action_message(pres.response_view(assessed[key][1]))).casefold()
+        assert "safe" not in text and "pause" not in text and "warning from this policy" in text
+        assert "send now" not in text and "okay to send" not in text and "ok to send" not in text
+
+
+def test_allow_action_lists_api_evidence_limitations(assessed):
+    body = assessed["first_contact"][1].body
+    limited = [item for item in body["recipients"] if item["evidence_limitations"]]
+    assert limited, "the legitimate first contact carries an evidence limitation"
+    message = pres.action_message(pres.response_view(assessed["first_contact"][1]))
+    assert message.kind == "allow" and message.items_heading == pres.LIMITED_ITEMS_HEADING
+    assert [item.address for item in message.items] == [item["address"] for item in limited]
+    for action_item, item in zip(message.items, limited, strict=True):
+        assert [(line.code, line.text) for line in action_item.lines] == [(code["code"], code["text"]) for code in item["evidence_limitations"]]
+    assert pres.LIMITED_NOTE in message.notes
+    assert "warn" not in " ".join(line.kind for item in message.items for line in item.lines)
+
+
+def test_unable_action_shows_category_and_message_and_no_decision(client, catalog, names):
+    cases = {
+        "unavailable": client.assess(pres.build_request(unknown_address_form(catalog), names)),
+        "invalid_input": client.assess(pres.build_request(invalid_address_form(catalog), names)),
+        "unexpected_response": ApiResponse(200, {"status": "assessed", "decision": "allow"}),
+    }
+    cases["transport"] = ApiResponse(status_code=None, body=None, error="ConnectError: refused")
+    for name, response in cases.items():
+        view = pres.response_view(response)
+        message = pres.action_message(view)
+        text = _action_text(message)
+        assert message.kind == "unable" and message.headline == pres.UNABLE_ACTION, name
+        assert f"Category: {view.category}." in text, name
+        assert f"Service message: {view.message}" in text, name
+        if response.body and response.body.get("message"):
+            assert response.body["message"] in text
+        assert "allow" not in text.casefold(), name
+        # No score is shown: no "risk score:" label and no number beside it.
+        assert re.search(r"risk score:?\s*[-+]?\d", text.casefold()) is None, name
+        assert message.items == ()
+    assert pres.DIRECTORY_SENTENCE in _action_text(pres.action_message(pres.response_view(cases["unavailable"])))
+
+
+def test_stale_and_empty_actions_show_no_previous_result(client, catalog, names):
+    request = pres.build_request(catalog.examples["added_recipient"].form, names)
+    record = pres.AssessmentRecord(pres.fingerprint(request), client.assess(request))
+    assert pres.action_message(pres.result_view(record, pres.fingerprint(request))).kind == "warn"
+    edited = pres.build_request(replace(catalog.examples["added_recipient"].form, subject="Edited"), names)
+    stale = pres.action_message(pres.result_view(record, pres.fingerprint(edited)))
+    assert stale.kind == "stale" and stale.headline == pres.STALE_ACTION and stale.items == ()
+    text = _action_text(stale)
+    assert pres.WARN_ACTION not in text and pres.ALLOW_ACTION not in text
+    assert not any(item in text for item in pres.result_view(record, pres.fingerprint(request)).flagged)
+    assert pres.action_message(pres.result_view(None, pres.fingerprint(request))).kind == "empty"
+
+
 # -------------------------------------------------------------- exploration
 
 
@@ -580,7 +683,8 @@ def test_app_assesses_marks_stale_and_posts_feedback_once(monkeypatch, api, cata
 
     at.text_input(key="f_subject").input("Edited subject").run()
     texts = _app_texts(at)
-    assert any(pres.STALE_HEADLINE in text for text in texts)
+    assert any(pres.STALE_ACTION in text for text in texts)
+    assert not any(pres.WARN_ACTION in text or pres.ALLOW_ACTION in text for text in texts)
     assert not any("Simulated decision" in text for text in texts)
     assert spy.count("POST", "/assess") == assessments
 
@@ -600,9 +704,46 @@ def test_app_shows_no_decision_for_a_malformed_response(monkeypatch, assessed, e
     at.button(key="assess").click().run()
     assert not at.exception
     texts = _app_texts(at)
-    assert any(pres.UNABLE_HEADLINE in text for text in texts)
+    assert any(pres.UNABLE_ACTION in text for text in texts)
+    assert any("Category: unexpected_response." in text for text in texts)
     assert not any("Simulated decision" in text for text in texts)
     assert not at.metric
+
+
+def test_app_keeps_ready_status_out_of_the_way(monkeypatch, api):
+    """A ready service puts nothing above the compose form; its status and versions sit in a collapsed section at the bottom."""
+    at = _app(monkeypatch, api)
+    at.run()
+    assert not at.exception
+    texts = _main_texts(at)
+    details_at = texts.index("Assessment details")
+    assert not any("Scoring service" in text for text in texts[:details_at])
+    assert not at.main.success and not at.main.error
+    expanders = [expander.label for expander in at.main.expander]
+    assert expanders[-1] == "Service status and versions"
+    bottom = at.main.expander[-1]
+    assert any("Scoring service ready" in str(element.value) for element in bottom.markdown)
+    table = str(bottom.table[0].value.to_dict()) if bottom.table else ""
+    assert "Blocking" in table and "disabled" in table and "T_warn" in table
+    assert not at.button(key="assess").disabled
+
+
+def test_app_shows_the_review_panel_beside_the_message(monkeypatch, api):
+    """The sender sees the email and, beside it, the Assess button and the message, without scrolling past the form."""
+    at = _app(monkeypatch, api)
+    at.run()
+    _load_and_assess(at, "added_recipient")
+    message_column, review_column = at.main.columns[0], at.main.columns[1]
+    assert {widget.key for widget in message_column.multiselect} == {"f_to", "f_cc", "f_bcc"}
+    assert [widget.key for widget in message_column.text_input] == ["f_subject"]
+    assert [button.key for button in review_column.button] == ["assess"]
+    assert any(pres.WARN_ACTION in element.value for element in review_column.warning)
+    # One box per field: addresses are picked or typed in the same box; the send time is a simulation setting.
+    assert not [widget for widget in at.text_input if widget.key and widget.key.endswith("_other")]
+    for widget in message_column.multiselect:
+        # Addresses can be typed in; a single Enter can never add a whole filtered list.
+        assert widget.proto.accept_new_options and widget.proto.select_all == 0
+    assert at.sidebar.text_input(key="f_timestamp").label == "Simulated send time"
 
 
 def test_app_disables_assessment_for_another_bundle(monkeypatch, exploration):
@@ -616,3 +757,93 @@ def test_app_disables_assessment_for_another_bundle(monkeypatch, exploration):
     assert not at.exception
     assert at.button(key="assess").disabled
     assert any("different contract, snapshot, or bundle" in element.value for element in at.error)
+
+
+
+def _walk(node):
+    """Main-area elements in screen order."""
+    children = getattr(node, "children", None)
+    if isinstance(children, dict):
+        for key in sorted(children):
+            yield from _walk(children[key])
+    else:
+        yield node
+
+
+def _main_texts(at) -> list[str]:
+    return [str(getattr(element, "value", "")) for element in _walk(at.main)]
+
+
+def _load_and_assess(at, key):
+    at.selectbox(key="example_choice").set_value(key).run()
+    at.button(key="load_example").click().run()
+    at.button(key="assess").click().run()
+    assert not at.exception
+
+
+def test_app_warn_message_sits_under_the_button_and_names_each_field(monkeypatch, api, assessed):
+    at = _app(monkeypatch, api)
+    at.run()
+    _load_and_assess(at, "added_recipient")
+    texts = _main_texts(at)
+    action_at = next(i for i, text in enumerate(texts) if pres.WARN_ACTION in text)
+    result_at = texts.index("Assessment details")
+    assert action_at < result_at
+    body = assessed["added_recipient"][1].body
+    action_block = "\n".join(texts[action_at:result_at])
+    for index, item in enumerate(body["recipients"]):
+        link = f"(#{pres.recipient_anchor(index)})"
+        if item["flagged"]:
+            fields = " and ".join(role.capitalize() for role in item["roles"])
+            assert f"[`{item['address']}`]{link}" in action_block and f"in **{fields}**" in action_block
+            for code in item["reason_codes"]:
+                label = "Reason" if code["code"] == "CONTENT_RELATIONSHIP_MISMATCH" else "Context"
+                assert f"{label}: {code['text']}" in action_block
+                assert code["code"] not in action_block  # code names stay in the details cards
+        else:
+            assert item["address"] not in action_block
+    assert pres.WARN_NOTE_ACTION in action_block
+    shown = set(re.findall(r"\b[A-Z]{3,}(?:_[A-Z]+)+\b", action_block))
+    assert shown <= {code["code"] for item in body["recipients"] for code in item["reason_codes"]}
+    anchors = {getattr(header.proto, "anchor", "") for header in at.main.subheader}
+    assert {pres.recipient_anchor(i) for i, item in enumerate(body["recipients"]) if item["flagged"]} <= anchors
+
+
+def test_app_allow_messages_with_and_without_limitations(monkeypatch, api, assessed):
+    at = _app(monkeypatch, api)
+    at.run()
+    _load_and_assess(at, "routine")
+    texts = _main_texts(at)
+    action_at = next(i for i, text in enumerate(texts) if pres.ALLOW_ACTION in text)
+    block = "\n".join(texts[action_at:texts.index("Assessment details")])
+    assert pres.ALLOW_NOTE_ACTION in block and pres.LIMITED_ITEMS_HEADING not in block
+    assert "safe" not in block.casefold() and pres.WARN_ACTION not in block
+
+    _load_and_assess(at, "first_contact")
+    texts = _main_texts(at)
+    action_at = next(i for i, text in enumerate(texts) if pres.ALLOW_ACTION in text)
+    block = "\n".join(texts[action_at:texts.index("Assessment details")])
+    assert pres.LIMITED_ITEMS_HEADING in block and pres.LIMITED_NOTE in block
+    for item in assessed["first_contact"][1].body["recipients"]:
+        for code in item["evidence_limitations"]:
+            assert item["address"] in block and code["text"] in block
+
+
+def test_app_unable_messages_for_invalid_and_unavailable(monkeypatch, api, catalog):
+    at = _app(monkeypatch, api)
+    at.run()
+    at.selectbox(key="example_choice").set_value("routine").run()
+    at.button(key="load_example").click().run()
+    for form, category in ((invalid_address_form(catalog), "invalid_input"), (unknown_address_form(catalog), "unavailable")):
+        # Addresses typed into the To box, as a sender would.
+        at.multiselect(key="f_to").set_value(list(form.to)).run()
+        at.button(key="assess").click().run()
+        assert not at.exception
+        main = "\n".join(_main_texts(at))
+        assert pres.UNABLE_ACTION in main and f"Category: {category}." in main
+        assert "Simulated decision" not in main and not at.main.metric
+        # The only table left is the exploration table; no recipient table is shown.
+        assert all("Address" not in frame.value.columns for frame in at.main.dataframe)
+        assert "allow" not in main.casefold()
+        if category == "unavailable":
+            assert pres.DIRECTORY_SENTENCE in main

@@ -12,7 +12,6 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
@@ -54,11 +53,6 @@ class DraftForm:
     bcc: tuple[str, ...] = ()
     subject: str = ""
     body: str = ""
-
-
-def split_addresses(text: str) -> tuple[str, ...]:
-    """Typed addresses, separated by commas, semicolons, or new lines. The API normalizes them."""
-    return tuple(part.strip() for part in re.split(r"[,;\n]", text or "") if part.strip())
 
 
 def build_request(form: DraftForm, display_names: Mapping[str, str], snapshot_id: str = EXPECTED_SNAPSHOT_ID) -> dict:
@@ -436,3 +430,107 @@ def feedback_note(response: ApiResponse) -> str:
         )
     message = (response.body or {}).get("message") or response.error or f"HTTP {response.status_code}"
     return f"Feedback was not recorded: {message}"
+
+
+# ------------------------------------------------------------ action message
+
+WARN_ACTION = "Pause and review before sending."
+ALLOW_ACTION = "No warning from this policy."
+UNABLE_ACTION = "Assessment unavailable. Check recipients manually before sending."
+STALE_ACTION = "The draft changed after the last assessment. Assess the edited draft again; the earlier result no longer applies."
+EMPTY_ACTION = "Not assessed yet. Assess the draft to see whether the service asks you to pause."
+WARN_ITEMS_HEADING = "Check these recipients and the field they are in:"
+WARN_NOTE_ACTION = "A warning asks you to check these addresses. It is not proof of a mistake."
+NO_CODE_TEXT = "The service returned no reason or context code for this recipient."
+ALLOW_NOTE_ACTION = (
+    "This is not a check that every recipient is correct, and the policy misses some kinds of mistakes. "
+    "Review the recipients yourself before sending."
+)
+LIMITED_ITEMS_HEADING = "Less evidence for:"
+LIMITED_NOTE = "Less evidence is an evidence limitation from the service, not a warning."
+ROLE_LABELS = {"to": "To", "cc": "Cc", "bcc": "Bcc"}
+
+
+@dataclass(frozen=True)
+class ActionItem:
+    address: str
+    display_name: str
+    fields: str
+    anchor: str
+    lines: tuple[CodeLine, ...]
+
+
+@dataclass(frozen=True)
+class ActionMessage:
+    """What to do next, shown under the Assess button. Built only from the result view, which comes from the API response."""
+
+    kind: str  # "empty", "stale", "warn", "allow", or "unable"
+    headline: str
+    items_heading: str | None = None
+    items: tuple[ActionItem, ...] = ()
+    notes: tuple[str, ...] = ()
+
+
+def recipient_anchor(index: int) -> str:
+    return f"recipient-{index}"
+
+
+def _fields(roles: tuple[str, ...]) -> str:
+    return " and ".join(ROLE_LABELS.get(role, role) for role in roles)
+
+
+def action_message(view: ResultView) -> ActionMessage:
+    """The plain-language next step for a result view.
+
+    Warn lists every flagged recipient in the API's order with the field it is
+    in and the API's own codes. Allow lists recipients with the API's evidence
+    limitations. Nothing is ranked by score and no reason is derived.
+    """
+    if view.kind == "empty":
+        return ActionMessage(kind="empty", headline=EMPTY_ACTION)
+    if view.kind == "stale":
+        return ActionMessage(kind="stale", headline=STALE_ACTION)
+    if view.kind == "unable":
+        return ActionMessage(kind="unable", headline=UNABLE_ACTION, notes=(f"Category: {view.category}.", *view.detail))
+    if view.decision == "warn":
+        items = tuple(
+            ActionItem(
+                address=row.address,
+                display_name=row.display_name,
+                fields=_fields(row.roles),
+                anchor=recipient_anchor(index),
+                lines=row.codes,
+            )
+            for index, row in enumerate(view.recipients)
+            if row.flagged
+        )
+        return ActionMessage(kind="warn", headline=WARN_ACTION, items_heading=WARN_ITEMS_HEADING, items=items, notes=(WARN_NOTE_ACTION,))
+    items = tuple(
+        ActionItem(
+            address=row.address,
+            display_name=row.display_name,
+            fields=_fields(row.roles),
+            anchor=recipient_anchor(index),
+            lines=row.limitations,
+        )
+        for index, row in enumerate(view.recipients)
+        if row.limitations
+    )
+    notes = (ALLOW_NOTE_ACTION, LIMITED_NOTE) if items else (ALLOW_NOTE_ACTION,)
+    return ActionMessage(kind="allow", headline=ALLOW_ACTION, items_heading=LIMITED_ITEMS_HEADING if items else None, items=items, notes=notes)
+
+
+def action_lines(message: ActionMessage) -> list[str]:
+    """Every string the action message shows."""
+    lines = [message.headline]
+    if message.items_heading:
+        lines.append(message.items_heading)
+    for item in message.items:
+        name = f" ({item.display_name})" if item.display_name else ""
+        lines.append(f"{item.address}{name}, in {item.fields}")
+        if item.lines:
+            lines.extend(f"{line.kind.capitalize()}: {line.text}" for line in item.lines)
+        elif message.kind == "warn":
+            lines.append(NO_CODE_TEXT)
+    lines.extend(message.notes)
+    return lines

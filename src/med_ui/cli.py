@@ -38,6 +38,7 @@ def main(argv: list[str] | None = None) -> int:
             "--server.port", str(port),
             "--server.headless", "true",
             "--browser.gatherUsageStats", "false",
+            "--client.toolbarMode", "minimal",
         ]
         return subprocess.call(command, env=env)
     if args.command == "walkthrough":
