@@ -4,6 +4,13 @@ This is proposal arithmetic. No online experiment has been run, no real user
 has seen a warning, and nothing here is evidence about a live system. The
 functions take a baseline and a target and return how many emails or senders a
 future test would need under stated assumptions.
+
+The two arms run the same frozen policy on the same kind of draft, so the
+policy's scores, warnings, and recall are identical in both by construction.
+What the arms can differ on is what senders do with a warning. The primary
+outcome is therefore behavioral: the share of policy-warned mistakes that the
+sender corrects before sending. Model recall is reported as a descriptive
+number and sets how many warned mistakes a test can expect to see.
 """
 
 from __future__ import annotations
@@ -13,11 +20,14 @@ import math
 from scipy.stats import binom, norm
 
 from med_monitor.version import (
+    EXPERIMENT_ACCEPTANCE_RATES,
     EXPERIMENT_ALPHA,
+    EXPERIMENT_BASELINE_CORRECTION_RATES,
     EXPERIMENT_EMAILS_PER_SENDER,
     EXPERIMENT_ICC_VALUES,
     EXPERIMENT_POWER,
     EXPERIMENT_PREVALENCE,
+    STOP_FOR_HARM_ALPHA,
 )
 
 
@@ -41,7 +51,7 @@ def zero_event_n(rate_per_1000: float, confidence: float = 1 - EXPERIMENT_ALPHA)
     return math.ceil(-math.log(1 - confidence) / (rate_per_1000 / 1000.0))
 
 
-def stop_for_harm_count(legitimate: int, budget_per_1000: float, alpha: float = 0.01) -> int:
+def stop_for_harm_count(legitimate: int, budget_per_1000: float, alpha: float = STOP_FOR_HARM_ALPHA) -> int:
     """Smallest count of confirmed false interventions that would be this unlikely at the budget rate."""
     rate = budget_per_1000 / 1000.0
     count = 0
@@ -56,22 +66,61 @@ def sender_scaling(emails: int, icc: float, cluster_size: float = EXPERIMENT_EMA
     return {"icc": icc, "design_effect": effect, "emails": inflated, "senders": math.ceil(inflated / cluster_size)}
 
 
-def detection_table(baseline_recall: float, lifts=(0.10, 0.20)) -> list[dict]:
-    """Confirmed-detection rows: positives and emails per arm, then the sender-level cost of clustering."""
+def correction_rate_with_warning(baseline: float, acceptance: float) -> float:
+    """Correction rate of a warned mistake when the warning is shown.
+
+    Without a warning a sender fixes it at the baseline rate. With one, a
+    further `acceptance` share of the rest is fixed.
+    """
+    return baseline + (1.0 - baseline) * acceptance
+
+
+def primary_table(warned_recall: float) -> list[dict]:
+    """Primary outcome: correction rate among policy-warned mistakes, treatment against control.
+
+    Positives per arm are confirmed warned mistakes. A mistake is warned with
+    probability `warned_recall`, so emails per arm = positives / (prevalence * recall).
+    """
     rows = []
-    for lift in lifts:
-        target = baseline_recall + lift
-        positives = two_proportion_n(baseline_recall, target)
-        emails = math.ceil(positives / EXPERIMENT_PREVALENCE)
-        rows.append(
-            {
-                "baseline_recall": baseline_recall,
-                "target_recall": target,
-                "confirmed_misdirected_per_arm": positives,
-                "emails_per_arm_if_independent": emails,
-                "with_sender_clustering": [sender_scaling(emails, icc) for icc in EXPERIMENT_ICC_VALUES],
-            }
-        )
+    for baseline in EXPERIMENT_BASELINE_CORRECTION_RATES:
+        for acceptance in EXPERIMENT_ACCEPTANCE_RATES:
+            treated = correction_rate_with_warning(baseline, acceptance)
+            positives = two_proportion_n(baseline, treated)
+            emails = math.ceil(positives / (EXPERIMENT_PREVALENCE * warned_recall))
+            rows.append(
+                {
+                    "baseline_correction": baseline,
+                    "acceptance": acceptance,
+                    "treated_correction": treated,
+                    "confirmed_warned_mistakes_per_arm": positives,
+                    "emails_per_arm_if_independent": emails,
+                    "with_sender_clustering": [sender_scaling(emails, icc) for icc in EXPERIMENT_ICC_VALUES],
+                }
+            )
+    return rows
+
+
+def sent_mistake_table(warned_recall: float) -> list[dict]:
+    """Secondary outcome: misdirected emails still on their way out at send, per email.
+
+    Only warned mistakes can change, so the difference is small against a rate that is
+    already about half a percent; this is why it is not the primary outcome.
+    """
+    rows = []
+    for baseline in EXPERIMENT_BASELINE_CORRECTION_RATES:
+        for acceptance in EXPERIMENT_ACCEPTANCE_RATES:
+            control = EXPERIMENT_PREVALENCE * (1.0 - baseline)
+            treated = control * (1.0 - warned_recall * acceptance)
+            emails = two_proportion_n(control, treated)
+            rows.append(
+                {
+                    "baseline_correction": baseline,
+                    "acceptance": acceptance,
+                    "control_sent_per_1000": 1000 * control,
+                    "treated_sent_per_1000": 1000 * treated,
+                    "emails_per_arm_if_independent": emails,
+                }
+            )
     return rows
 
 
@@ -103,8 +152,8 @@ def false_intervention_guardrail(budget_per_1000: float) -> dict:
 
 def design(reference: dict) -> dict:
     """The whole proposal table from the stored reference numbers."""
-    baseline_recall = reference["recorded_test_pass"]["recall"]
     validation = reference["policy_reference"]["validation"]
+    warned_recall = validation["warned_mistakes"] / validation["misdirected"]
     warning_rate = validation["warnings"] / validation["emails"]
     budget = 1.0
     return {
@@ -114,9 +163,18 @@ def design(reference: dict) -> dict:
         "assumed_prevalence": EXPERIMENT_PREVALENCE,
         "assumed_emails_per_sender": EXPERIMENT_EMAILS_PER_SENDER,
         "icc_values": list(EXPERIMENT_ICC_VALUES),
-        "baseline_recall_source": "the one recorded frozen test pass, product-like",
+        "baseline_correction_rates": list(EXPERIMENT_BASELINE_CORRECTION_RATES),
+        "acceptance_rates": list(EXPERIMENT_ACCEPTANCE_RATES),
+        "descriptive_recall": {
+            "value": warned_recall,
+            "warned_mistakes": validation["warned_mistakes"],
+            "misdirected": validation["misdirected"],
+            "source": "validation product-like, the subset that chose the cutoff; not independent of it",
+            "identical_in_both_arms": True,
+        },
         "baseline_warning_rate_source": "validation product-like, the subset that chose the cutoff",
-        "detections": detection_table(baseline_recall),
+        "primary": primary_table(warned_recall),
+        "sent_mistakes": sent_mistake_table(warned_recall),
         "warning_rate": warning_rate_table(warning_rate),
         "false_interventions": false_intervention_guardrail(budget),
         "latency": {"p95_limit_ms": 300.0, "requests_per_arm_minimum": 1000},

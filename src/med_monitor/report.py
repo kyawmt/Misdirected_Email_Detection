@@ -13,6 +13,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from med_api.version import DEFAULT_SCORING_TIMEOUT_SECONDS
 from med_monitor import alerts as alert_module
 from med_monitor import experiment, version
 from med_monitor.drift import ALERT, INSUFFICIENT, NO_CHANGE, NO_DRIFT, OK, STRUCTURAL, WATCH
@@ -38,6 +39,7 @@ from med_monitor.version import (
     REFERENCE_WINDOWS,
     SHARE_SHIFT_ALERT,
     SHARE_SHIFT_WATCH,
+    STOP_FOR_HARM_ALPHA,
 )
 
 STATUS_LABEL = {
@@ -156,8 +158,10 @@ def bundle_line(records: Records) -> str:
 def frozen_note() -> str:
     return (
         "All data is fictional. Monitored requests are `validation_product_like` drafts, plus copies of legitimate first-contact "
-        "validation drafts in the shifted windows. No frozen test row is read, replayed, scored, or summarized; the one recorded "
-        "test result is quoted as recorded where it serves as a reference."
+        "validation drafts in the shifted windows. No monitor command opens a file that holds frozen test results or a frozen feature matrix "
+        "(`test_evaluation.json` and `features_test_*` are never read), and no frozen draft is scored, replayed, or summarized. "
+        "The draft-keyed tables (drafts, recipients, labels, reviewer notes) are streamed record by record and only validation records are kept; "
+        "the CSV parser still reads past each frozen record to find the next record boundary, because a quoted body can hold newlines, and drops it at once."
     )
 
 
@@ -195,12 +199,13 @@ def monitoring(records: Records) -> str:
                 ["Recipients per email, flagged recipients", "Response body (the log carries both counts)", "Reference windows", "Reported; no rule", "n/a"],
                 ["Warning rate", "Decision (the log carries it)", "Reference windows", f"Two-sided exact test, alpha {RATE_ALPHA}", f"{count(MIN_EMAILS_DECISION_RATE)} emails on each side"],
                 ["Block count", "Decision", "Must be 0", "Any block is critical", "none"],
-                ["Served versions", "Log fields and `GET /ready`", "The frozen policy file", "Any other version is critical", "none"],
+                ["Served versions", "Version fields of responses that name a bundle (the log carries them) and `GET /ready`", "The frozen policy file", "A different bundle named on any response is critical", "none"],
+                ["Bundle availability", "Failures that carry no version provenance: the service answered without a loaded bundle", "Must be 0", "Any such failure is high severity. It is an availability signal, not evidence that another bundle answered", "none"],
                 ["Limited relationship history (first contact or cold start), limited text", "Evidence limitations in the response", "Reference windows", f"Rate above the reference: one-sided exact test, alpha {RATE_ALPHA}", f"{MIN_EMAILS_SCORE_BAND} assessed emails"],
                 ["Emails from a sender with no earlier mail", "Feature rows (`sender_history_available` = 0)", "Reference windows", "Same test", f"{MIN_EMAILS_SCORE_BAND} assessed emails"],
                 ["Email risk score distribution; scores near `T_warn`", "Email risk score in the response", "Reference windows", f"Emails in [T_warn - {NEAR_BAND}, T_warn): one-sided exact test; margin to the highest allowed score reported", f"{MIN_EMAILS_SCORE_BAND} assessed emails"],
                 ["Input drift", "Model-input feature rows against the train reference", "Train only", f"PSI alert {PSI_ALERT}, watch {PSI_WATCH}; indicators also alert at a share shift of {SHARE_SHIFT_ALERT:g}; an alert needs {MIN_EXCESS_ROWS} excess rows", f"{MIN_ROWS_INPUT_DRIFT} recipient rows and {MIN_EMAILS_INPUT_DRIFT} emails"],
-                ["Confirmed performance change", "Reviewed labels only", f"The recorded frozen test pass and the reference windows", "Recall intervals do not overlap", f"{MIN_REVIEWED_POSITIVES} confirmed misdirected emails on each side"],
+                ["Confirmed performance change", "Reviewed labels only", "The reference windows, by the simulated review", "Recall intervals do not overlap", f"{MIN_REVIEWED_POSITIVES} confirmed misdirected emails on each side"],
             ],
         ),
         "",
@@ -774,8 +779,8 @@ def _targeted_experiment(records: Records) -> str:
             "- Any confirmed false warning, or a near-band share above the reference: do not move `T_warn`. Open a new policy version through the offline path (new evidence on a new frozen dataset version, "
             "separate calibration and selection portions, one test pass) and gate it as in [the runbook](RUNBOOK.md#promotion-gates).",
             "",
-            "**Side question the same data answers.** The recorded threshold-free separation of mistaken first contacts from legitimate ones (AUC 0.88 on `validation_diagnostic`, 10 against 20 rows) "
-            "says the score can rank them. The shadow run measures whether that ranking holds at the volume and mix of a real wave. It does not, by itself, justify a lower cutoff.",
+            "**Side question the same data answers.** The [Phase 4 decision record](../phase_4/DECISION_RECORD.md#mistaken-first-contacts-s11-against-legitimate-first-contacts-s03-s06) compares mistaken first contacts with legitimate ones without a cutoff. "
+            "The shadow run measures whether that ranking holds at the volume and mix of a real wave. It does not, by itself, justify a lower cutoff.",
             "",
         ]
     )
@@ -848,9 +853,8 @@ def feedback_review(records: Records) -> str:
         "",
         "- It does not show how well real reviewers would label, how many would respond, or how fast.",
         "- It does not show that detection improved. It shows how to measure detection when labels arrive, and why a click stream cannot do it.",
-        f"- The reference recall for a future comparison is the one recorded frozen test pass: {ratio(records.reference['recorded_test_pass']['warned_mistakes'], records.reference['recorded_test_pass']['misdirected'])} misdirected emails warned (exact interval "
-        f"{number(records.reference['recorded_test_pass']['recall_interval_exact'][0], 3)} to {number(records.reference['recorded_test_pass']['recall_interval_exact'][1], 3)}, if emails were independent). "
-        "The validation figure is not independent of the cutoff.",
+        f"- The reference recall for a future comparison is the validation figure, {ratio(records.reference['policy_reference']['validation']['warned_mistakes'], records.reference['policy_reference']['validation']['misdirected'])} misdirected emails warned. "
+        "It is not independent of the cutoff, because validation chose the cutoff. The one recorded frozen test pass is reported in the [evaluation report](../phase_5/EVALUATION_REPORT.md); the monitor does not open the file that stores it.",
         "",
     ]
     return "\n".join(lines)
@@ -995,6 +999,9 @@ def experiment_proposal(records: Records) -> str:
     design = experiment.design(records.reference)
     pop = records.plan.get("traffic_population") or {}
     validation = records.reference["policy_reference"]["validation"]
+    recall = design["descriptive_recall"]
+    guardrail = design["false_interventions"]
+    ref_summary = records.replay["blocks"]["reference"]["summary"]
 
     def scaling(rows: list[dict]) -> str:
         return "; ".join(f"ICC {item['icc']:g}: {count(item['emails'])} emails, {count(item['senders'])} senders" for item in rows)
@@ -1007,42 +1014,72 @@ def experiment_proposal(records: Records) -> str:
         "",
         "## Question",
         "",
-        "Does showing the frozen warning policy to senders lead to more confirmed detections of misdirected mail, at an acceptable cost in interruptions, "
-        "than showing nothing (shadow scoring only)?",
+        "When a sender is shown a warning about a recipient, does the sender correct the mistake more often than when nothing is shown, and at what cost in interruptions?",
+        "",
+        "**What the test can and cannot measure.** Both arms run the same frozen policy on the same kind of draft, so its scores, its warnings, and its recall are the same in both arms by construction. "
+        "Showing a decision does not change the policy's prediction. Recall therefore describes the model and is not an effect of the treatment. "
+        "What can differ between the arms is what senders do: whether a flagged recipient is removed or replaced before the email is sent. The outcomes below measure that.",
         "",
         "## Design",
         "",
-        "- **Arms.** Control: the policy scores every draft in shadow and no warning is shown. Treatment: the same policy, warnings shown. Both arms are scored, so every metric except user behavior is observable in both.",
+        "- **Arms.** Control: the policy scores every draft in shadow and no warning is shown. Treatment: the same policy, warnings shown. Both arms are scored, so every metric except sender behavior is observable in both.",
         "- **Unit of randomization: the sender.** A sender's drafts share history, habits, and recipients, so randomizing emails would leak treatment across a sender's mail and understate variance. Analysis uses sender-level clustering.",
         f"- **Feasibility on this population.** The validation traffic has {count(pop.get('senders', 0))} senders and {100 * pop.get('largest_sender_share', 0):.1f}% of emails come from one of them, so a sender-level test cannot be run on it. "
         "A real test needs many senders with comparable volume.",
-        "- **Exposure.** Fixed horizon; no interim looks at the primary metric.",
+        "- **Exposure.** Fixed horizon; no interim looks at the primary outcome.",
+        "",
+        "### When drafts, labels, and outcomes are captured",
+        "",
+        "1. **First assessment.** In both arms, record the draft's recipient set as first assessed (the *as-assessed snapshot*) and the policy's decision. In the treatment arm the warning is shown after this capture.",
+        "2. **Review.** A reviewer labels each recipient of the as-assessed snapshot as intended or unintended, from a stratified sample with known inclusion probabilities (see [the feedback review](FEEDBACK_REVIEW.md#review-workflow)). The reviewer sees neither the sent mail nor the sender's arm. Labels attach to the snapshot, so a correction cannot erase the mistake it corrected.",
+        "3. **Send.** Record the recipient set at send. A mistake is *corrected* when every recipient the reviewer marked unintended is absent at send.",
+        "4. **Label cutoff.** The date after which a returning label is not counted is fixed before the test starts.",
         "",
         "## Metrics",
         "",
         table(
             ["Role", "Metric", "Definition", "Baseline and its source"],
             [
-                ["Primary", "Confirmed detections", "Warned emails a reviewer confirms are misdirected, over all confirmed misdirected emails (recall), from the stratified review", f"{number(design['detections'][0]['baseline_recall'], 2)}: {ratio(records.reference['recorded_test_pass']['warned_mistakes'], records.reference['recorded_test_pass']['misdirected'])}, the one recorded frozen test pass"],
+                ["**Primary**", "Correction rate among warned mistakes", "Of the drafts the policy warns (shown in treatment, shadow in control) whose as-assessed recipients a reviewer marks misdirected, the share in which every unintended recipient is gone at send. Treatment against control", "Not measured; no correction data exists. Assumed values are in the sample-size grid"],
+                ["Secondary", "Misdirected emails sent per 1,000 emails", "Emails a reviewer marks misdirected on the as-assessed snapshot whose unintended recipient is still present at send, per 1,000 emails", "Not measured. It is the outcome that matters most and the one this test is least able to resolve; see the sample sizes"],
+                ["Descriptive, both arms", "Recall of the frozen policy", "Warned confirmed mistakes over all confirmed mistakes on the as-assessed snapshot. Identical in the two arms by construction, so it is reported, not compared", f"{ratio(recall['warned_mistakes'], recall['misdirected'])} on validation product-like, the subset that chose the cutoff, so not independent of it"],
                 ["Guardrail", "Warning rate", "Emails warned over emails assessed", f"{ratio(validation['warnings'], validation['emails'])} on validation product-like, the subset that chose the cutoff"],
-                ["Guardrail", "Confirmed false interventions", f"Reviewed warned emails confirmed all intended, per 1,000 legitimate emails; budget {design['false_interventions']['budget_per_1000']:g} per 1,000", f"{ratio(validation['false_interventions'], validation['legitimate'])} on validation and {ratio(records.reference['recorded_test_pass']['false_interventions'], records.reference['recorded_test_pass']['legitimate'])} on the recorded test pass; not confidence-supported (AC01 is insufficient evidence)"],
-                ["Guardrail", "User corrections", "Share of warned emails in which the sender changes a flagged recipient before sending. **Not measurable today:** the UI records no correction, only an intended or unintended click", "none measured"],
+                ["Guardrail", "Confirmed false interventions", f"Reviewed warned emails confirmed all intended, per 1,000 legitimate emails; budget {guardrail['budget_per_1000']:g} per 1,000", f"{ratio(validation['false_interventions'], validation['legitimate'])} on validation; not confidence-supported (AC01 is insufficient evidence)"],
+                ["Guardrail", "Intended recipients removed after a warning", "Of warned drafts a reviewer marks all intended, the share in which the sender removes or replaces a recipient before send. The cost of a false warning that a sender obeys", "none measured"],
                 ["Guardrail", "Latency", f"Client p95 per arm, at least {count(design['latency']['requests_per_arm_minimum'])} requests per arm, below {design['latency']['p95_limit_ms']:.0f} ms", "the recorded AC05 measurement"],
-                ["Guardrail", "Unable to assess", "Share of requests that return unable to assess, by category", ratio(records.replay["blocks"]["reference"]["summary"]["unable_to_assess"], records.replay["blocks"]["reference"]["summary"]["requests"]) + " in the reference windows"],
-                ["Safety", "Blocks", "Must be 0", count(records.replay["blocks"]["reference"]["summary"]["blocks"]) + " in the reference windows"],
+                ["Guardrail", "Unable to assess", "Share of requests that return unable to assess, by category", ratio(ref_summary["unable_to_assess"], ref_summary["requests"]) + " in the reference windows"],
+                ["Safety", "Blocks", "Must be 0", count(ref_summary["blocks"]) + " in the reference windows"],
             ],
         ),
         "",
         "## Sample size",
         "",
         f"Alpha {design['alpha']}, power {design['power']}, assumed misdirection rate {100 * design['assumed_prevalence']:.1f}% (a simulation assumption), "
-        f"{design['assumed_emails_per_sender']} emails per sender over the test period. Clustering inflates emails by the design effect 1 + (m - 1) * ICC; ICC is unknown, so three values are shown.",
+        f"{design['assumed_emails_per_sender']} emails per sender over the test period. Clustering inflates emails by the design effect 1 + (m - 1) * ICC; ICC is unknown, so three values are shown. "
+        f"A mistake is warned with probability equal to the policy's recall ({number(recall['value'], 2)} on validation), so the test sees about {number(recall['value'] * design['assumed_prevalence'] * 1000, 1)} warned mistakes per 1,000 emails.",
         "",
-        "### Confirmed detections",
+        "There is no correction data, so the two behavioral inputs are **assumptions, shown as a grid**: the share of warned mistakes a sender fixes with no warning shown, and the further share of the rest that a shown warning gets fixed.",
+        "",
+        "### Primary outcome: correction rate among warned mistakes",
         "",
         table(
-            ["Baseline recall", "Target recall", "Confirmed misdirected emails per arm", "Emails per arm if independent", "With sender clustering (per arm)"],
-            [[number(r["baseline_recall"], 2), number(r["target_recall"], 2), count(r["confirmed_misdirected_per_arm"]), count(r["emails_per_arm_if_independent"]), scaling(r["with_sender_clustering"])] for r in design["detections"]],
+            ["Fixed with no warning", "Extra fixed by a shown warning", "Correction rate with a warning", "Confirmed warned mistakes per arm", "Emails per arm if independent", "With sender clustering (per arm)"],
+            [
+                [number(r["baseline_correction"], 2), number(r["acceptance"], 2), number(r["treated_correction"], 3), count(r["confirmed_warned_mistakes_per_arm"]), count(r["emails_per_arm_if_independent"]), scaling(r["with_sender_clustering"])]
+                for r in design["primary"]
+            ],
+        ),
+        "",
+        "### Why misdirected emails sent is only secondary",
+        "",
+        f"Only warned mistakes can change, and the policy warned {ratio(recall['warned_mistakes'], recall['misdirected'], 0)} of the validation mistakes, so the treatment moves a rate that is already small by a fraction of itself:",
+        "",
+        table(
+            ["Fixed with no warning", "Extra fixed by a shown warning", "Control, sent per 1,000 emails", "Treatment, sent per 1,000 emails", "Emails per arm if independent"],
+            [
+                [number(r["baseline_correction"], 2), number(r["acceptance"], 2), number(r["control_sent_per_1000"], 2), number(r["treated_sent_per_1000"], 2), count(r["emails_per_arm_if_independent"])]
+                for r in design["sent_mistakes"]
+            ],
         ),
         "",
         "### Warning rate (detect a doubling)",
@@ -1054,30 +1091,31 @@ def experiment_proposal(records: Records) -> str:
         "",
         "### False-intervention guardrail",
         "",
-        f"To show with {100 * (1 - design['alpha']):.0f}% confidence that the false-intervention rate is no higher than {design['false_interventions']['budget_per_1000']:g} per 1,000 after observing zero, "
-        f"an arm needs about {count(design['false_interventions']['legitimate_emails_per_arm_for_zero_count_bound'])} reviewed legitimate emails if they were independent. "
-        f"With sender clustering: {scaling(design['false_interventions']['with_sender_clustering'])}.",
+        f"To show with {100 * (1 - design['alpha']):.0f}% confidence that the false-intervention rate is no higher than {guardrail['budget_per_1000']:g} per 1,000 after observing zero, "
+        f"an arm needs about {count(guardrail['legitimate_emails_per_arm_for_zero_count_bound'])} reviewed legitimate emails if they were independent. "
+        f"With sender clustering: {scaling(guardrail['with_sender_clustering'])}.",
         "",
         "## Stopping rules",
         "",
-        "- **Stop an arm at once** on any block decision, any response that carries a decision or score with a failure, a served version that is not the frozen bundle, or an unable-to-assess alert (see [monitoring](MONITORING.md)).",
-        f"- **Stop the treatment for harm** when confirmed false interventions reach {design['false_interventions']['stop_for_harm_confirmed_false_interventions']} within "
-        f"{count(design['false_interventions']['stop_for_harm_at_legitimate_emails'])} reviewed legitimate emails: at the budget rate that count has a probability of 1% or less. It is a safety stop, not a success criterion.",
-        "- **Do not stop early for success.** The primary metric is read once, at the planned horizon, on labels returned by then. A late-returning label is counted only if the protocol fixes a cutoff date before the test starts.",
-        "- **Do not extend** a test whose primary metric is inconclusive without a new protocol; extending by peeking inflates the error rate.",
+        "- **Stop an arm at once** on any block decision, any response that carries a decision or score with a failure, a served version that is not the frozen bundle, a service answering without a loaded bundle, or an unable-to-assess alert (see [monitoring](MONITORING.md)).",
+        f"- **Stop the treatment for harm** when confirmed false interventions reach {guardrail['stop_for_harm_confirmed_false_interventions']} within "
+        f"{count(guardrail['stop_for_harm_at_legitimate_emails'])} reviewed legitimate emails: at the budget rate a count that high has a probability of {STOP_FOR_HARM_ALPHA:g} or less. It is a safety stop, not a success criterion.",
+        "- **Do not stop early for success.** The primary outcome is read once, at the planned horizon, on labels returned by the label cutoff.",
+        "- **Do not extend** a test whose primary outcome is inconclusive without a new protocol; extending by peeking inflates the error rate.",
         "",
         "## Analysis and reading",
         "",
         "- Cluster-robust intervals at the sender level. Report counts and denominators for every metric.",
-        "- Reviewed labels come from the stratified queue with known inclusion probabilities, so misses are weighted back. Feedback clicks are not labels.",
-        "- A positive result would say the warning surfaced mistakes at a given interruption cost for the senders tested. It would not say the model improved.",
+        "- Reviewed labels come from the stratified queue with known inclusion probabilities, so mistakes the policy misses are weighted back. Feedback clicks are not labels.",
+        "- A positive primary result would say that, for the senders tested, a shown warning got more flagged mistakes corrected, at a stated interruption cost. It would not say the model improved, and it would not measure the mistakes the policy does not warn on.",
         "",
         "## Preconditions not met today",
         "",
-        "- Enough senders, and a way to randomize them at request time.",
-        "- Correction logging in the UI, and a reviewer workflow with real reviewers.",
-        "- Shadow scoring that records the decision without showing it.",
-        "- A privacy decision on the log fields the monitor needs (see [monitoring](MONITORING.md#what-the-structured-log-carries-and-what-it-does-not)).",
+        "- **Correction logging.** The UI records only an intended or unintended click. The primary outcome needs the recipient set at first assessment and at send, linked by a draft identifier. The API accepts an optional `draft_reference` correlation label that the UI does not send, and nothing records a send.",
+        "- Reviewers who label the as-assessed snapshot without seeing the sent mail or the arm.",
+        "- Shadow scoring that records the decision without showing it, and a way to randomize senders at request time.",
+        "- Enough senders with comparable volume.",
+        "- A privacy decision on the log fields the monitor needs (see [monitoring](MONITORING.md#what-the-structured-log-carries-and-what-it-does-not)) and on storing recipient sets at first assessment and at send.",
         "",
     ]
     return "\n".join(lines)
@@ -1095,7 +1133,8 @@ def runbook(records: Records) -> str:
         [
             ["Any block decision", "count above 0", "critical"],
             ["Any response that breaks a contract invariant", "for example a failure body with a decision or score", "critical"],
-            ["A served version other than the frozen bundle", "any", "critical"],
+            ["A response naming a bundle other than the frozen one", "any", "critical"],
+            ["A failure with no version provenance (the service answered without a loaded bundle)", "any", "high"],
             ["Unexpected (non-contract) responses", "any", "high"],
             ["Unable-to-assess rate above the reference", f"one-sided exact test, alpha {RATE_ALPHA}, at least {MIN_REQUESTS_OPERATIONAL} requests", "high"],
             ["Input drift", f"PSI alert {PSI_ALERT}; indicator share shift {SHARE_SHIFT_ALERT:g}", "high"],
@@ -1203,6 +1242,8 @@ def runbook(records: Records) -> str:
 
 
 def _incident_false_positive(records: Records) -> str:
+    policy_reference = records.reference["policy_reference"]
+    margin = policy_reference["T_warn"] - policy_reference["highest_legitimate_validation_email_risk"]
     return "\n".join(
         [
             "### A high-impact false positive",
@@ -1212,7 +1253,7 @@ def _incident_false_positive(records: Records) -> str:
             "1. **Contain.** Do not change the cutoff. If a shadow mode exists, move the affected senders to it. Otherwise record the affected window and the count.",
             "2. **Capture** the request id, the bundle versions, and the reason codes the service returned. Do not copy the body, subject, or addresses out of the affected mailbox.",
             "3. **Classify.** Was the warning correct on the evidence (a real mistake the sender then confirmed), or a false intervention? A reviewer, not a click, decides.",
-            "4. **Locate.** Compare the email risk score with `T_warn` (the margin is small: the highest legitimate validation score sits 2.3e-3 below it). Check the input-drift and near-band findings for the same period, and whether the recipient is a first contact.",
+            f"4. **Locate.** Compare the email risk score with `T_warn` (the margin is small: the highest legitimate validation score sits {margin:.2e} below it). Check the input-drift and near-band findings for the same period, and whether the recipient is a first contact.",
             "5. **Offline check.** Reproduce the assessment from the request. If it reproduces, the cause is the policy on this input; go to the promotion gates. If it does not, treat it as a service defect and check parity.",
             "6. **Decide** with a reviewer. A confirmed false intervention counts against the budget. It is a reason to open a new policy version, not to move the cutoff in place.",
             "",
@@ -1243,10 +1284,10 @@ def _incident_outage(records: Records) -> str:
         [
             "### A scoring outage",
             "",
-            "**Signal.** `/ready` returns 503, the unable-to-assess rate alert fires, latency exceeds the target, or the timeout message appears.",
+            "**Signal.** `/ready` returns 503, the bundle-availability or unable-to-assess alert fires, latency exceeds the target, or the timeout message appears.",
             "",
             "1. **Read the category.** `unavailable` with \"The scoring bundle is not loaded\" means startup failed; `/ready` gives the reason (a version or checksum mismatch, a missing file). "
-            "\"Scoring timed out\" means the two-second scoring timeout fired. \"A recipient is not in the context snapshot directory\" is one address, not an outage.",
+            f"\"Scoring timed out\" means the {DEFAULT_SCORING_TIMEOUT_SECONDS:g}-second scoring timeout fired. \"A recipient is not in the context snapshot directory\" is one address, not an outage.",
             "2. **Nothing fails open.** A failure returns unable to assess with no decision and no score. Clients must show it as unable to assess, never as allow.",
             "3. **Restore.** Fix the bundle path or files, or restore the previous bundle as in the rollback steps, and re-check `/ready`.",
             "4. **Verify.** Re-run the failure probes and a small replay; confirm the served versions and that unable-to-assess is back to the reference.",

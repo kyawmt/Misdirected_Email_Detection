@@ -1,6 +1,6 @@
 # Phase 8 — Runbook: rollout, rollback, and incident triage
 
-Served bundle: contract `med-api-v1`, snapshot `med-synth-v4`, features `med-features-v2`, model `med-model-v2`, policy `med-policy-v2`, `T_warn = 0.9996767050340489`, blocking disabled. This runbook describes how a frozen, versioned bundle would be shadowed, canaried, rolled back, and investigated. It is a document, not deployment tooling: no container, CI, or live switch between two bundles exists yet, and those belong to the next phase. All data is fictional. Monitored requests are `validation_product_like` drafts, plus copies of legitimate first-contact validation drafts in the shifted windows. No frozen test row is read, replayed, scored, or summarized; the one recorded test result is quoted as recorded where it serves as a reference.
+Served bundle: contract `med-api-v1`, snapshot `med-synth-v4`, features `med-features-v2`, model `med-model-v2`, policy `med-policy-v2`, `T_warn = 0.9996767050340489`, blocking disabled. This runbook describes how a frozen, versioned bundle would be shadowed, canaried, rolled back, and investigated. It is a document, not deployment tooling: no container, CI, or live switch between two bundles exists yet, and those belong to the next phase. All data is fictional. Monitored requests are `validation_product_like` drafts, plus copies of legitimate first-contact validation drafts in the shifted windows. No monitor command opens a file that holds frozen test results or a frozen feature matrix (`test_evaluation.json` and `features_test_*` are never read), and no frozen draft is scored, replayed, or summarized. The draft-keyed tables (drafts, recipients, labels, reviewer notes) are streamed record by record and only validation records are kept; the CSV parser still reads past each frozen record to find the next record boundary, because a quoted body can hold newlines, and drops it at once.
 
 ## The unit of change is a frozen bundle
 
@@ -73,7 +73,8 @@ A new bundle moves through these stages. Each stage has an exit rule that is wri
 | --- | --- | --- |
 | Any block decision | count above 0 | critical |
 | Any response that breaks a contract invariant | for example a failure body with a decision or score | critical |
-| A served version other than the frozen bundle | any | critical |
+| A response naming a bundle other than the frozen one | any | critical |
+| A failure with no version provenance (the service answered without a loaded bundle) | any | high |
 | Unexpected (non-contract) responses | any | high |
 | Unable-to-assess rate above the reference | one-sided exact test, alpha 0.01, at least 200 requests | high |
 | Input drift | PSI alert 0.25; indicator share shift 0.1 | high |
@@ -91,7 +92,7 @@ Warnings are advisory and blocking is disabled, so the worst automatic outcome i
 1. **Contain.** Do not change the cutoff. If a shadow mode exists, move the affected senders to it. Otherwise record the affected window and the count.
 2. **Capture** the request id, the bundle versions, and the reason codes the service returned. Do not copy the body, subject, or addresses out of the affected mailbox.
 3. **Classify.** Was the warning correct on the evidence (a real mistake the sender then confirmed), or a false intervention? A reviewer, not a click, decides.
-4. **Locate.** Compare the email risk score with `T_warn` (the margin is small: the highest legitimate validation score sits 2.3e-3 below it). Check the input-drift and near-band findings for the same period, and whether the recipient is a first contact.
+4. **Locate.** Compare the email risk score with `T_warn` (the margin is small: the highest legitimate validation score sits 2.31e-03 below it). Check the input-drift and near-band findings for the same period, and whether the recipient is a first contact.
 5. **Offline check.** Reproduce the assessment from the request. If it reproduces, the cause is the policy on this input; go to the promotion gates. If it does not, treat it as a service defect and check parity.
 6. **Decide** with a reviewer. A confirmed false intervention counts against the budget. It is a reason to open a new policy version, not to move the cutoff in place.
 
@@ -109,9 +110,9 @@ Warnings are advisory and blocking is disabled, so the worst automatic outcome i
 
 ### A scoring outage
 
-**Signal.** `/ready` returns 503, the unable-to-assess rate alert fires, latency exceeds the target, or the timeout message appears.
+**Signal.** `/ready` returns 503, the bundle-availability or unable-to-assess alert fires, latency exceeds the target, or the timeout message appears.
 
-1. **Read the category.** `unavailable` with "The scoring bundle is not loaded" means startup failed; `/ready` gives the reason (a version or checksum mismatch, a missing file). "Scoring timed out" means the two-second scoring timeout fired. "A recipient is not in the context snapshot directory" is one address, not an outage.
+1. **Read the category.** `unavailable` with "The scoring bundle is not loaded" means startup failed; `/ready` gives the reason (a version or checksum mismatch, a missing file). "Scoring timed out" means the 2-second scoring timeout fired. "A recipient is not in the context snapshot directory" is one address, not an outage.
 2. **Nothing fails open.** A failure returns unable to assess with no decision and no score. Clients must show it as unable to assess, never as allow.
 3. **Restore.** Fix the bundle path or files, or restore the previous bundle as in the rollback steps, and re-check `/ready`.
 4. **Verify.** Re-run the failure probes and a small replay; confirm the served versions and that unable-to-assess is back to the reference.

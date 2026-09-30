@@ -31,6 +31,8 @@ LIMITED_HISTORY = "LIMITED_RELATIONSHIP_HISTORY"
 LIMITED_TEXT = "LIMITED_TEXT"
 WITHHELD = "[message withheld: long or contains an address]"
 MAX_MESSAGE_CHARS = 160
+# A failure before the bundle loads carries no provenance, so no version is known.
+UNKNOWN_VERSION = "unknown"
 
 
 def safe_message(text) -> str:
@@ -55,17 +57,17 @@ class Observation:
     flagged_count: int = 0
     limited_history_recipients: int = 0
     limited_text_recipients: int = 0
-    version_key: str = "unknown"
+    version_key: str = UNKNOWN_VERSION
     server_ms: float | None = None
     problems: tuple[str, ...] = field(default_factory=tuple)
 
 
 def version_key(provenance) -> str:
     if not isinstance(provenance, dict):
-        return "unknown"
+        return UNKNOWN_VERSION
     parts = [provenance.get(name) for name in ("model_version", "feature_spec_version", "policy_version")]
     if not all(isinstance(part, str) for part in parts):
-        return "unknown"
+        return UNKNOWN_VERSION
     return "|".join(parts)
 
 
@@ -176,6 +178,7 @@ class WindowSummary:
         self.decisions: Counter = Counter()
         self.problems: Counter = Counter()
         self.versions: Counter = Counter()
+        self.failures_without_provenance = 0
         self.recipient_counts: Counter = Counter()
         self.flagged_recipients = 0
         self.emails_with_flags = 0
@@ -200,7 +203,12 @@ class WindowSummary:
         self.client_ms.append(observation.client_ms)
         if observation.server_ms is not None:
             self.server_ms.append(float(observation.server_ms))
-        self.versions[observation.version_key] += 1
+        # Versions are counted only where a response names them. A contract-shaped failure with no
+        # provenance is the signature of a service whose bundle did not load; it is counted apart.
+        if observation.version_key != UNKNOWN_VERSION:
+            self.versions[observation.version_key] += 1
+        elif observation.status == UNABLE:
+            self.failures_without_provenance += 1
         for problem in observation.problems:
             self.problems[problem] += 1
         if observation.status != ASSESSED:
@@ -262,4 +270,5 @@ class WindowSummary:
             "client_latency_ms": percentiles(self.client_ms),
             "server_latency_ms": percentiles(self.server_ms),
             "versions": dict(sorted(self.versions.items())),
+            "failures_without_provenance": self.failures_without_provenance,
         }

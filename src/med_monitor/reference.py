@@ -8,6 +8,11 @@ descriptive statistics of the training inputs, not a fitted model.
 
 The training subset is enriched to 10% misdirected mail, so the reference
 mix of recipients is not the product-like mix. The report states that offset.
+
+No file that holds frozen test results or rows is opened here. The stored test
+evaluation lists per-draft test outcomes, so the monitor does not parse it, even
+to quote its aggregate. Operating numbers come from the policy file's validation
+record, which is validation only.
 """
 
 from __future__ import annotations
@@ -182,29 +187,6 @@ def policy_reference(policy_dir: Path) -> dict:
     }
 
 
-def recorded_test_pass(policy_dir: Path) -> dict:
-    """The one recorded frozen-test result, quoted as an aggregate and nothing else.
-
-    The stored file also holds per-draft outcomes. Only the product-like
-    aggregate counts are kept; the rest is dropped at once. This is the only
-    place the monitor opens that file, and no test row is scored or replayed.
-    """
-    stored = json.loads((Path(policy_dir) / "test_evaluation.json").read_text(encoding="utf-8"))
-    block = stored["subsets"]["test_product_like"]["policy"]
-    email, interventions = block["email"], block["interventions"]
-    return {
-        "subset": "test_product_like",
-        "emails": email["n"],
-        "misdirected": email["positives"],
-        "legitimate": email["legitimate"],
-        "warned_mistakes": email["true_positives"],
-        "false_interventions": interventions["false_interventions"],
-        "recall": email["recall"],
-        "recall_interval_exact": [email["recall_interval_exact"]["low"], email["recall_interval_exact"]["high"]],
-        "note": "Quoted as recorded. Not used to choose a threshold, a window, or a statistic.",
-    }
-
-
 def latency_reference(latency_path: Path) -> dict:
     """The recorded AC05 measurement, read as-is. It is never rewritten."""
     stored = json.loads(Path(latency_path).read_text(encoding="utf-8"))
@@ -224,7 +206,6 @@ def latency_reference(latency_path: Path) -> dict:
 def build_all(features_dir: Path, policy_dir: Path, latency_path: Path) -> dict:
     payload = build_reference(features_dir)
     payload["policy_reference"] = policy_reference(policy_dir)
-    payload["recorded_test_pass"] = recorded_test_pass(policy_dir)
     payload["latency_reference"] = latency_reference(latency_path)
     return payload
 

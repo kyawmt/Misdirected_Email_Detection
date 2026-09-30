@@ -518,11 +518,11 @@
         "assessed": 2000,
         "blocks": 0,
         "client_latency_ms": {
-          "max": 361.494,
+          "max": 274.105,
           "n": 2000,
-          "p50": 31.05,
-          "p95": 71.081,
-          "p99": 83.757
+          "p50": 29.514,
+          "p95": 66.267,
+          "p99": 73.806
         },
         "decisions": {
           "allow": 1998,
@@ -539,6 +539,7 @@
         "emails_with_limited_relationship_history": 142,
         "emails_with_limited_text": 0,
         "failures": [],
+        "failures_without_provenance": 0,
         "flagged_recipients": 3,
         "highest_allowed_email_risk": 0.9985271618483554,
         "invariant_problems": {},
@@ -573,11 +574,11 @@
           "near band": 13
         },
         "server_latency_ms": {
-          "max": 360.153,
+          "max": 273.435,
           "n": 2000,
-          "p50": 30.21,
-          "p95": 70.262,
-          "p99": 82.955
+          "p50": 28.821,
+          "p95": 65.599,
+          "p99": 73.104
         },
         "statuses": {
           "assessed": 2000
@@ -1114,11 +1115,11 @@
         "assessed": 2000,
         "blocks": 0,
         "client_latency_ms": {
-          "max": 221.514,
+          "max": 208.93,
           "n": 2000,
-          "p50": 28.524,
-          "p95": 64.079,
-          "p99": 72.891
+          "p50": 27.811,
+          "p95": 62.715,
+          "p99": 68.989
         },
         "decisions": {
           "allow": 1994,
@@ -1135,6 +1136,7 @@
         "emails_with_limited_relationship_history": 25,
         "emails_with_limited_text": 6,
         "failures": [],
+        "failures_without_provenance": 0,
         "flagged_recipients": 6,
         "highest_allowed_email_risk": 0.9973707113436169,
         "invariant_problems": {},
@@ -1169,11 +1171,11 @@
           "near band": 2
         },
         "server_latency_ms": {
-          "max": 220.366,
+          "max": 208.055,
           "n": 2000,
-          "p50": 27.663,
-          "p95": 63.27,
-          "p99": 72.04
+          "p50": 26.994,
+          "p95": 61.947,
+          "p99": 68.219
         },
         "statuses": {
           "assessed": 2000
@@ -1202,7 +1204,7 @@
     "policy_version": "med-policy-v2",
     "snapshot_id": "med-synth-v4"
   },
-  "elapsed_seconds": 135.3,
+  "elapsed_seconds": 129.4,
   "environment": {
     "cpu_count": 10,
     "machine": "arm64",
@@ -2910,7 +2912,7 @@
     ]
   },
   "service": {
-    "load_seconds": 8.828
+    "load_seconds": 9.148
   },
   "warmup_calls": 20,
   "windows": [
@@ -3436,11 +3438,11 @@
         "assessed": 500,
         "blocks": 0,
         "client_latency_ms": {
-          "max": 195.68,
+          "max": 198.241,
           "n": 500,
-          "p50": 26.818,
-          "p95": 62.205,
-          "p99": 68.252
+          "p50": 26.297,
+          "p95": 61.938,
+          "p99": 68.392
         },
         "decisions": {
           "allow": 497,
@@ -3457,6 +3459,7 @@
         "emails_with_limited_relationship_history": 5,
         "emails_with_limited_text": 2,
         "failures": [],
+        "failures_without_provenance": 0,
         "flagged_recipients": 3,
         "highest_allowed_email_risk": 0.9949507022795011,
         "invariant_problems": {},
@@ -3490,11 +3493,11 @@
           "near band": 1
         },
         "server_latency_ms": {
-          "max": 194.909,
+          "max": 197.336,
           "n": 500,
-          "p50": 25.983,
-          "p95": 61.5,
-          "p99": 67.365
+          "p50": 25.465,
+          "p95": 61.05,
+          "p99": 66.968
         },
         "statuses": {
           "assessed": 500
@@ -4031,11 +4034,11 @@
         "assessed": 500,
         "blocks": 0,
         "client_latency_ms": {
-          "max": 221.514,
+          "max": 197.148,
           "n": 500,
-          "p50": 27.928,
-          "p95": 61.145,
-          "p99": 70.394
+          "p50": 26.856,
+          "p95": 59.11,
+          "p99": 66.103
         },
         "decisions": {
           "allow": 498,
@@ -4052,6 +4055,7 @@
         "emails_with_limited_relationship_history": 8,
         "emails_with_limited_text": 2,
         "failures": [],
+        "failures_without_provenance": 0,
         "flagged_recipients": 2,
         "highest_allowed_email_risk": 0.9937331643765537,
         "invariant_problems": {},
@@ -4085,11 +4089,11 @@
           "near band": 0
         },
         "server_latency_ms": {
-          "max": 220.366,
+          "max": 196.438,
           "n": 500,
-          "p50": 27.017,
-          "p95": 60.311,
-          "p99": 69.413
+          "p50": 26.056,
+          "p95": 58.2,
+          "p99": 65.36
         },
         "statuses": {
           "assessed": 500
@@ -4625,11 +4629,11 @@
         "assessed": 500,
         "blocks": 0,
         "client_latency_ms": {
-          "max": 205.133,
+          "max": 208.93,
           "n": 500,
-          "p50": 28.684,
-          "p95": 67.469,
-          "p99": 75.002
+          "p50": 27.609,
+          "p95": 64.423,
+          "p99": 68.938
         },
         "decisions": {
           "allow": 499,
@@ -4646,6 +4650,7 @@
         "emails_with_limited_relationship_history": 8,
         "emails_with_limited_text": 2,
         "failures": [],
+        "failures_without_provenance": 0,
         "flagged_recipients": 1,
         "highest_allowed_email_risk": 0.9973707113436169,
         "invariant_problems": {},
@@ -4680,11 +4685,11 @@
           "near band": 1
         },
         "server_latency_ms": {
-          "max": 204.355,
+          "max": 208.055,
           "n": 500,
-          "p50": 27.771,
-          "p95": 66.57,
-          "p99": 74.061
+          "p50": 26.828,
+          "p95": 63.532,
+          "p99": 68.143
         },
         "statuses": {
           "assessed": 500
@@ -5221,11 +5226,11 @@
         "assessed": 500,
         "blocks": 0,
         "client_latency_ms": {
-          "max": 206.403,
+          "max": 207.603,
           "n": 500,
-          "p50": 29.023,
-          "p95": 65.644,
-          "p99": 71.46
+          "p50": 28.699,
+          "p95": 65.41,
+          "p99": 70.094
         },
         "decisions": {
           "allow": 500,
@@ -5242,6 +5247,7 @@
         "emails_with_limited_relationship_history": 4,
         "emails_with_limited_text": 0,
         "failures": [],
+        "failures_without_provenance": 0,
         "flagged_recipients": 0,
         "highest_allowed_email_risk": 0.9789578440369323,
         "invariant_problems": {},
@@ -5275,11 +5281,11 @@
           "near band": 0
         },
         "server_latency_ms": {
-          "max": 205.486,
+          "max": 206.732,
           "n": 500,
-          "p50": 28.166,
-          "p95": 64.851,
-          "p99": 70.597
+          "p50": 27.873,
+          "p95": 64.582,
+          "p99": 69.237
         },
         "statuses": {
           "assessed": 500
@@ -5817,11 +5823,11 @@
         "assessed": 500,
         "blocks": 0,
         "client_latency_ms": {
-          "max": 226.227,
+          "max": 218.265,
           "n": 500,
-          "p50": 29.92,
-          "p95": 70.903,
-          "p99": 77.76
+          "p50": 29.278,
+          "p95": 67.143,
+          "p99": 73.205
         },
         "decisions": {
           "allow": 500,
@@ -5838,6 +5844,7 @@
         "emails_with_limited_relationship_history": 2,
         "emails_with_limited_text": 0,
         "failures": [],
+        "failures_without_provenance": 0,
         "flagged_recipients": 0,
         "highest_allowed_email_risk": 0.9877007913135178,
         "invariant_problems": {},
@@ -5871,11 +5878,11 @@
           "near band": 0
         },
         "server_latency_ms": {
-          "max": 225.345,
+          "max": 217.525,
           "n": 500,
-          "p50": 29.002,
-          "p95": 70.138,
-          "p99": 76.86
+          "p50": 28.491,
+          "p95": 65.991,
+          "p99": 72.316
         },
         "statuses": {
           "assessed": 500
@@ -6411,11 +6418,11 @@
         "assessed": 500,
         "blocks": 0,
         "client_latency_ms": {
-          "max": 361.494,
+          "max": 261.864,
           "n": 500,
-          "p50": 30.701,
-          "p95": 69.554,
-          "p99": 83.567
+          "p50": 29.025,
+          "p95": 64.115,
+          "p99": 72.342
         },
         "decisions": {
           "allow": 498,
@@ -6432,6 +6439,7 @@
         "emails_with_limited_relationship_history": 20,
         "emails_with_limited_text": 0,
         "failures": [],
+        "failures_without_provenance": 0,
         "flagged_recipients": 3,
         "highest_allowed_email_risk": 0.9972835352739652,
         "invariant_problems": {},
@@ -6466,11 +6474,11 @@
           "near band": 1
         },
         "server_latency_ms": {
-          "max": 360.153,
+          "max": 261.196,
           "n": 500,
-          "p50": 29.842,
-          "p95": 68.783,
-          "p99": 82.685
+          "p50": 28.377,
+          "p95": 63.367,
+          "p99": 71.62
         },
         "statuses": {
           "assessed": 500
@@ -7011,11 +7019,11 @@
         "assessed": 500,
         "blocks": 0,
         "client_latency_ms": {
-          "max": 242.059,
+          "max": 219.147,
           "n": 500,
-          "p50": 30.879,
-          "p95": 46.65,
-          "p99": 79.31
+          "p50": 29.434,
+          "p95": 40.437,
+          "p99": 71.564
         },
         "decisions": {
           "allow": 500,
@@ -7032,6 +7040,7 @@
         "emails_with_limited_relationship_history": 40,
         "emails_with_limited_text": 0,
         "failures": [],
+        "failures_without_provenance": 0,
         "flagged_recipients": 0,
         "highest_allowed_email_risk": 0.9985271618483554,
         "invariant_problems": {},
@@ -7065,11 +7074,11 @@
           "near band": 4
         },
         "server_latency_ms": {
-          "max": 241.281,
+          "max": 218.45,
           "n": 500,
-          "p50": 30.062,
-          "p95": 45.808,
-          "p99": 78.422
+          "p50": 28.77,
+          "p95": 39.718,
+          "p99": 70.875
         },
         "statuses": {
           "assessed": 500
@@ -7616,11 +7625,11 @@
         "assessed": 500,
         "blocks": 0,
         "client_latency_ms": {
-          "max": 318.648,
+          "max": 274.105,
           "n": 500,
-          "p50": 32.023,
-          "p95": 78.979,
-          "p99": 86.3
+          "p50": 30.083,
+          "p95": 70.763,
+          "p99": 75.663
         },
         "decisions": {
           "allow": 500,
@@ -7637,6 +7646,7 @@
         "emails_with_limited_relationship_history": 80,
         "emails_with_limited_text": 0,
         "failures": [],
+        "failures_without_provenance": 0,
         "flagged_recipients": 0,
         "highest_allowed_email_risk": 0.9985271618483554,
         "invariant_problems": {},
@@ -7670,11 +7680,11 @@
           "near band": 8
         },
         "server_latency_ms": {
-          "max": 317.73,
+          "max": 273.435,
           "n": 500,
-          "p50": 31.181,
-          "p95": 78.229,
-          "p99": 85.409
+          "p50": 29.419,
+          "p95": 70.097,
+          "p99": 74.887
         },
         "statuses": {
           "assessed": 500

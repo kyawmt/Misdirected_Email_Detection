@@ -939,20 +939,6 @@
     "quantile_bins": 10,
     "watch": 0.1
   },
-  "recorded_test_pass": {
-    "emails": 6000,
-    "false_interventions": 0,
-    "legitimate": 5970,
-    "misdirected": 30,
-    "note": "Quoted as recorded. Not used to choose a threshold, a window, or a statistic.",
-    "recall": 0.3,
-    "recall_interval_exact": [
-      0.1473451847547011,
-      0.4939590414625536
-    ],
-    "subset": "test_product_like",
-    "warned_mistakes": 9
-  },
   "rows": 3955,
   "source": {
     "checked_against": "artifact_manifest.json",

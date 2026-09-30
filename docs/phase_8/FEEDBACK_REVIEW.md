@@ -1,6 +1,6 @@
 # Phase 8 — Reviewed feedback
 
-Served bundle: contract `med-api-v1`, snapshot `med-synth-v4`, features `med-features-v2`, model `med-model-v2`, policy `med-policy-v2`, `T_warn = 0.9996767050340489`, blocking disabled. **A click is not a label.** Feedback reaches a label only through a reviewer, and it never retrains, recalibrates, or moves the cutoff. All data is fictional. Monitored requests are `validation_product_like` drafts, plus copies of legitimate first-contact validation drafts in the shifted windows. No frozen test row is read, replayed, scored, or summarized; the one recorded test result is quoted as recorded where it serves as a reference.
+Served bundle: contract `med-api-v1`, snapshot `med-synth-v4`, features `med-features-v2`, model `med-model-v2`, policy `med-policy-v2`, `T_warn = 0.9996767050340489`, blocking disabled. **A click is not a label.** Feedback reaches a label only through a reviewer, and it never retrains, recalibrates, or moves the cutoff. All data is fictional. Monitored requests are `validation_product_like` drafts, plus copies of legitimate first-contact validation drafts in the shifted windows. No monitor command opens a file that holds frozen test results or a frozen feature matrix (`test_evaluation.json` and `features_test_*` are never read), and no frozen draft is scored, replayed, or summarized. The draft-keyed tables (drafts, recipients, labels, reviewer notes) are streamed record by record and only validation records are kept; the CSV parser still reads past each frozen record to find the next record boundary, because a quoted body can hold newlines, and drops it at once.
 
 ## Sources, and how much reviewed evidence exists today
 
@@ -117,4 +117,4 @@ At a misdirection rate of 0.5% a block of 2,000 emails holds about 10 mistakes, 
 
 - It does not show how well real reviewers would label, how many would respond, or how fast.
 - It does not show that detection improved. It shows how to measure detection when labels arrive, and why a click stream cannot do it.
-- The reference recall for a future comparison is the one recorded frozen test pass: 9 of 30 (30.00%) misdirected emails warned (exact interval 0.147 to 0.494, if emails were independent). The validation figure is not independent of the cutoff.
+- The reference recall for a future comparison is the validation figure, 8 of 20 (40.00%) misdirected emails warned. It is not independent of the cutoff, because validation chose the cutoff. The one recorded frozen test pass is reported in the [evaluation report](../phase_5/EVALUATION_REPORT.md); the monitor does not open the file that stores it.

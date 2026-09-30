@@ -160,9 +160,10 @@ def test_no_monitoring_command_reads_a_frozen_test_row(monkeypatch, plan, struct
     read = set(spy.names)
     allowed = {
         "split_manifest.csv", "drafts.csv", "draft_recipients.csv", "labels.csv", "contacts.csv", "reviewer_feedback.csv",
-        "features_train.csv", "artifact_manifest.json", "policy.json", "test_evaluation.json", "latency.json",
+        "features_train.csv", "artifact_manifest.json", "policy.json", "latency.json",
     }
     assert read <= allowed, sorted(read - allowed)
+    assert "test_evaluation.json" not in read
     assert not [name for name in read if name.startswith("features_test")]
     # Draft-keyed tables are streamed, never read whole.
     assert not {"drafts.csv", "draft_recipients.csv", "labels.csv", "reviewer_feedback.csv"} & {
@@ -190,11 +191,24 @@ def test_frozen_and_non_validation_drafts_are_refused(structure, plan):
     assert set(frame["subset"]) <= {"train", "validation_product_like", "validation_diagnostic"}
 
 
-def test_only_the_recorded_test_aggregate_is_quoted(stored):
-    quoted = stored["reference"]["recorded_test_pass"]
-    assert set(quoted) == {"subset", "emails", "misdirected", "legitimate", "warned_mistakes", "false_interventions", "recall", "recall_interval_exact", "note"}
-    assert all(not isinstance(value, (dict, list)) or key == "recall_interval_exact" for key, value in quoted.items())
-    assert quoted == ref.recorded_test_pass(POLICY_DIR)
+def test_no_monitor_command_opens_a_file_that_stores_test_results(monkeypatch, stored, plan, tmp_path):
+    """P8-02: the stored test evaluation lists per-draft test outcomes, so no monitor code parses it, even for an aggregate."""
+    assert "recorded_test_pass" not in stored["reference"] and not hasattr(ref, "recorded_test_pass")
+    spy = FileSpy(monkeypatch)
+    ref.build_all(FEATURES, POLICY_DIR, ROOT / V.LATENCY_PATH)
+    records = report.load_records(STORED, POLICY_PATH)
+    report.render_all(records)
+    fb.summarize(stored["replay"], DATA, policy_path=POLICY_PATH, model_path=MODEL_PATH, feedback_path=tmp_path / "none.jsonl")
+    opened = set(spy.names)
+    assert opened, "the spy saw no file"
+    assert "test_evaluation.json" not in opened
+    assert not [name for name in opened if name.startswith("features_test")]
+    # The policy file the monitor does read holds validation figures only.
+    reference = ref.policy_reference(POLICY_DIR)
+    assert reference["selection_subset"] == V.TRAFFIC_SUBSET and reference["validation"]["independent_of_selection"] is False
+    text = "\n".join(path.read_text(encoding="utf-8") for path in DOCS.glob("*.md"))
+    assert "`test_evaluation.json` and `features_test_*` are never read" in text
+    assert "still reads past each frozen record" in text
 
 
 # ------------------------------------------------------------- the reference
@@ -392,7 +406,7 @@ def test_stored_replay_matches_the_plan_the_bundle_and_the_frozen_policy(stored,
         summary = item["summary"]
         assert summary["blocks"] == 0 and summary["decisions"]["block"] == 0
         assert summary["requests"] == V.WINDOW_EMAILS == summary["assessed"] + summary["unable_to_assess"] + summary["unexpected_responses"]
-        assert set(summary["versions"]) == {key} and not summary["invariant_problems"]
+        assert set(summary["versions"]) == {key} and not summary["invariant_problems"] and summary["failures_without_provenance"] == 0
     # The replayed base traffic contains every validation mistake exactly once, so the warnings match the stored policy record.
     total = sum(item["summary"]["warnings"] for item in replay_record["windows"])
     assert total == policy["validation_confusion"]["warnings"]
@@ -516,7 +530,7 @@ def test_window_summary_bins_the_near_band_and_keeps_aggregates_only():
 def test_critical_checks_and_gated_rate_checks():
     base = {
         "requests": 600, "assessed": 600, "unable_to_assess": 0, "unexpected_responses": 0, "blocks": 0, "warnings": 1, "invariant_problems": {},
-        "versions": {"m|f|p": 600}, "failures": [], "emails_with_limited_relationship_history": 5, "emails_with_limited_text": 1,
+        "versions": {"m|f|p": 600}, "failures_without_provenance": 0, "failures": [], "emails_with_limited_relationship_history": 5, "emails_with_limited_text": 1,
         "email_flags_from_feature_rows": {"cold_start_sender": 1}, "near_band_emails": 1, "margin_to_cutoff": 0.002,
         "client_latency_ms": {"n": 600, "p50": 20.0, "p95": 40.0, "p99": 50.0, "max": 60.0},
     }
@@ -525,6 +539,7 @@ def test_critical_checks_and_gated_rate_checks():
     assert not [item for item in by_id(base).values() if item["status"] == drift.ALERT]
     assert by_id({**base, "blocks": 1})["blocks"]["status"] == drift.ALERT and by_id({**base, "blocks": 1})["blocks"]["severity"] == alerts.CRITICAL
     assert by_id({**base, "versions": {"m|f|other": 600}})["served_versions"]["status"] == drift.ALERT
+    assert by_id({**base, "versions": {"m|f|other": 600}})["bundle_available"]["status"] == drift.OK
     assert by_id({**base, "invariant_problems": {"x": 1}})["response_invariants"]["severity"] == alerts.CRITICAL
     assert by_id({**base, "client_latency_ms": {**base["client_latency_ms"], "p95": 400.0}})["latency_p95"]["status"] == drift.ALERT
     small = by_id({**base, "requests": 100, "client_latency_ms": {**base["client_latency_ms"], "p95": 900.0}})
@@ -533,6 +548,41 @@ def test_critical_checks_and_gated_rate_checks():
     assert unable["unable_to_assess_rate"]["status"] == drift.ALERT
     few = by_id({**base, "assessed": V.MIN_EMAILS_SCORE_BAND - 1, "near_band_emails": 40})
     assert few["near_cutoff_scores"]["status"] == drift.INSUFFICIENT
+
+
+def test_a_bundle_outage_is_an_availability_alert_and_not_a_version_mismatch(tmp_path, plan, stored, policy):
+    """P8-03: a not-ready service answers without provenance; that is not evidence that another bundle answered."""
+    request = mdata.load_requests(DATA, [plan["probe_draft_id"]])[plan["probe_draft_id"]]
+    description, builder = next((d, b) for name, d, b in bundles.CASES if name == "feature_artifact_tampered")
+    paths = replace(builder(ApiPaths.from_env(ROOT), tmp_path), feedback=tmp_path / "feedback.jsonl")
+    with TestClient(create_app(paths)) as broken:
+        assert broken.get("/ready").status_code == 503
+        response = broken.post("/assess", json=request)
+    body = response.json()
+    assert response.status_code == 503 and body["category"] == "unavailable" and "provenance" not in body
+    observed = obs.observe(response.status_code, body, 4.0)
+    assert observed.status == obs.UNABLE and observed.version_key == obs.UNKNOWN_VERSION and not observed.problems
+    summary = obs.WindowSummary(policy["T_warn"])
+    for _ in range(V.MIN_REQUESTS_OPERATIONAL + 50):
+        summary.add(observed)
+    result = summary.to_dict()
+    assert result["versions"] == {} and result["failures_without_provenance"] == V.MIN_REQUESTS_OPERATIONAL + 50
+    reference = stored["replay"]["blocks"]["reference"]["summary"]
+    checks = {item["id"]: item for item in alerts.operational_checks(result, reference, alerts.expected_version_key(policy))}
+    assert checks["served_versions"]["status"] == drift.OK
+    assert checks["bundle_available"]["status"] == drift.ALERT and checks["bundle_available"]["severity"] == alerts.HIGH
+    assert checks["unable_to_assess_rate"]["status"] == drift.ALERT
+    assert "no loaded bundle" not in checks["served_versions"]["statement"] and "another bundle" not in checks["bundle_available"]["statement"]
+    # A response that names a different bundle is the version alert, and it is not an availability alert.
+    other = obs.WindowSummary(policy["T_warn"])
+    named = _assessed_body(provenance={"model_version": "m", "feature_spec_version": "f", "policy_version": "other", "blocking_enabled": False})
+    other.add(obs.observe(200, named, 3.0))
+    changed = {item["id"]: item for item in alerts.operational_checks(other.to_dict(), reference, alerts.expected_version_key(policy))}
+    assert changed["served_versions"]["status"] == drift.ALERT and changed["bundle_available"]["status"] == drift.OK
+    # A body that is not a contract response is an unexpected response, not a missing bundle.
+    junk = obs.WindowSummary(policy["T_warn"])
+    junk.add(obs.observe(502, "<html>bad gateway</html>", 3.0))
+    assert junk.to_dict()["failures_without_provenance"] == 0 and junk.to_dict()["unexpected_responses"] == 1
 
 
 # ------------------------------------------------------- reviewed feedback
@@ -746,7 +796,7 @@ def test_documents_are_regenerated_from_the_stored_records():
     assert "## Reference periods" in monitoring and "insufficient sample" in monitoring and "What the structured log carries" in monitoring
     assert "Three findings, kept apart" in replay_doc and "Proposed targeted experiment (not run)" in replay_doc
     assert "A click is not a label" in feedback_doc and "Why feedback on warned emails alone is biased" in feedback_doc
-    assert "There is no online evidence" in proposal and "Unit of randomization: the sender" in proposal
+    assert "There is no online evidence" in proposal and "Unit of randomization: the sender" in proposal and "Correction rate among warned mistakes" in proposal
     for heading in ("## Rollout", "## Rollback", "### A high-impact false positive", "### Rising false negatives", "### A scoring outage", "## Promotion gates"):
         assert heading in runbook, heading
     assert "does not show that detection improved" in feedback_doc and "Nothing here shows that detection improved" in monitoring
@@ -843,7 +893,40 @@ def test_experiment_arithmetic_is_labeled_a_proposal(stored):
     assert experiment.stop_for_harm_count(2996, 1.0) > 3
     design = experiment.design(stored["reference"])
     assert design["status"] == "proposal: no online evidence"
-    assert design["detections"][0]["baseline_recall"] == stored["reference"]["recorded_test_pass"]["recall"]
-    assert all(row["with_sender_clustering"][0]["emails"] <= row["with_sender_clustering"][-1]["emails"] for row in design["detections"])
+    validation = stored["reference"]["policy_reference"]["validation"]
+    assert design["descriptive_recall"]["value"] == validation["warned_mistakes"] / validation["misdirected"]
+    assert "not independent" in design["descriptive_recall"]["source"]
+    assert len(design["primary"]) == len(V.EXPERIMENT_BASELINE_CORRECTION_RATES) * len(V.EXPERIMENT_ACCEPTANCE_RATES)
+    for row in design["primary"]:
+        assert row["with_sender_clustering"][0]["emails"] <= row["with_sender_clustering"][-1]["emails"]
     pop = stored["replay_plan"]["traffic_population"]
     assert pop["senders"] > 1 and pop["largest_sender_share"] > 0.9
+
+
+def test_the_ab_primary_outcome_is_behavioral_and_not_model_recall(stored):
+    """P8-01: both arms run the same frozen policy, so recall is identical by construction; the outcome must be what senders do."""
+    design = experiment.design(stored["reference"])
+    assert design["descriptive_recall"]["identical_in_both_arms"] is True
+    # A shown warning can only add corrections on top of what senders fix unaided.
+    assert experiment.correction_rate_with_warning(0.1, 0.0) == pytest.approx(0.1)
+    assert experiment.correction_rate_with_warning(0.1, 1.0) == pytest.approx(1.0)
+    for row in design["primary"]:
+        assert row["treated_correction"] > row["baseline_correction"]
+    # Recall only sets how many warned mistakes a test sees; it does not change the effect being tested.
+    low, high = experiment.primary_table(0.2), experiment.primary_table(0.4)
+    for a, b in zip(low, high, strict=True):
+        assert a["confirmed_warned_mistakes_per_arm"] == b["confirmed_warned_mistakes_per_arm"]
+        assert a["emails_per_arm_if_independent"] == pytest.approx(2 * b["emails_per_arm_if_independent"], rel=0.01)
+    # The rate of misdirected mail that still gets sent needs far more mail than the primary outcome.
+    for primary, sent in zip(design["primary"], design["sent_mistakes"], strict=True):
+        assert sent["emails_per_arm_if_independent"] > 5 * primary["emails_per_arm_if_independent"]
+        assert sent["treated_sent_per_1000"] < sent["control_sent_per_1000"]
+    # The precondition the proposal states holds: nothing records a correction or sends a draft reference today.
+    from med_ui.config import REQUEST_FIELDS
+
+    assert "draft_reference" not in REQUEST_FIELDS
+    text = (DOCS / "EXPERIMENT_PROPOSAL.md").read_text(encoding="utf-8")
+    for needed in ("Correction rate among warned mistakes", "as-assessed snapshot", "Correction logging", "Identical in the two arms by construction", "Label cutoff"):
+        assert needed in text, needed
+    primary_row = next(line for line in text.splitlines() if line.startswith("| **Primary**"))
+    assert "recall" not in primary_row.lower() and "Confirmed detections" not in text

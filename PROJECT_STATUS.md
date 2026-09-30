@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-09-27.
+Last updated: 2026-09-30.
 
 This file is the handoff for the next session. Standing rules are in [AGENTS.md](AGENTS.md).
 
@@ -15,7 +15,8 @@ This file is the handoff for the next session. Standing rules are in [AGENTS.md]
 | 5 — Evaluation and threshold policy | Complete (v4) | `med-policy-v2`: one warning cutoff on the risk score, blocking disabled, calibration not fit, scoring-path parity proven on all 4,000 selection drafts, one frozen test pass. AC01 insufficient evidence (independence not established). |
 | 6 — Backend and scoring API | Complete (v4) | Contract `med-api-v1` serving the v4 bundle and snapshot `med-synth-v4`. Emits `CONTENT_RELATIONSHIP_MISMATCH` on content-sensitive warnings. AC05 measured once: met. |
 | 7 — Simulated draft-review UI | Complete (v4) | Streamlit client `src/med_ui/` of `med-api-v1`, package version 0.7.0 with a `ui` extra. Curated validation examples chosen by rule, stale-result hiding, feedback, what-if exploration on stored validation scores. Walkthrough generated from the live API. No API, model, policy, or artifact change. |
-| 8 through 10 | Not started | No monitoring or deployment. |
+| 8 — Monitoring, reviewed feedback, and rollback notes | Complete (v4) | `src/med_monitor/` (`med-monitor-v1`), package version 0.8.0. Train-only input reference, a deterministic eight-window replay through the API, three separately reported findings (input drift, decision-rate change, confirmed performance change) each with a minimum sample size, a labeled simulated review workflow, bundle-refusal evidence, and five generated documents in `docs/phase_8/`. No API, model, policy, `T_warn`, dataset, or contract change. Detection did not improve and is not claimed to. |
+| 9 through 10 | Not started | No packaging or deployment. |
 
 Phase 2 dataset revision `med-synth-v4` (generator `1.3.0`, seed `20260926`) replaces `med-synth-v2`. An intermediate `med-synth-v3` (generator `1.2.0`, commit `6ff7aa6`) was reviewed and superseded before anything was built on it; its test subsets were never evaluated and `data/med-synth-v3` was removed from the working tree (it stays in git history). What v4 changes relative to v2:
 - Each topic has one template whose wording overlaps a neighbouring topic, so text similarity is a partial signal.
@@ -32,10 +33,10 @@ The cross-phase revision (`project_context/fixes_before_phase7.md`, Sections A, 
 
 | Item | Owner |
 | --- | --- |
-| Active phase | Phase 8 — monitoring, reviewed feedback, and rollback notes, on branch `phase-8-monitoring` (created from `main` at `90d0fdf`, 2026-09-30). In progress; nothing below describes Phase 8 results until this row says otherwise. |
-| Owner | Claude Code session started 2026-09-30 (Phase 8). Not committed. |
+| Active phase | None. Phase 8 review findings P8-01 through P8-03 in `project_context/comments.md` were verified as addressed. Next: Phase 9, when requested. |
+| Owner | Unassigned |
 
-Sections B and C are committed as `d760de7`, and the fixes for the review of that commit (RB-01, RC-01 to RC-06 in `project_context/comments.md`) as `b8092e7`. Both are on `main` (with the handoff commit `2e62761`). Phase 7 work is on branch `phase-7-ui`, created from `main` at `2e62761` (which contains all of `v4-rerun-phases-3-6`), and was committed there as `04e2146`. The fixes for its review (P7-01 to P7-06 in `project_context/comments.md`) are the next commit on that branch, and `phase-7-ui` was merged into `main` by fast-forward on 2026-09-27. Nothing is pushed. A Phase 7 UI refinement (the action message below) is committed on branch `phase-7-ux` (created from `main` at `62b682d`) as `1c33892` ("Improve the review screen for senders") and merged into `main` by fast-forward on 2026-09-30. Nothing is pushed. The Phase 8 brief is `project_context/phase8.md`. The Phase 7 brief is `project_context/phase7.md`.
+Sections B and C are committed as `d760de7`, and the fixes for the review of that commit (RB-01, RC-01 to RC-06 in `project_context/comments.md`) as `b8092e7`. Both are on `main` (with the handoff commit `2e62761`). Phase 7 work is on branch `phase-7-ui`, created from `main` at `2e62761` (which contains all of `v4-rerun-phases-3-6`), and was committed there as `04e2146`. The fixes for its review (P7-01 to P7-06 in `project_context/comments.md`) are the next commit on that branch, and `phase-7-ui` was merged into `main` by fast-forward on 2026-09-27. Nothing is pushed. A Phase 7 UI refinement (the action message below) is committed on branch `phase-7-ux` (created from `main` at `62b682d`) as `1c33892` ("Improve the review screen for senders") and merged into `main` by fast-forward on 2026-09-30. Nothing is pushed. The Phase 8 brief is `project_context/phase8.md`. The Phase 7 brief is `project_context/phase7.md`. Phase 8 is on branch `phase-8-monitoring`, created from `main` at `90d0fdf` (which contains `phase-7-ux`), and is committed there as `1dbb9ce`, then as the commit titled "Address Phase 8 review (P8-01 to P8-03)" (the fixes for its review in `project_context/comments.md`). `phase-8-monitoring` was merged into `main` by fast-forward on 2026-09-30. The Phase 8 commits are not pushed: `origin/main` is at `62b682d` and `origin/phase-8-monitoring` at `90d0fdf`, so older "nothing is pushed" sentences above predate those pushes. The Phase 8 brief is `project_context/phase8.md`.
 
 ## Phase 7 — what was built
 
@@ -72,6 +73,44 @@ Sections B and C are committed as `d760de7`, and the fixes for the review of tha
 ### pyarrow and runtime
 
 The `ui` extra installs Streamlit, which requires pyarrow. With pyarrow importable, pandas 3.0.6 stores strings in Arrow by default. Results are unchanged (full `pytest` passed under Arrow strings: 121 passed in 1018.53 s; `med_data validate` 31 checks passed in 159.8 s), but the pipeline is about three times slower (`validate` 49.1 s with pyarrow blocked). `tests/conftest.py` sets `mode.string_storage = "python"`, restoring the test runtime. The CLIs are not pinned; the UI guide suggests a separate virtual environment for the UI. Phase 9 packaging should decide whether to pin the storage in the packages or split environments.
+
+## Phase 8 — what was built (branch `phase-8-monitoring`, 2026-09-30)
+
+- **Package** `src/med_monitor/`: `version.py` (monitor version, paths, every threshold and minimum sample size; bundle versions come from `med_policy.version` and `med_api.version`), `data.py` (validation-only streaming; a frozen id raises `FrozenRowError`), `reference.py` (train-only input reference, checksum-verified against the feature manifest), `drift.py` (PSI, exact tests, the three findings), `observations.py` (per-response reduction and window aggregates), `stream.py` (deterministic replay plan), `replay.py` (drives the API; refuses a service that does not report the frozen bundle), `alerts.py` (pure checks over stored aggregates), `feedback.py` (click and dataset feedback, simulated review, efficacy), `bundles.py` (mismatched and corrupted bundles handed to the real API), `experiment.py` (sample-size arithmetic), `report.py` (generates `docs/phase_8`), `cli.py`. No module imports training code or calls `.fit`.
+- **Commands** (`python -m med_monitor`): `build-reference`, `replay` (in process, or `--api URL`), `feedback`, `bundle-checks`, `report`. Each record command refuses to overwrite. Records are in `artifacts/med-monitor-v1/` (`reference.json`, `replay_plan.json`, `replay.json`, `feedback_review.json`, `bundle_checks.json`); the documents are `docs/phase_8/{MONITORING,DRIFT_REPLAY,FEEDBACK_REVIEW,EXPERIMENT_PROPOSAL,RUNBOOK}.md`, all generated from the records. A test regenerates them and requires an exact match.
+- **What is stored:** window aggregates only (counts, histograms, percentiles, one highest-allowed score and one margin per window and slice), the plan's draft ids, and the simulated review queue (draft id, decision, coarse stratum, simulated label, delay). No address, name, subject, body, or per-email score. The API's log allow-list is unchanged.
+- **Tests:** `tests/test_phase8.py`, 32 tests in about 22 s (one shared in-process API, small live replays). Sixteen mutations of the key rules (reference reads validation, gate removed, pending review applied, frozen id allowed, unreturned labels counted, a `.fit` call, and others) were each caught by a test. Two survived at first: one was aimed at the wrong test, and the other showed that the once-per-email counting function was only tested through the stored reference, so it now has a direct assertion. `tests/test_phase7.py::test_package_version_and_ui_extra` now accepts version 0.7.0 or later.
+
+### Phase 8 review fixes (P8-01 to P8-03, 2026-09-30)
+
+- **P8-01, A/B primary outcome.** Both arms run the same frozen policy, so recall is identical by construction and cannot be a treatment effect. The proposal's primary outcome is now the correction rate among policy-warned mistakes (a sender's behavior), with capture timing (snapshot at first assessment, reviewer labels on the snapshot, recipients at send, a fixed label cutoff) and correction logging as a precondition. Recall is descriptive. Sample sizes are on an assumption grid, since no correction data exists.
+- **P8-02, frozen test file.** The monitor no longer parses `test_evaluation.json` (it holds per-draft test outcomes), even to quote the aggregate. `reference.json` lost `recorded_test_pass`; references come from the validation record in `policy.json`. The generated documents now say exactly what is and is not opened. `med_ui.walkthrough` (Phase 7) still parses that file for one sentence; that is unchanged and is flagged in `comments.md`.
+- **P8-03, outage vs version.** A service answering without a loaded bundle returns a failure with no provenance. That is now an availability alert (`bundle_available`), and `served_versions` alerts only when a response names a different bundle.
+- `reference.json` and `replay.json` were regenerated (schema and window fields changed); `replay_plan.json` and `feedback_review.json` regenerated byte-identical; `bundle_checks.json` is unchanged.
+
+### Design findings worth carrying forward
+
+- **Lifetime-count inputs are structural.** Seven features (`sender_outbound_count`, `sender_history_span_days`, `pair_outbound_count`, `pair_inbound_count`, `domain_outbound_count`, `co_joint_message_count`, `pair_text_message_count`) leave the train range as time passes (train-vs-validation PSI 0.7 to 8; about 95% to 100% of reference and current window emails above the train maximum for the two sender-level ones). A train-only PSI alert on them would fire on every future window, so the monitor counts them and never alerts on them. It cannot say when that extrapolation starts to matter. Fixing that means monitoring rates or windowed counts, or a rolling refit: model changes, outside this phase.
+- **Unit of analysis.** Eleven features describe the sender or the draft, so a six-recipient email repeated its value six times and put unshifted reference windows in the alert band. They are now counted once per email, in the reference and in every window.
+- **PSI is slow on rare states.** A 0/1 indicator moving from about 2% to about 13% reaches PSI 0.23, below 0.25. Indicators therefore also alert on a share shift of 0.10. That rule was added after seeing this on validation windows; the report says so.
+- **The train reference is enriched.** Two features (`co_partner_fraction`, `pair_outbound_rate_per_day`) sit in the watch band on ordinary reference windows for that reason.
+- **Reviewed evidence is nearly empty.** `reviewer_feedback.csv` has 3 rows, all train, none accepted. `var/feedback.jsonl` had 2 unreviewed clicks with no draft link and no assessment time, so label delay cannot be computed for them. Every coverage, delay, and efficacy figure comes from a *simulated* reviewer (stipulated labels, gamma delays, always right).
+- **Confirmed performance cannot be stated.** The reference windows hold 18 of the 20 validation mistakes and the current windows 2, so no comparison reaches the 30 confirmed mistakes per side that the check requires.
+- **The replay is built from 40 distinct first-contact drafts,** so counts of near-cutoff emails repeat drafts (window 8: 8 emails, 4 distinct drafts).
+
+### Replay, measured 2026-09-30 (live API, in process, v4 bundle)
+
+| Item | Result |
+| --- | --- |
+| Plan | 8 windows of 500 `validation_product_like` emails in send order; windows 1-4 reference, window 5 unshifted control, windows 6-8 replace 4%, 8%, 16% of routine drafts with copies of legitimate first-contact validation drafts. Plan checksum `a16f64569efd3729…` |
+| Reference windows (2,000 emails) | 6 warned, 0 blocked, 0 unable to assess, 25 with limited relationship history, 2 in the near band, client p50 27.8 / p95 62.7 / p99 69.0 ms (regenerated after the review fixes; latency varies between runs) |
+| Unshifted windows | No check alerts in window 5; no reference window has an input-drift alert |
+| First alerts | Window 6 limited-relationship-history rate (20 of 500 against 25 of 2,000); window 7 input drift on one feature (`pair_outbound_rate_per_day`, low confidence); window 8 near-cutoff scores (8 of 500 against 2 of 2,000) and four first-contact inputs |
+| Three findings, window 8 / pooled | Input drift: alert / watch. Decision rate: insufficient sample (window) / no change detected, 2 warned of 2,000 against 6 of 2,000 (p = 0.289). Confirmed performance: insufficient sample, 16 and 2 confirmed mistakes against a minimum of 30 |
+| Simulated review | 192 emails queued: all 8 warned, all 133 allowed emails scoring at least 0.9, 6 of 69 scoring 0.5 to 0.9 (inclusion 0.10), 45 of 3,790 below 0.5 (inclusion 0.01); delay median 5.1 days, 90th percentile 11.9 days; in window 8, 40 reviewed allowed emails scoring at least 0.9 were all confirmed intended |
+| Bundle checks | Control served; the 9 altered bundles (policy version, model run, model checksum, corrupted model, blocking on, non-numeric cutoff, missing policy, tampered feature file, previous bundle) were each refused: `/ready` 503, `/assess` `unavailable`, no decision, no score |
+| Transport | The same replay over HTTP against `python -m med_api serve` gave an identical plan and identical aggregates apart from timing (checked in scratch, not stored) |
+| Runtime | Replay 129.4 s; feedback 1.4 s; bundle checks about 20 s; report 1.5 s |
 
 ## Section B (code hygiene) — what changed
 
@@ -166,6 +205,11 @@ Verified on 2026-09-26 and 2026-09-27 from the repository root with the project 
 | `python -m med_api serve` + `python -m med_ui` (2026-09-27, end-user layout) | Warn and allow checked at 1440×900 in headless Chrome (Assess button and message visible on landing); an unknown address typed into Bcc in the browser gave `unavailable` with the directory sentence; screenshots for steps 1, 2, 4 recaptured |
 | `pytest` (2026-09-27, end-user layout) | 138 passed, 0 failed in 539.94 s (9m00s) |
 | `pytest tests/test_phase7.py tests/test_public_docs.py` (2026-09-30, after removing dead code: unused `re` import, `FORM_KEYS`, and the unused `known` argument) | 35 passed in 14.27 s |
+| `python -m med_monitor build-reference`, `replay`, `feedback`, `bundle-checks`, `report` (2026-09-30) | Wrote `artifacts/med-monitor-v1/` and `docs/phase_8/` from the final code, in that order; see the replay table above |
+| `python -m pytest tests/test_phase8.py` (2026-09-30) | 30 passed in about 22 s |
+| `python -m pytest` (2026-09-30, Phase 8 final) | 168 passed, 0 failed in 532.11 s (8m52s) |
+| `python -m pytest` (2026-09-30, after the Phase 8 review fixes P8-01 to P8-03) | 170 passed, 0 failed in 521.49 s (8m41s). `med_data validate` was not rerun: no data, feature, or model file changed |
+| `python -m med_data validate --data data/med-synth-v4` (2026-09-30, Phase 8 final, pyarrow installed) | 31 checks passed, 161.48 s |
 
 ### v4 results (current)
 
@@ -197,7 +241,12 @@ Verified on 2026-09-26 and 2026-09-27 from the repository root with the project 
 
 ## Known gaps and handoff
 
+- **Phase 8 review (2026-09-30):** P8-01 (High) and P8-02/P8-03 (Medium) in `project_context/comments.md` were verified as addressed. The original review ran 30 focused tests in 22.68 s; the verification ran `.venv/bin/python -m pytest tests/test_phase8.py -q`: 32 passed in 22.39 s. `git diff --check` passed. The full suite was not rerun in the verification.
 - **Phase 7 UI** shows the API's result and adds nothing: no reason codes, no scoring. It makes the S01, S04, and S11 misses visible; it does not reduce them. What Phase 8 should monitor: per-bundle assessment volume, `unable_to_assess` counts by category and message (unknown addresses in particular, since typos are `unavailable`), warning rate against the validation rate (8 of 4,000), email risk scores near `T_warn` (the legitimate first-contact margin is 2.3e-3), `LIMITED_RELATIONSHIP_HISTORY` and `LIMITED_TEXT` rates, API latency, and feedback volume and label mix (feedback on warned drafts only is biased; sampled allowed drafts need review too). Feedback lands in `var/feedback.jsonl` (gitignored); it is not a label until reviewed.
+- **Phase 8 monitoring is a simulation.** No production traffic, real reviewer, or online experiment exists. Thresholds are conventions that no incident has tested. The stored records are aggregates; the API log allow-list was not widened. The metrics a deployment needs but the log cannot carry today (failure messages, evidence limitations, a near-cutoff flag, a score band) are a proposed privacy decision in `docs/phase_8/MONITORING.md`, not implemented.
+- **What Phase 9 inherits from Phase 8.** (1) A rollback between two loadable bundles does not exist: the service loads one bundle version and refuses every other, including the previous one (`bundle_checks.json`, case `previous_bundle`), so a rollback needs the previous code and bundle as a pair. (2) A shadow mode that records a decision without showing it, and a per-sender routing switch, are needed for the canary in the runbook. (3) The UI records no correction, so the "user corrections" guardrail in the A/B proposal is not measurable. (4) A sender-level A/B test cannot run on this population: 14 senders, 95.1% of validation emails from one. (5) The replay and the failure probes are candidates for the compact scenario regression suite. (6) Decide whether to pin pandas string storage in the packages or split environments (see the pyarrow note above); `med_monitor` runs under either.
+- **Latency alerts are timing-dependent** and are excluded from the deterministic alert set; the stored latency numbers describe one run on this machine.
+- **`replay --api URL`** needs `httpx` (the `monitor`, `ui`, or `dev` extra). The in-process default needs it too, through the FastAPI test client.
 - **S01, S04, S11 are still missed.** At the zero-false-warning cutoff the policy warns only on added recipients (S02, S08) and cold senders (S09). Legitimate first contacts (S03, S06) score just below `T_warn`, so the cutoff sits above every lookalike, familiar-recipient topic mistake, and mistaken first contact. Any lower cutoff produces validation false warnings.
 - **Content is a strong signal.** Content cosine separation 0.932 is inside the 0.05–0.95 audit bounds but not far inside. S02 and S04 are off-topic by scenario definition. The C3 checks passed by clear margins for the logistic families; the tree's content-only margin was thin (+0.015) and it was not selected.
 - **C = 1000 is the top of the extended grid**; coefficients are not separate effects.

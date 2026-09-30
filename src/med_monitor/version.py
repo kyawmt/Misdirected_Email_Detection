@@ -183,6 +183,15 @@ EXPERIMENT_POWER = 0.80
 EXPERIMENT_PREVALENCE = 0.005
 EXPERIMENT_ICC_VALUES = (0.0, 0.01, 0.05)
 EXPERIMENT_EMAILS_PER_SENDER = 200
+# The primary outcome is behavioral. No correction data exists, so both inputs
+# are assumptions shown as a grid, not estimates: the share of warned mistakes
+# a sender fixes with no warning shown, and the share of shown warnings on a
+# mistake that a sender acts on.
+EXPERIMENT_BASELINE_CORRECTION_RATES = (0.05, 0.10, 0.20)
+EXPERIMENT_ACCEPTANCE_RATES = (0.2, 0.5)
+# A treatment arm stops for harm when confirmed false interventions reach a
+# count this unlikely at the budget rate.
+STOP_FOR_HARM_ALPHA = 0.01
 
 __all__ = [name for name in dir() if name.isupper()] + [
     "API_CONTRACT_VERSION",

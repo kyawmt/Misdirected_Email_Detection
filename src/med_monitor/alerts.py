@@ -70,15 +70,29 @@ def operational_checks(summary: dict, reference: dict, expected_key: str) -> lis
             counts=dict(problems),
         )
     )
+    # Only responses that name a bundle can show a different bundle. A failure with no provenance is an availability
+    # signal, checked apart, and is not evidence that another bundle answered.
     wrong = {key: count for key, count in summary["versions"].items() if key != expected_key}
+    named = sum(summary["versions"].values())
     checks.append(
         _check(
             "served_versions",
             "operational",
             CRITICAL,
             _ok_or(bool(wrong)),
-            f"All {summary['requests']} responses report {expected_key.replace('|', ', ')}." if not wrong else f"Responses from other bundles: {wrong}.",
-            counts={"expected": expected_key, "other": wrong},
+            f"All {named} responses that name a bundle report {expected_key.replace('|', ', ')}." if not wrong else f"Responses from other bundles: {wrong}.",
+            counts={"expected": expected_key, "other": wrong, "naming_a_bundle": named},
+        )
+    )
+    unloaded = summary["failures_without_provenance"]
+    checks.append(
+        _check(
+            "bundle_available",
+            "operational",
+            HIGH,
+            _ok_or(unloaded > 0),
+            "No failure came from a service without a loaded bundle." if not unloaded else f"{unloaded} of {summary['requests']} responses were failures with no version provenance: the service answered without a loaded bundle.",
+            counts={"failures_without_provenance": unloaded, "requests": summary["requests"]},
         )
     )
     unexpected = summary["unexpected_responses"]

@@ -1,6 +1,6 @@
 # Phase 8 — Drift replay
 
-Served bundle: contract `med-api-v1`, snapshot `med-synth-v4`, features `med-features-v2`, model `med-model-v2`, policy `med-policy-v2`, `T_warn = 0.9996767050340489`, blocking disabled. This document replays one shift, follows the alert to an investigation, and ends with a proposed experiment. The experiment is a written proposal. Nothing in the served model, the policy, or `T_warn` changes. All data is fictional. Monitored requests are `validation_product_like` drafts, plus copies of legitimate first-contact validation drafts in the shifted windows. No frozen test row is read, replayed, scored, or summarized; the one recorded test result is quoted as recorded where it serves as a reference.
+Served bundle: contract `med-api-v1`, snapshot `med-synth-v4`, features `med-features-v2`, model `med-model-v2`, policy `med-policy-v2`, `T_warn = 0.9996767050340489`, blocking disabled. This document replays one shift, follows the alert to an investigation, and ends with a proposed experiment. The experiment is a written proposal. Nothing in the served model, the policy, or `T_warn` changes. All data is fictional. Monitored requests are `validation_product_like` drafts, plus copies of legitimate first-contact validation drafts in the shifted windows. No monitor command opens a file that holds frozen test results or a frozen feature matrix (`test_evaluation.json` and `features_test_*` are never read), and no frozen draft is scored, replayed, or summarized. The draft-keyed tables (drafts, recipients, labels, reviewer notes) are streamed record by record and only validation records are kept; the CSV parser still reads past each frozen record to find the next record boundary, because a quoted body can hold newlines, and drops it at once.
 
 ## What was replayed
 
@@ -108,7 +108,7 @@ Queued emails from window 8 whose simulated label came back within 14 days. The 
 - Zero false warnings and a near-band share no higher than the reference: keep `med-policy-v2`, record the tail, and keep watching the near-band check.
 - Any confirmed false warning, or a near-band share above the reference: do not move `T_warn`. Open a new policy version through the offline path (new evidence on a new frozen dataset version, separate calibration and selection portions, one test pass) and gate it as in [the runbook](RUNBOOK.md#promotion-gates).
 
-**Side question the same data answers.** The recorded threshold-free separation of mistaken first contacts from legitimate ones (AUC 0.88 on `validation_diagnostic`, 10 against 20 rows) says the score can rank them. The shadow run measures whether that ranking holds at the volume and mix of a real wave. It does not, by itself, justify a lower cutoff.
+**Side question the same data answers.** The [Phase 4 decision record](../phase_4/DECISION_RECORD.md#mistaken-first-contacts-s11-against-legitimate-first-contacts-s03-s06) compares mistaken first contacts with legitimate ones without a cutoff. The shadow run measures whether that ranking holds at the volume and mix of a real wave. It does not, by itself, justify a lower cutoff.
 
 
 ## Reproduce
