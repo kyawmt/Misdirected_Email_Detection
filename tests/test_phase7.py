@@ -608,7 +608,7 @@ def test_ui_modules_do_not_import_scoring_internals():
 
 def test_package_version_and_ui_extra():
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
-    assert project["version"] == "0.7.0"
+    assert tuple(int(part) for part in project["version"].split(".")) >= (0, 7, 0)
     assert any(item.startswith("streamlit") for item in project["optional-dependencies"]["ui"])
     assert not any(item.startswith("streamlit") for item in project["dependencies"])
 

@@ -1,0 +1,2525 @@
+{
+  "checksums": {
+    "after": {
+      "model.joblib": "f698b69f7ff20fc9df9068ff06c1be44c9c6bc8ee6ce8cfacea851dbd7f9dfaa",
+      "policy.json": "be39929a3c92cf978dc00c1773f9bf9dd6bdbdfc73984381033979b46152e8e5"
+    },
+    "before": {
+      "model.joblib": "f698b69f7ff20fc9df9068ff06c1be44c9c6bc8ee6ce8cfacea851dbd7f9dfaa",
+      "policy.json": "be39929a3c92cf978dc00c1773f9bf9dd6bdbdfc73984381033979b46152e8e5"
+    }
+  },
+  "effective_label_rule": "Only a reviewer record with status accepted and an asserted bit changes a recipient label; clicks, pending, and rejected records change nothing.",
+  "efficacy": {
+    "by_horizon": {
+      "1": {
+        "current": {
+          "assessed_emails": 2000,
+          "false_interventions": {
+            "confirmed": 0,
+            "legitimate_emails_estimated": null,
+            "note": "Confirmed false interventions are a lower bound while warned emails are still unreviewed.",
+            "of_reviewed_warned": 1
+          },
+          "label_coverage_of_assessed": 0.003,
+          "positives_confirmed": 1,
+          "queued": 116,
+          "recall": {
+            "estimate": null,
+            "high": null,
+            "low": null,
+            "note": "A stratum has no returned labels at this horizon."
+          },
+          "returned": 6,
+          "reviewed_total": 6,
+          "strata": {
+            "allowed_score_0.5_to_0.9": {
+              "estimate": null,
+              "high": 36.0,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 36,
+              "queued": 3,
+              "reviewed": 0
+            },
+            "allowed_score_at_least_0.9": {
+              "estimate": 0.0,
+              "high": 45.920490009238364,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 93,
+              "queued": 93,
+              "reviewed": 5
+            },
+            "allowed_score_below_0.5": {
+              "estimate": null,
+              "high": 1869.0,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 1869,
+              "queued": 18,
+              "reviewed": 0
+            },
+            "warned": {
+              "estimate": 2.0,
+              "high": 2.0,
+              "low": 1.025,
+              "mistakes": 1,
+              "population": 2,
+              "queued": 2,
+              "reviewed": 1
+            }
+          },
+          "warned": {
+            "confirmed_all_intended": 0,
+            "confirmed_misdirected": 1,
+            "coverage": 0.5,
+            "population": 2,
+            "reviewed": 1
+          },
+          "warned_only_view": {
+            "recall_if_only_warned_emails_were_reviewed": 1.0,
+            "why_biased": "No allowed email is reviewed, so no missed mistake can be observed; the denominator drops every miss."
+          }
+        },
+        "reference": {
+          "assessed_emails": 2000,
+          "false_interventions": {
+            "confirmed": 0,
+            "legitimate_emails_estimated": null,
+            "note": "Confirmed false interventions are a lower bound while warned emails are still unreviewed.",
+            "of_reviewed_warned": 1
+          },
+          "label_coverage_of_assessed": 0.0015,
+          "positives_confirmed": 1,
+          "queued": 76,
+          "recall": {
+            "estimate": null,
+            "high": null,
+            "low": null,
+            "note": "A stratum has no returned labels at this horizon."
+          },
+          "returned": 3,
+          "reviewed_total": 3,
+          "strata": {
+            "allowed_score_0.5_to_0.9": {
+              "estimate": null,
+              "high": 33.0,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 33,
+              "queued": 3,
+              "reviewed": 0
+            },
+            "allowed_score_at_least_0.9": {
+              "estimate": null,
+              "high": 40.0,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 40,
+              "queued": 40,
+              "reviewed": 0
+            },
+            "allowed_score_below_0.5": {
+              "estimate": 0.0,
+              "high": 1615.579458506844,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 1921,
+              "queued": 27,
+              "reviewed": 2
+            },
+            "warned": {
+              "estimate": 6.0,
+              "high": 6.0,
+              "low": 1.125,
+              "mistakes": 1,
+              "population": 6,
+              "queued": 6,
+              "reviewed": 1
+            }
+          },
+          "warned": {
+            "confirmed_all_intended": 0,
+            "confirmed_misdirected": 1,
+            "coverage": 0.16666666666666666,
+            "population": 6,
+            "reviewed": 1
+          },
+          "warned_only_view": {
+            "recall_if_only_warned_emails_were_reviewed": 1.0,
+            "why_biased": "No allowed email is reviewed, so no missed mistake can be observed; the denominator drops every miss."
+          }
+        }
+      },
+      "14": {
+        "current": {
+          "assessed_emails": 2000,
+          "false_interventions": {
+            "confirmed": 0,
+            "legitimate_emails_estimated": 1998.0,
+            "note": "Confirmed false interventions are a lower bound while warned emails are still unreviewed.",
+            "of_reviewed_warned": 2
+          },
+          "label_coverage_of_assessed": 0.056,
+          "positives_confirmed": 2,
+          "queued": 116,
+          "recall": {
+            "estimate": 1.0,
+            "high": 1.0,
+            "low": 0.0054273040209447815,
+            "note": "Conservative: per-stratum 95% Clopper-Pearson intervals added together, not simultaneous."
+          },
+          "returned": 112,
+          "reviewed_total": 112,
+          "strata": {
+            "allowed_score_0.5_to_0.9": {
+              "estimate": 0.0,
+              "high": 23.350741463897542,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 36,
+              "queued": 3,
+              "reviewed": 3
+            },
+            "allowed_score_at_least_0.9": {
+              "estimate": 0.0,
+              "high": 0.16240343019852732,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 93,
+              "queued": 93,
+              "reviewed": 89
+            },
+            "allowed_score_below_0.5": {
+              "estimate": 0.0,
+              "high": 342.99394302316443,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 1869,
+              "queued": 18,
+              "reviewed": 18
+            },
+            "warned": {
+              "estimate": 2.0,
+              "high": 2.0,
+              "low": 2.0,
+              "mistakes": 2,
+              "population": 2,
+              "queued": 2,
+              "reviewed": 2
+            }
+          },
+          "warned": {
+            "confirmed_all_intended": 0,
+            "confirmed_misdirected": 2,
+            "coverage": 1.0,
+            "population": 2,
+            "reviewed": 2
+          },
+          "warned_only_view": {
+            "recall_if_only_warned_emails_were_reviewed": 1.0,
+            "why_biased": "No allowed email is reviewed, so no missed mistake can be observed; the denominator drops every miss."
+          }
+        },
+        "reference": {
+          "assessed_emails": 2000,
+          "false_interventions": {
+            "confirmed": 0,
+            "legitimate_emails_estimated": 1983.4736842105262,
+            "note": "Confirmed false interventions are a lower bound while warned emails are still unreviewed.",
+            "of_reviewed_warned": 6
+          },
+          "label_coverage_of_assessed": 0.0365,
+          "positives_confirmed": 16,
+          "queued": 76,
+          "recall": {
+            "estimate": 0.3630573248407643,
+            "high": 0.36882069858008004,
+            "low": 0.02106521768598374,
+            "note": "Conservative: per-stratum 95% Clopper-Pearson intervals added together, not simultaneous."
+          },
+          "returned": 73,
+          "reviewed_total": 73,
+          "strata": {
+            "allowed_score_0.5_to_0.9": {
+              "estimate": 0.0,
+              "high": 26.09846962673901,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 33,
+              "queued": 3,
+              "reviewed": 2
+            },
+            "allowed_score_at_least_0.9": {
+              "estimate": 10.526315789473685,
+              "high": 10.862016487404478,
+              "low": 10.268067446049947,
+              "mistakes": 10,
+              "population": 40,
+              "queued": 40,
+              "reviewed": 38
+            },
+            "allowed_score_below_0.5": {
+              "estimate": 0.0,
+              "high": 241.86923126362885,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 1921,
+              "queued": 27,
+              "reviewed": 27
+            },
+            "warned": {
+              "estimate": 6.0,
+              "high": 6.0,
+              "low": 6.0,
+              "mistakes": 6,
+              "population": 6,
+              "queued": 6,
+              "reviewed": 6
+            }
+          },
+          "warned": {
+            "confirmed_all_intended": 0,
+            "confirmed_misdirected": 6,
+            "coverage": 1.0,
+            "population": 6,
+            "reviewed": 6
+          },
+          "warned_only_view": {
+            "recall_if_only_warned_emails_were_reviewed": 1.0,
+            "why_biased": "No allowed email is reviewed, so no missed mistake can be observed; the denominator drops every miss."
+          }
+        }
+      },
+      "3": {
+        "current": {
+          "assessed_emails": 2000,
+          "false_interventions": {
+            "confirmed": 0,
+            "legitimate_emails_estimated": null,
+            "note": "Confirmed false interventions are a lower bound while warned emails are still unreviewed.",
+            "of_reviewed_warned": 1
+          },
+          "label_coverage_of_assessed": 0.018,
+          "positives_confirmed": 1,
+          "queued": 116,
+          "recall": {
+            "estimate": null,
+            "high": null,
+            "low": null,
+            "note": "A stratum has no returned labels at this horizon."
+          },
+          "returned": 36,
+          "reviewed_total": 36,
+          "strata": {
+            "allowed_score_0.5_to_0.9": {
+              "estimate": null,
+              "high": 36.0,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 36,
+              "queued": 3,
+              "reviewed": 0
+            },
+            "allowed_score_at_least_0.9": {
+              "estimate": 0.0,
+              "high": 8.02334770251715,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 93,
+              "queued": 93,
+              "reviewed": 28
+            },
+            "allowed_score_below_0.5": {
+              "estimate": 0.0,
+              "high": 762.7057316329563,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 1869,
+              "queued": 18,
+              "reviewed": 7
+            },
+            "warned": {
+              "estimate": 2.0,
+              "high": 2.0,
+              "low": 1.025,
+              "mistakes": 1,
+              "population": 2,
+              "queued": 2,
+              "reviewed": 1
+            }
+          },
+          "warned": {
+            "confirmed_all_intended": 0,
+            "confirmed_misdirected": 1,
+            "coverage": 0.5,
+            "population": 2,
+            "reviewed": 1
+          },
+          "warned_only_view": {
+            "recall_if_only_warned_emails_were_reviewed": 1.0,
+            "why_biased": "No allowed email is reviewed, so no missed mistake can be observed; the denominator drops every miss."
+          }
+        },
+        "reference": {
+          "assessed_emails": 2000,
+          "false_interventions": {
+            "confirmed": 0,
+            "legitimate_emails_estimated": 1978.6153846153845,
+            "note": "Confirmed false interventions are a lower bound while warned emails are still unreviewed.",
+            "of_reviewed_warned": 2
+          },
+          "label_coverage_of_assessed": 0.0115,
+          "positives_confirmed": 7,
+          "queued": 76,
+          "recall": {
+            "estimate": 0.2805755395683453,
+            "high": 0.4070102868414849,
+            "low": 0.003128987541916402,
+            "note": "Conservative: per-stratum 95% Clopper-Pearson intervals added together, not simultaneous."
+          },
+          "returned": 23,
+          "reviewed_total": 23,
+          "strata": {
+            "allowed_score_0.5_to_0.9": {
+              "estimate": 0.0,
+              "high": 31.2,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 33,
+              "queued": 3,
+              "reviewed": 1
+            },
+            "allowed_score_at_least_0.9": {
+              "estimate": 15.384615384615385,
+              "high": 23.474004721320295,
+              "low": 8.741642150034338,
+              "mistakes": 5,
+              "population": 40,
+              "queued": 40,
+              "reviewed": 13
+            },
+            "allowed_score_below_0.5": {
+              "estimate": 0.0,
+              "high": 784.0057842886564,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 1921,
+              "queued": 27,
+              "reviewed": 7
+            },
+            "warned": {
+              "estimate": 6.0,
+              "high": 6.0,
+              "low": 2.632455532033676,
+              "mistakes": 2,
+              "population": 6,
+              "queued": 6,
+              "reviewed": 2
+            }
+          },
+          "warned": {
+            "confirmed_all_intended": 0,
+            "confirmed_misdirected": 2,
+            "coverage": 0.3333333333333333,
+            "population": 6,
+            "reviewed": 2
+          },
+          "warned_only_view": {
+            "recall_if_only_warned_emails_were_reviewed": 1.0,
+            "why_biased": "No allowed email is reviewed, so no missed mistake can be observed; the denominator drops every miss."
+          }
+        }
+      },
+      "30": {
+        "current": {
+          "assessed_emails": 2000,
+          "false_interventions": {
+            "confirmed": 0,
+            "legitimate_emails_estimated": 1998.0,
+            "note": "Confirmed false interventions are a lower bound while warned emails are still unreviewed.",
+            "of_reviewed_warned": 2
+          },
+          "label_coverage_of_assessed": 0.058,
+          "positives_confirmed": 2,
+          "queued": 116,
+          "recall": {
+            "estimate": 1.0,
+            "high": 1.0,
+            "low": 0.005429696923100975,
+            "note": "Conservative: per-stratum 95% Clopper-Pearson intervals added together, not simultaneous."
+          },
+          "returned": 116,
+          "reviewed_total": 116,
+          "strata": {
+            "allowed_score_0.5_to_0.9": {
+              "estimate": 0.0,
+              "high": 23.350741463897542,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 36,
+              "queued": 3,
+              "reviewed": 3
+            },
+            "allowed_score_at_least_0.9": {
+              "estimate": 0.0,
+              "high": 0.0,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 93,
+              "queued": 93,
+              "reviewed": 93
+            },
+            "allowed_score_below_0.5": {
+              "estimate": 0.0,
+              "high": 342.99394302316443,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 1869,
+              "queued": 18,
+              "reviewed": 18
+            },
+            "warned": {
+              "estimate": 2.0,
+              "high": 2.0,
+              "low": 2.0,
+              "mistakes": 2,
+              "population": 2,
+              "queued": 2,
+              "reviewed": 2
+            }
+          },
+          "warned": {
+            "confirmed_all_intended": 0,
+            "confirmed_misdirected": 2,
+            "coverage": 1.0,
+            "population": 2,
+            "reviewed": 2
+          },
+          "warned_only_view": {
+            "recall_if_only_warned_emails_were_reviewed": 1.0,
+            "why_biased": "No allowed email is reviewed, so no missed mistake can be observed; the denominator drops every miss."
+          }
+        },
+        "reference": {
+          "assessed_emails": 2000,
+          "false_interventions": {
+            "confirmed": 0,
+            "legitimate_emails_estimated": 1982.0,
+            "note": "Confirmed false interventions are a lower bound while warned emails are still unreviewed.",
+            "of_reviewed_warned": 6
+          },
+          "label_coverage_of_assessed": 0.038,
+          "positives_confirmed": 18,
+          "queued": 76,
+          "recall": {
+            "estimate": 0.3333333333333333,
+            "high": 0.3333333333333333,
+            "low": 0.021344931463361423,
+            "note": "Conservative: per-stratum 95% Clopper-Pearson intervals added together, not simultaneous."
+          },
+          "returned": 76,
+          "reviewed_total": 76,
+          "strata": {
+            "allowed_score_0.5_to_0.9": {
+              "estimate": 0.0,
+              "high": 21.2279467853614,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 33,
+              "queued": 3,
+              "reviewed": 3
+            },
+            "allowed_score_at_least_0.9": {
+              "estimate": 12.0,
+              "high": 12.0,
+              "low": 12.0,
+              "mistakes": 12,
+              "population": 40,
+              "queued": 40,
+              "reviewed": 40
+            },
+            "allowed_score_below_0.5": {
+              "estimate": 0.0,
+              "high": 241.86923126362885,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 1921,
+              "queued": 27,
+              "reviewed": 27
+            },
+            "warned": {
+              "estimate": 6.0,
+              "high": 6.0,
+              "low": 6.0,
+              "mistakes": 6,
+              "population": 6,
+              "queued": 6,
+              "reviewed": 6
+            }
+          },
+          "warned": {
+            "confirmed_all_intended": 0,
+            "confirmed_misdirected": 6,
+            "coverage": 1.0,
+            "population": 6,
+            "reviewed": 6
+          },
+          "warned_only_view": {
+            "recall_if_only_warned_emails_were_reviewed": 1.0,
+            "why_biased": "No allowed email is reviewed, so no missed mistake can be observed; the denominator drops every miss."
+          }
+        }
+      },
+      "7": {
+        "current": {
+          "assessed_emails": 2000,
+          "false_interventions": {
+            "confirmed": 0,
+            "legitimate_emails_estimated": 1998.0,
+            "note": "Confirmed false interventions are a lower bound while warned emails are still unreviewed.",
+            "of_reviewed_warned": 2
+          },
+          "label_coverage_of_assessed": 0.04,
+          "positives_confirmed": 2,
+          "queued": 116,
+          "recall": {
+            "estimate": 1.0,
+            "high": 1.0,
+            "low": 0.004118013374498235,
+            "note": "Conservative: per-stratum 95% Clopper-Pearson intervals added together, not simultaneous."
+          },
+          "returned": 80,
+          "reviewed_total": 80,
+          "strata": {
+            "allowed_score_0.5_to_0.9": {
+              "estimate": 0.0,
+              "high": 23.350741463897542,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 36,
+              "queued": 3,
+              "reviewed": 3
+            },
+            "allowed_score_at_least_0.9": {
+              "estimate": 0.0,
+              "high": 1.790641667308019,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 93,
+              "queued": 93,
+              "reviewed": 62
+            },
+            "allowed_score_below_0.5": {
+              "estimate": 0.0,
+              "high": 458.52969612887404,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 1869,
+              "queued": 18,
+              "reviewed": 13
+            },
+            "warned": {
+              "estimate": 2.0,
+              "high": 2.0,
+              "low": 2.0,
+              "mistakes": 2,
+              "population": 2,
+              "queued": 2,
+              "reviewed": 2
+            }
+          },
+          "warned": {
+            "confirmed_all_intended": 0,
+            "confirmed_misdirected": 2,
+            "coverage": 1.0,
+            "population": 2,
+            "reviewed": 2
+          },
+          "warned_only_view": {
+            "recall_if_only_warned_emails_were_reviewed": 1.0,
+            "why_biased": "No allowed email is reviewed, so no missed mistake can be observed; the denominator drops every miss."
+          }
+        },
+        "reference": {
+          "assessed_emails": 2000,
+          "false_interventions": {
+            "confirmed": 0,
+            "legitimate_emails_estimated": 1982.5714285714287,
+            "note": "Confirmed false interventions are a lower bound while warned emails are still unreviewed.",
+            "of_reviewed_warned": 4
+          },
+          "label_coverage_of_assessed": 0.0235,
+          "positives_confirmed": 12,
+          "queued": 76,
+          "recall": {
+            "estimate": 0.34426229508196715,
+            "high": 0.38494016181668333,
+            "low": 0.009291176166763131,
+            "note": "Conservative: per-stratum 95% Clopper-Pearson intervals added together, not simultaneous."
+          },
+          "returned": 47,
+          "reviewed_total": 47,
+          "strata": {
+            "allowed_score_0.5_to_0.9": {
+              "estimate": 0.0,
+              "high": 26.09846962673901,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 33,
+              "queued": 3,
+              "reviewed": 2
+            },
+            "allowed_score_at_least_0.9": {
+              "estimate": 11.428571428571429,
+              "high": 13.840019785387287,
+              "low": 9.5868381508535,
+              "mistakes": 8,
+              "population": 40,
+              "queued": 40,
+              "reviewed": 28
+            },
+            "allowed_score_below_0.5": {
+              "estimate": 0.0,
+              "high": 471.3764333048985,
+              "low": 0.0,
+              "mistakes": 0,
+              "population": 1921,
+              "queued": 27,
+              "reviewed": 13
+            },
+            "warned": {
+              "estimate": 6.0,
+              "high": 6.0,
+              "low": 4.795270728767051,
+              "mistakes": 4,
+              "population": 6,
+              "queued": 6,
+              "reviewed": 4
+            }
+          },
+          "warned": {
+            "confirmed_all_intended": 0,
+            "confirmed_misdirected": 4,
+            "coverage": 0.6666666666666666,
+            "population": 6,
+            "reviewed": 4
+          },
+          "warned_only_view": {
+            "recall_if_only_warned_emails_were_reviewed": 1.0,
+            "why_biased": "No allowed email is reviewed, so no missed mistake can be observed; the denominator drops every miss."
+          }
+        }
+      }
+    },
+    "comparison_horizon_days": 14,
+    "horizons_days": [
+      1,
+      3,
+      7,
+      14,
+      30
+    ]
+  },
+  "kind": "feedback_review",
+  "labels_changed_by_feedback": 0,
+  "monitor_version": "med-monitor-v1",
+  "plan_checksum": "a16f64569efd3729e400fadece3028d4f5fcfc7d6b7fcd1f03eabb1769a82e02",
+  "policy_and_model_unchanged": true,
+  "queue_items": [
+    {
+      "decision": "allow",
+      "delay_days": 16.28,
+      "draft_id": "d003073",
+      "misdirected": true,
+      "position": 0,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 1
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.225,
+      "draft_id": "d003001",
+      "misdirected": true,
+      "position": 1,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 1
+    },
+    {
+      "decision": "allow",
+      "delay_days": 8.577,
+      "draft_id": "d003002",
+      "misdirected": true,
+      "position": 3,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 1
+    },
+    {
+      "decision": "warn",
+      "delay_days": 2.387,
+      "draft_id": "d003025",
+      "misdirected": true,
+      "position": 4,
+      "stratum": "warned",
+      "window": 1
+    },
+    {
+      "decision": "allow",
+      "delay_days": 1.891,
+      "draft_id": "d003003",
+      "misdirected": true,
+      "position": 5,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 1
+    },
+    {
+      "decision": "allow",
+      "delay_days": 6.669,
+      "draft_id": "d003095",
+      "misdirected": true,
+      "position": 8,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 1
+    },
+    {
+      "decision": "warn",
+      "delay_days": 9.203,
+      "draft_id": "d003170",
+      "misdirected": true,
+      "position": 15,
+      "stratum": "warned",
+      "window": 1
+    },
+    {
+      "decision": "allow",
+      "delay_days": 10.432,
+      "draft_id": "d003049",
+      "misdirected": true,
+      "position": 45,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 1
+    },
+    {
+      "decision": "allow",
+      "delay_days": 12.647,
+      "draft_id": "d003356",
+      "misdirected": false,
+      "position": 48,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 1
+    },
+    {
+      "decision": "allow",
+      "delay_days": 8.316,
+      "draft_id": "d003410",
+      "misdirected": false,
+      "position": 102,
+      "stratum": "allowed_score_below_0.5",
+      "window": 1
+    },
+    {
+      "decision": "warn",
+      "delay_days": 6.893,
+      "draft_id": "d003096",
+      "misdirected": true,
+      "position": 126,
+      "stratum": "warned",
+      "window": 1
+    },
+    {
+      "decision": "allow",
+      "delay_days": 4.269,
+      "draft_id": "d003447",
+      "misdirected": false,
+      "position": 140,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 1
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.314,
+      "draft_id": "d003535",
+      "misdirected": false,
+      "position": 228,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 1
+    },
+    {
+      "decision": "allow",
+      "delay_days": 7.005,
+      "draft_id": "d003546",
+      "misdirected": false,
+      "position": 239,
+      "stratum": "allowed_score_below_0.5",
+      "window": 1
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.198,
+      "draft_id": "d003556",
+      "misdirected": false,
+      "position": 249,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 1
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.483,
+      "draft_id": "d003561",
+      "misdirected": false,
+      "position": 254,
+      "stratum": "allowed_score_below_0.5",
+      "window": 1
+    },
+    {
+      "decision": "allow",
+      "delay_days": 0.769,
+      "draft_id": "d003570",
+      "misdirected": false,
+      "position": 268,
+      "stratum": "allowed_score_below_0.5",
+      "window": 1
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.426,
+      "draft_id": "d003050",
+      "misdirected": true,
+      "position": 288,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 1
+    },
+    {
+      "decision": "allow",
+      "delay_days": 4.837,
+      "draft_id": "d003026",
+      "misdirected": true,
+      "position": 298,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 1
+    },
+    {
+      "decision": "allow",
+      "delay_days": 20.108,
+      "draft_id": "d003074",
+      "misdirected": true,
+      "position": 343,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 1
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.015,
+      "draft_id": "d003691",
+      "misdirected": false,
+      "position": 392,
+      "stratum": "allowed_score_below_0.5",
+      "window": 1
+    },
+    {
+      "decision": "allow",
+      "delay_days": 4.209,
+      "draft_id": "d003713",
+      "misdirected": false,
+      "position": 414,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 1
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.521,
+      "draft_id": "d003806",
+      "misdirected": false,
+      "position": 7,
+      "stratum": "allowed_score_0.5_to_0.9",
+      "window": 2
+    },
+    {
+      "decision": "allow",
+      "delay_days": 4.449,
+      "draft_id": "d003212",
+      "misdirected": false,
+      "position": 19,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 2
+    },
+    {
+      "decision": "allow",
+      "delay_days": 1.024,
+      "draft_id": "d003312",
+      "misdirected": false,
+      "position": 26,
+      "stratum": "allowed_score_below_0.5",
+      "window": 2
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.388,
+      "draft_id": "d003856",
+      "misdirected": false,
+      "position": 63,
+      "stratum": "allowed_score_below_0.5",
+      "window": 2
+    },
+    {
+      "decision": "warn",
+      "delay_days": 5.372,
+      "draft_id": "d003027",
+      "misdirected": true,
+      "position": 83,
+      "stratum": "warned",
+      "window": 2
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.248,
+      "draft_id": "d003051",
+      "misdirected": true,
+      "position": 103,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 2
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.481,
+      "draft_id": "d003955",
+      "misdirected": false,
+      "position": 169,
+      "stratum": "allowed_score_below_0.5",
+      "window": 2
+    },
+    {
+      "decision": "allow",
+      "delay_days": 14.304,
+      "draft_id": "d003983",
+      "misdirected": false,
+      "position": 197,
+      "stratum": "allowed_score_0.5_to_0.9",
+      "window": 2
+    },
+    {
+      "decision": "allow",
+      "delay_days": 9.117,
+      "draft_id": "d004011",
+      "misdirected": false,
+      "position": 225,
+      "stratum": "allowed_score_below_0.5",
+      "window": 2
+    },
+    {
+      "decision": "allow",
+      "delay_days": 1.712,
+      "draft_id": "d003004",
+      "misdirected": true,
+      "position": 317,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 2
+    },
+    {
+      "decision": "allow",
+      "delay_days": 0.193,
+      "draft_id": "d004133",
+      "misdirected": false,
+      "position": 350,
+      "stratum": "allowed_score_below_0.5",
+      "window": 2
+    },
+    {
+      "decision": "allow",
+      "delay_days": 5.153,
+      "draft_id": "d003214",
+      "misdirected": false,
+      "position": 356,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 2
+    },
+    {
+      "decision": "allow",
+      "delay_days": 6.843,
+      "draft_id": "d003052",
+      "misdirected": true,
+      "position": 358,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 2
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.328,
+      "draft_id": "d004141",
+      "misdirected": false,
+      "position": 362,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 2
+    },
+    {
+      "decision": "allow",
+      "delay_days": 7.29,
+      "draft_id": "d004147",
+      "misdirected": false,
+      "position": 368,
+      "stratum": "allowed_score_below_0.5",
+      "window": 2
+    },
+    {
+      "decision": "warn",
+      "delay_days": 0.714,
+      "draft_id": "d003028",
+      "misdirected": true,
+      "position": 376,
+      "stratum": "warned",
+      "window": 2
+    },
+    {
+      "decision": "allow",
+      "delay_days": 1.205,
+      "draft_id": "d004156",
+      "misdirected": false,
+      "position": 378,
+      "stratum": "allowed_score_below_0.5",
+      "window": 2
+    },
+    {
+      "decision": "allow",
+      "delay_days": 1.144,
+      "draft_id": "d004162",
+      "misdirected": false,
+      "position": 384,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 2
+    },
+    {
+      "decision": "allow",
+      "delay_days": 5.826,
+      "draft_id": "d004163",
+      "misdirected": false,
+      "position": 385,
+      "stratum": "allowed_score_below_0.5",
+      "window": 2
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.526,
+      "draft_id": "d004198",
+      "misdirected": false,
+      "position": 420,
+      "stratum": "allowed_score_below_0.5",
+      "window": 2
+    },
+    {
+      "decision": "allow",
+      "delay_days": 9.119,
+      "draft_id": "d004207",
+      "misdirected": false,
+      "position": 429,
+      "stratum": "allowed_score_below_0.5",
+      "window": 2
+    },
+    {
+      "decision": "allow",
+      "delay_days": 13.166,
+      "draft_id": "d004249",
+      "misdirected": false,
+      "position": 471,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 2
+    },
+    {
+      "decision": "allow",
+      "delay_days": 12.105,
+      "draft_id": "d004299",
+      "misdirected": false,
+      "position": 21,
+      "stratum": "allowed_score_below_0.5",
+      "window": 3
+    },
+    {
+      "decision": "allow",
+      "delay_days": 8.005,
+      "draft_id": "d004316",
+      "misdirected": false,
+      "position": 41,
+      "stratum": "allowed_score_below_0.5",
+      "window": 3
+    },
+    {
+      "decision": "allow",
+      "delay_days": 7.012,
+      "draft_id": "d004319",
+      "misdirected": false,
+      "position": 44,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 3
+    },
+    {
+      "decision": "allow",
+      "delay_days": 9.557,
+      "draft_id": "d003215",
+      "misdirected": false,
+      "position": 114,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 3
+    },
+    {
+      "decision": "allow",
+      "delay_days": 7.109,
+      "draft_id": "d004448",
+      "misdirected": false,
+      "position": 176,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 3
+    },
+    {
+      "decision": "allow",
+      "delay_days": 8.047,
+      "draft_id": "d004455",
+      "misdirected": false,
+      "position": 184,
+      "stratum": "allowed_score_below_0.5",
+      "window": 3
+    },
+    {
+      "decision": "allow",
+      "delay_days": 6.069,
+      "draft_id": "d003216",
+      "misdirected": false,
+      "position": 188,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 3
+    },
+    {
+      "decision": "allow",
+      "delay_days": 11.669,
+      "draft_id": "d004469",
+      "misdirected": false,
+      "position": 200,
+      "stratum": "allowed_score_below_0.5",
+      "window": 3
+    },
+    {
+      "decision": "allow",
+      "delay_days": 4.723,
+      "draft_id": "d004482",
+      "misdirected": false,
+      "position": 213,
+      "stratum": "allowed_score_below_0.5",
+      "window": 3
+    },
+    {
+      "decision": "allow",
+      "delay_days": 10.199,
+      "draft_id": "d004605",
+      "misdirected": false,
+      "position": 338,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 3
+    },
+    {
+      "decision": "warn",
+      "delay_days": 8.338,
+      "draft_id": "d003117",
+      "misdirected": true,
+      "position": 393,
+      "stratum": "warned",
+      "window": 3
+    },
+    {
+      "decision": "allow",
+      "delay_days": 5.985,
+      "draft_id": "d004677",
+      "misdirected": false,
+      "position": 411,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 3
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.809,
+      "draft_id": "d003217",
+      "misdirected": false,
+      "position": 442,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 3
+    },
+    {
+      "decision": "allow",
+      "delay_days": 9.042,
+      "draft_id": "d004751",
+      "misdirected": false,
+      "position": 488,
+      "stratum": "allowed_score_below_0.5",
+      "window": 3
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.091,
+      "draft_id": "d003218",
+      "misdirected": false,
+      "position": 19,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 4
+    },
+    {
+      "decision": "allow",
+      "delay_days": 6.878,
+      "draft_id": "d004784",
+      "misdirected": false,
+      "position": 24,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 4
+    },
+    {
+      "decision": "allow",
+      "delay_days": 4.973,
+      "draft_id": "d004812",
+      "misdirected": false,
+      "position": 52,
+      "stratum": "allowed_score_below_0.5",
+      "window": 4
+    },
+    {
+      "decision": "allow",
+      "delay_days": 5.263,
+      "draft_id": "d004856",
+      "misdirected": false,
+      "position": 97,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 4
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.984,
+      "draft_id": "d004875",
+      "misdirected": false,
+      "position": 116,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 4
+    },
+    {
+      "decision": "allow",
+      "delay_days": 12.578,
+      "draft_id": "d004935",
+      "misdirected": false,
+      "position": 178,
+      "stratum": "allowed_score_below_0.5",
+      "window": 4
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.94,
+      "draft_id": "d004961",
+      "misdirected": false,
+      "position": 204,
+      "stratum": "allowed_score_0.5_to_0.9",
+      "window": 4
+    },
+    {
+      "decision": "allow",
+      "delay_days": 7.845,
+      "draft_id": "d004966",
+      "misdirected": false,
+      "position": 209,
+      "stratum": "allowed_score_below_0.5",
+      "window": 4
+    },
+    {
+      "decision": "allow",
+      "delay_days": 12.657,
+      "draft_id": "d004972",
+      "misdirected": false,
+      "position": 215,
+      "stratum": "allowed_score_below_0.5",
+      "window": 4
+    },
+    {
+      "decision": "allow",
+      "delay_days": 1.169,
+      "draft_id": "d004982",
+      "misdirected": false,
+      "position": 225,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 4
+    },
+    {
+      "decision": "allow",
+      "delay_days": 6.709,
+      "draft_id": "d005005",
+      "misdirected": false,
+      "position": 248,
+      "stratum": "allowed_score_below_0.5",
+      "window": 4
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.078,
+      "draft_id": "d003219",
+      "misdirected": false,
+      "position": 273,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 4
+    },
+    {
+      "decision": "allow",
+      "delay_days": 12.463,
+      "draft_id": "d005033",
+      "misdirected": false,
+      "position": 279,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 4
+    },
+    {
+      "decision": "allow",
+      "delay_days": 12.082,
+      "draft_id": "d005052",
+      "misdirected": false,
+      "position": 298,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 4
+    },
+    {
+      "decision": "allow",
+      "delay_days": 5.5,
+      "draft_id": "d005140",
+      "misdirected": false,
+      "position": 386,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 4
+    },
+    {
+      "decision": "allow",
+      "delay_days": 5.317,
+      "draft_id": "d005161",
+      "misdirected": false,
+      "position": 407,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 4
+    },
+    {
+      "decision": "allow",
+      "delay_days": 8.199,
+      "draft_id": "d005210",
+      "misdirected": false,
+      "position": 456,
+      "stratum": "allowed_score_below_0.5",
+      "window": 4
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.106,
+      "draft_id": "d005233",
+      "misdirected": false,
+      "position": 479,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 4
+    },
+    {
+      "decision": "allow",
+      "delay_days": 9.458,
+      "draft_id": "d003220",
+      "misdirected": false,
+      "position": 27,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 5
+    },
+    {
+      "decision": "allow",
+      "delay_days": 21.37,
+      "draft_id": "d005318",
+      "misdirected": false,
+      "position": 67,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 5
+    },
+    {
+      "decision": "allow",
+      "delay_days": 8.477,
+      "draft_id": "d005338",
+      "misdirected": false,
+      "position": 87,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 5
+    },
+    {
+      "decision": "allow",
+      "delay_days": 8.709,
+      "draft_id": "d005379",
+      "misdirected": false,
+      "position": 128,
+      "stratum": "allowed_score_below_0.5",
+      "window": 5
+    },
+    {
+      "decision": "allow",
+      "delay_days": 1.833,
+      "draft_id": "d005389",
+      "misdirected": false,
+      "position": 138,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 5
+    },
+    {
+      "decision": "allow",
+      "delay_days": 7.21,
+      "draft_id": "d005401",
+      "misdirected": false,
+      "position": 150,
+      "stratum": "allowed_score_below_0.5",
+      "window": 5
+    },
+    {
+      "decision": "allow",
+      "delay_days": 8.879,
+      "draft_id": "d005409",
+      "misdirected": false,
+      "position": 158,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 5
+    },
+    {
+      "decision": "allow",
+      "delay_days": 6.67,
+      "draft_id": "d005410",
+      "misdirected": false,
+      "position": 159,
+      "stratum": "allowed_score_0.5_to_0.9",
+      "window": 5
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.857,
+      "draft_id": "d005485",
+      "misdirected": false,
+      "position": 235,
+      "stratum": "allowed_score_below_0.5",
+      "window": 5
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.604,
+      "draft_id": "d005497",
+      "misdirected": false,
+      "position": 247,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 5
+    },
+    {
+      "decision": "allow",
+      "delay_days": 8.889,
+      "draft_id": "d005575",
+      "misdirected": false,
+      "position": 325,
+      "stratum": "allowed_score_below_0.5",
+      "window": 5
+    },
+    {
+      "decision": "allow",
+      "delay_days": 6.248,
+      "draft_id": "d005664",
+      "misdirected": false,
+      "position": 414,
+      "stratum": "allowed_score_below_0.5",
+      "window": 5
+    },
+    {
+      "decision": "allow",
+      "delay_days": 6.053,
+      "draft_id": "d005703",
+      "misdirected": false,
+      "position": 455,
+      "stratum": "allowed_score_below_0.5",
+      "window": 5
+    },
+    {
+      "decision": "allow",
+      "delay_days": 5.474,
+      "draft_id": "d005729",
+      "misdirected": false,
+      "position": 481,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 5
+    },
+    {
+      "decision": "allow",
+      "delay_days": 4.833,
+      "draft_id": "d003227",
+      "misdirected": false,
+      "position": 9,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 6
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.43,
+      "draft_id": "d005763",
+      "misdirected": false,
+      "position": 15,
+      "stratum": "allowed_score_below_0.5",
+      "window": 6
+    },
+    {
+      "decision": "allow",
+      "delay_days": 11.883,
+      "draft_id": "d003218",
+      "misdirected": false,
+      "position": 22,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 6
+    },
+    {
+      "decision": "allow",
+      "delay_days": 7.7,
+      "draft_id": "d003222",
+      "misdirected": false,
+      "position": 34,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 6
+    },
+    {
+      "decision": "allow",
+      "delay_days": 1.11,
+      "draft_id": "d003214",
+      "misdirected": false,
+      "position": 73,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 6
+    },
+    {
+      "decision": "allow",
+      "delay_days": 10.266,
+      "draft_id": "d003316",
+      "misdirected": false,
+      "position": 90,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 6
+    },
+    {
+      "decision": "allow",
+      "delay_days": 8.748,
+      "draft_id": "d005853",
+      "misdirected": false,
+      "position": 106,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 6
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.26,
+      "draft_id": "d005873",
+      "misdirected": false,
+      "position": 126,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 6
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.064,
+      "draft_id": "d005884",
+      "misdirected": false,
+      "position": 137,
+      "stratum": "allowed_score_below_0.5",
+      "window": 6
+    },
+    {
+      "decision": "warn",
+      "delay_days": 3.543,
+      "draft_id": "d003138",
+      "misdirected": true,
+      "position": 147,
+      "stratum": "warned",
+      "window": 6
+    },
+    {
+      "decision": "allow",
+      "delay_days": 6.292,
+      "draft_id": "d005925",
+      "misdirected": false,
+      "position": 179,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 6
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.896,
+      "draft_id": "d005937",
+      "misdirected": false,
+      "position": 191,
+      "stratum": "allowed_score_below_0.5",
+      "window": 6
+    },
+    {
+      "decision": "warn",
+      "delay_days": 0.793,
+      "draft_id": "d003139",
+      "misdirected": true,
+      "position": 256,
+      "stratum": "warned",
+      "window": 6
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.476,
+      "draft_id": "d006032",
+      "misdirected": false,
+      "position": 287,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 6
+    },
+    {
+      "decision": "allow",
+      "delay_days": 10.903,
+      "draft_id": "d006052",
+      "misdirected": false,
+      "position": 307,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 6
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.653,
+      "draft_id": "d003219",
+      "misdirected": false,
+      "position": 325,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 6
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.827,
+      "draft_id": "d006075",
+      "misdirected": false,
+      "position": 330,
+      "stratum": "allowed_score_below_0.5",
+      "window": 6
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.932,
+      "draft_id": "d003224",
+      "misdirected": false,
+      "position": 340,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 6
+    },
+    {
+      "decision": "allow",
+      "delay_days": 10.819,
+      "draft_id": "d006103",
+      "misdirected": false,
+      "position": 358,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 6
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.051,
+      "draft_id": "d003215",
+      "misdirected": false,
+      "position": 374,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 6
+    },
+    {
+      "decision": "allow",
+      "delay_days": 4.209,
+      "draft_id": "d003223",
+      "misdirected": false,
+      "position": 460,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 6
+    },
+    {
+      "decision": "allow",
+      "delay_days": 1.732,
+      "draft_id": "d003217",
+      "misdirected": false,
+      "position": 479,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 6
+    },
+    {
+      "decision": "allow",
+      "delay_days": 13.206,
+      "draft_id": "d003221",
+      "misdirected": false,
+      "position": 490,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 6
+    },
+    {
+      "decision": "allow",
+      "delay_days": 9.026,
+      "draft_id": "d003225",
+      "misdirected": false,
+      "position": 493,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 6
+    },
+    {
+      "decision": "allow",
+      "delay_days": 1.358,
+      "draft_id": "d003220",
+      "misdirected": false,
+      "position": 18,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 6.562,
+      "draft_id": "d003215",
+      "misdirected": false,
+      "position": 54,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.182,
+      "draft_id": "d006301",
+      "misdirected": false,
+      "position": 56,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 1.214,
+      "draft_id": "d006302",
+      "misdirected": false,
+      "position": 57,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 4.996,
+      "draft_id": "d003223",
+      "misdirected": false,
+      "position": 60,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 6.586,
+      "draft_id": "d003317",
+      "misdirected": false,
+      "position": 91,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.468,
+      "draft_id": "d006370",
+      "misdirected": false,
+      "position": 126,
+      "stratum": "allowed_score_below_0.5",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 4.402,
+      "draft_id": "d003230",
+      "misdirected": false,
+      "position": 130,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 7.712,
+      "draft_id": "d003228",
+      "misdirected": false,
+      "position": 134,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.503,
+      "draft_id": "d003212",
+      "misdirected": false,
+      "position": 167,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 6.697,
+      "draft_id": "d003214",
+      "misdirected": false,
+      "position": 186,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 8.568,
+      "draft_id": "d003222",
+      "misdirected": false,
+      "position": 191,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 0.487,
+      "draft_id": "d003224",
+      "misdirected": false,
+      "position": 202,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 10.068,
+      "draft_id": "d003226",
+      "misdirected": false,
+      "position": 215,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 1.161,
+      "draft_id": "d003218",
+      "misdirected": false,
+      "position": 231,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 11.172,
+      "draft_id": "d006491",
+      "misdirected": false,
+      "position": 248,
+      "stratum": "allowed_score_below_0.5",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.949,
+      "draft_id": "d006496",
+      "misdirected": false,
+      "position": 254,
+      "stratum": "allowed_score_below_0.5",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 0.547,
+      "draft_id": "d003221",
+      "misdirected": false,
+      "position": 307,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 4.85,
+      "draft_id": "d006567",
+      "misdirected": false,
+      "position": 325,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 5.679,
+      "draft_id": "d003216",
+      "misdirected": false,
+      "position": 356,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.457,
+      "draft_id": "d006636",
+      "misdirected": false,
+      "position": 394,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 9.496,
+      "draft_id": "d006637",
+      "misdirected": false,
+      "position": 395,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 0.728,
+      "draft_id": "d003217",
+      "misdirected": false,
+      "position": 412,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.177,
+      "draft_id": "d006657",
+      "misdirected": false,
+      "position": 415,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.515,
+      "draft_id": "d006658",
+      "misdirected": false,
+      "position": 416,
+      "stratum": "allowed_score_0.5_to_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.365,
+      "draft_id": "d003219",
+      "misdirected": false,
+      "position": 463,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 11.9,
+      "draft_id": "d003227",
+      "misdirected": false,
+      "position": 469,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.054,
+      "draft_id": "d006719",
+      "misdirected": false,
+      "position": 477,
+      "stratum": "allowed_score_below_0.5",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 0.353,
+      "draft_id": "d003229",
+      "misdirected": false,
+      "position": 497,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.179,
+      "draft_id": "d003225",
+      "misdirected": false,
+      "position": 498,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 7
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.256,
+      "draft_id": "d006746",
+      "misdirected": false,
+      "position": 4,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.962,
+      "draft_id": "d003228",
+      "misdirected": false,
+      "position": 16,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 4.115,
+      "draft_id": "d003215",
+      "misdirected": false,
+      "position": 25,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 0.446,
+      "draft_id": "d003221",
+      "misdirected": false,
+      "position": 33,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.713,
+      "draft_id": "d003227",
+      "misdirected": false,
+      "position": 43,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 9.098,
+      "draft_id": "d006836",
+      "misdirected": false,
+      "position": 95,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 6.874,
+      "draft_id": "d003219",
+      "misdirected": false,
+      "position": 101,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 14.256,
+      "draft_id": "d003217",
+      "misdirected": false,
+      "position": 102,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 7.905,
+      "draft_id": "d003220",
+      "misdirected": false,
+      "position": 117,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 12.894,
+      "draft_id": "d003230",
+      "misdirected": false,
+      "position": 146,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 6.926,
+      "draft_id": "d003218",
+      "misdirected": false,
+      "position": 148,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 13.085,
+      "draft_id": "d006890",
+      "misdirected": false,
+      "position": 149,
+      "stratum": "allowed_score_below_0.5",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.362,
+      "draft_id": "d003223",
+      "misdirected": false,
+      "position": 159,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 6.795,
+      "draft_id": "d006907",
+      "misdirected": false,
+      "position": 166,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 1.649,
+      "draft_id": "d003224",
+      "misdirected": false,
+      "position": 167,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 1.188,
+      "draft_id": "d003229",
+      "misdirected": false,
+      "position": 173,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.617,
+      "draft_id": "d003214",
+      "misdirected": false,
+      "position": 181,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 11.729,
+      "draft_id": "d006923",
+      "misdirected": false,
+      "position": 182,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 14.883,
+      "draft_id": "d003222",
+      "misdirected": false,
+      "position": 213,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 1.714,
+      "draft_id": "d006960",
+      "misdirected": false,
+      "position": 219,
+      "stratum": "allowed_score_below_0.5",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.155,
+      "draft_id": "d003216",
+      "misdirected": false,
+      "position": 226,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 1.762,
+      "draft_id": "d003212",
+      "misdirected": false,
+      "position": 231,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 12.916,
+      "draft_id": "d003226",
+      "misdirected": false,
+      "position": 241,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.573,
+      "draft_id": "d006993",
+      "misdirected": false,
+      "position": 252,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.165,
+      "draft_id": "d006994",
+      "misdirected": false,
+      "position": 253,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 22.199,
+      "draft_id": "d003225",
+      "misdirected": false,
+      "position": 261,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 1.653,
+      "draft_id": "d003219",
+      "misdirected": false,
+      "position": 280,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 8.194,
+      "draft_id": "d003222",
+      "misdirected": false,
+      "position": 285,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.462,
+      "draft_id": "d003229",
+      "misdirected": false,
+      "position": 313,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 8.123,
+      "draft_id": "d003227",
+      "misdirected": false,
+      "position": 314,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 12.905,
+      "draft_id": "d007066",
+      "misdirected": false,
+      "position": 325,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.281,
+      "draft_id": "d003216",
+      "misdirected": false,
+      "position": 343,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 9.508,
+      "draft_id": "d003214",
+      "misdirected": false,
+      "position": 349,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 9.278,
+      "draft_id": "d003225",
+      "misdirected": false,
+      "position": 376,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 1.836,
+      "draft_id": "d003250",
+      "misdirected": false,
+      "position": 379,
+      "stratum": "allowed_score_below_0.5",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.743,
+      "draft_id": "d007122",
+      "misdirected": false,
+      "position": 381,
+      "stratum": "allowed_score_0.5_to_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 5.153,
+      "draft_id": "d003221",
+      "misdirected": false,
+      "position": 382,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.004,
+      "draft_id": "d003218",
+      "misdirected": false,
+      "position": 383,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 1.361,
+      "draft_id": "d003224",
+      "misdirected": false,
+      "position": 400,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 3.289,
+      "draft_id": "d003215",
+      "misdirected": false,
+      "position": 408,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 6.95,
+      "draft_id": "d007167",
+      "misdirected": false,
+      "position": 426,
+      "stratum": "allowed_score_below_0.5",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 6.49,
+      "draft_id": "d003217",
+      "misdirected": false,
+      "position": 427,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.615,
+      "draft_id": "d003228",
+      "misdirected": false,
+      "position": 428,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 5.685,
+      "draft_id": "d003223",
+      "misdirected": false,
+      "position": 435,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 5.608,
+      "draft_id": "d003220",
+      "misdirected": false,
+      "position": 447,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 6.471,
+      "draft_id": "d003230",
+      "misdirected": false,
+      "position": 456,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 2.961,
+      "draft_id": "d003212",
+      "misdirected": false,
+      "position": 462,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    },
+    {
+      "decision": "allow",
+      "delay_days": 8.782,
+      "draft_id": "d003226",
+      "misdirected": false,
+      "position": 475,
+      "stratum": "allowed_score_at_least_0.9",
+      "window": 8
+    }
+  ],
+  "real_reviewed_labels": {
+    "api_feedback": {
+      "distinct_assessments": 2,
+      "distinct_contacts": 1,
+      "first_received": "2026-09-26T17:11:40Z",
+      "label_delay": "not computable: neither the log line nor the feedback line carries an assessment time",
+      "labels": {
+        "unintended": 2
+      },
+      "last_received": "2026-09-27T00:43:51Z",
+      "lines": 2,
+      "lines_for_the_served_bundle": 2,
+      "linkable_to_a_draft": false,
+      "path": "var/feedback.jsonl",
+      "review_status": "unreviewed: a click is a request for review, not a label",
+      "reviewed": 0
+    },
+    "dataset_reviewer_feedback": {
+      "about_validation_drafts": 0,
+      "accepted": 0,
+      "by_subset_and_status": {
+        "train/pending_review": 2,
+        "train/rejected": 1
+      },
+      "file": "reviewer_feedback.csv",
+      "note": "Illustrative rows. None is accepted and none concerns a validation draft, so none is a reviewed label for the monitored traffic.",
+      "rows_about_non_frozen_drafts": 3
+    },
+    "reviewed_labels_on_monitored_traffic": 0
+  },
+  "simulation": {
+    "assumptions": "Every queued email is answered; delays are gamma-distributed; the reviewer is always right. These are assumptions.",
+    "delay": {
+      "distribution": "gamma(shape=2.0, scale=3.0 days), seeded per queued email",
+      "max_days": 22.19871780269368,
+      "median_days": 5.0740879341181495,
+      "p90_days": 11.89794102476983,
+      "queued": 192
+    },
+    "label_source": "simulated reviewer: the stipulated label of each queued validation draft, returned after a seeded delay",
+    "queue_policy": [
+      {
+        "inclusion_probability": 1.0,
+        "name": "warned"
+      },
+      {
+        "inclusion_probability": 1.0,
+        "name": "allowed_score_at_least_0.9",
+        "score_below": 1.0,
+        "score_from": 0.9
+      },
+      {
+        "inclusion_probability": 0.1,
+        "name": "allowed_score_0.5_to_0.9",
+        "score_below": 0.9,
+        "score_from": 0.5
+      },
+      {
+        "inclusion_probability": 0.01,
+        "name": "allowed_score_below_0.5",
+        "score_below": 0.5,
+        "score_from": 0.0
+      }
+    ]
+  }
+}

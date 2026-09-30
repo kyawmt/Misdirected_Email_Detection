@@ -32,8 +32,8 @@ The cross-phase revision (`project_context/fixes_before_phase7.md`, Sections A, 
 
 | Item | Owner |
 | --- | --- |
-| Active phase | None. Next: Phase 8 (monitoring, reviewed feedback, rollback notes), when the user asks for it. |
-| Owner | Unassigned |
+| Active phase | Phase 8 — monitoring, reviewed feedback, and rollback notes, on branch `phase-8-monitoring` (created from `main` at `90d0fdf`, 2026-09-30). In progress; nothing below describes Phase 8 results until this row says otherwise. |
+| Owner | Claude Code session started 2026-09-30 (Phase 8). Not committed. |
 
 Sections B and C are committed as `d760de7`, and the fixes for the review of that commit (RB-01, RC-01 to RC-06 in `project_context/comments.md`) as `b8092e7`. Both are on `main` (with the handoff commit `2e62761`). Phase 7 work is on branch `phase-7-ui`, created from `main` at `2e62761` (which contains all of `v4-rerun-phases-3-6`), and was committed there as `04e2146`. The fixes for its review (P7-01 to P7-06 in `project_context/comments.md`) are the next commit on that branch, and `phase-7-ui` was merged into `main` by fast-forward on 2026-09-27. Nothing is pushed. A Phase 7 UI refinement (the action message below) is committed on branch `phase-7-ux` (created from `main` at `62b682d`) as `1c33892` ("Improve the review screen for senders") and merged into `main` by fast-forward on 2026-09-30. Nothing is pushed. The Phase 8 brief is `project_context/phase8.md`. The Phase 7 brief is `project_context/phase7.md`.
 

@@ -1,0 +1,963 @@
+{
+  "bundle": {
+    "contract_version": "med-api-v1",
+    "dataset_version": "med-synth-v4",
+    "feature_spec_version": "med-features-v2",
+    "model_version": "med-model-v2",
+    "policy_version": "med-policy-v2",
+    "snapshot_id": "med-synth-v4"
+  },
+  "cumulative_features": [
+    "sender_outbound_count",
+    "sender_history_span_days",
+    "pair_outbound_count",
+    "pair_inbound_count",
+    "domain_outbound_count",
+    "co_joint_message_count",
+    "pair_text_message_count"
+  ],
+  "drafts": 3000,
+  "features": {
+    "address_similarity_max": {
+      "counts": [
+        42,
+        1011,
+        511,
+        303,
+        463,
+        289,
+        183,
+        498,
+        655
+      ],
+      "cumulative": false,
+      "edges": [
+        0.33333333333333337,
+        0.5,
+        0.6923076923076923,
+        0.75,
+        0.7692307692307692,
+        0.7777777777777778,
+        0.8,
+        0.8181818181818181
+      ],
+      "feature": "address_similarity_max",
+      "kind": "quantile",
+      "max": 0.8888888888888888,
+      "mean": 0.6403755382137177,
+      "min": 0.19999999999999996,
+      "rows": 3955,
+      "unique": 22,
+      "unit": "recipient_row"
+    },
+    "addressed_recipient_count": {
+      "counts": [
+        2626,
+        122,
+        45,
+        118,
+        61,
+        23,
+        5,
+        0
+      ],
+      "cumulative": false,
+      "feature": "addressed_recipient_count",
+      "kind": "discrete",
+      "max": 7.0,
+      "mean": 1.3183333333333334,
+      "min": 1.0,
+      "rows": 3000,
+      "unique": 7,
+      "unit": "email",
+      "values": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+        7.0
+      ]
+    },
+    "co_focus_conditional_fraction": {
+      "counts": [
+        0,
+        3164,
+        394,
+        397
+      ],
+      "cumulative": false,
+      "edges": [
+        0.0,
+        0.787793533749291,
+        0.882035466461064
+      ],
+      "feature": "co_focus_conditional_fraction",
+      "kind": "quantile",
+      "max": 1.0,
+      "mean": 0.22492612137373968,
+      "min": 0.0,
+      "rows": 3955,
+      "unique": 769,
+      "unit": "recipient_row"
+    },
+    "co_focus_history_available": {
+      "counts": [
+        70,
+        3885,
+        0
+      ],
+      "cumulative": false,
+      "feature": "co_focus_history_available",
+      "kind": "discrete",
+      "max": 1.0,
+      "mean": 0.9823008849557522,
+      "min": 0.0,
+      "rows": 3955,
+      "unique": 2,
+      "unit": "recipient_row",
+      "values": [
+        0.0,
+        1.0
+      ]
+    },
+    "co_joint_message_count": {
+      "counts": [
+        0,
+        3164,
+        394,
+        397
+      ],
+      "cumulative": true,
+      "edges": [
+        0.0,
+        912.6000000000008,
+        1938.0
+      ],
+      "feature": "co_joint_message_count",
+      "kind": "quantile",
+      "max": 2859.0,
+      "mean": 406.2657395701643,
+      "min": 0.0,
+      "rows": 3955,
+      "unique": 536,
+      "unit": "recipient_row"
+    },
+    "co_partner_fraction": {
+      "counts": [
+        2835,
+        6,
+        28,
+        25,
+        72,
+        80,
+        909,
+        0
+      ],
+      "cumulative": false,
+      "feature": "co_partner_fraction",
+      "kind": "discrete",
+      "max": 1.0,
+      "mean": 0.26889169827222925,
+      "min": 0.0,
+      "rows": 3955,
+      "unique": 7,
+      "unit": "recipient_row",
+      "values": [
+        0.0,
+        0.5,
+        0.6,
+        0.6666666666666666,
+        0.75,
+        0.8,
+        1.0
+      ]
+    },
+    "co_support_applicable": {
+      "counts": [
+        2626,
+        374,
+        0
+      ],
+      "cumulative": false,
+      "feature": "co_support_applicable",
+      "kind": "discrete",
+      "max": 1.0,
+      "mean": 0.12466666666666666,
+      "min": 0.0,
+      "rows": 3000,
+      "unique": 2,
+      "unit": "email",
+      "values": [
+        0.0,
+        1.0
+      ]
+    },
+    "contact_similarity_observed": {
+      "counts": [
+        3955,
+        0
+      ],
+      "cumulative": false,
+      "feature": "contact_similarity_observed",
+      "kind": "constant",
+      "max": 1.0,
+      "mean": 1.0,
+      "min": 1.0,
+      "rows": 3955,
+      "unique": 1,
+      "unit": "recipient_row",
+      "values": [
+        1.0
+      ]
+    },
+    "content_cosine": {
+      "counts": [
+        396,
+        395,
+        396,
+        395,
+        395,
+        396,
+        395,
+        396,
+        395,
+        396
+      ],
+      "cumulative": false,
+      "edges": [
+        0.21628890830269928,
+        0.2705252789736832,
+        0.29950800326463933,
+        0.33316762697531904,
+        0.375216243556804,
+        0.4095982906774191,
+        0.47390172679084924,
+        0.6049208938741388,
+        0.7156202075720614
+      ],
+      "feature": "content_cosine",
+      "kind": "quantile",
+      "max": 0.8245383457453132,
+      "mean": 0.40599008186440483,
+      "min": 0.0,
+      "rows": 3955,
+      "unique": 3870,
+      "unit": "recipient_row"
+    },
+    "content_similarity_observed": {
+      "counts": [
+        75,
+        3880,
+        0
+      ],
+      "cumulative": false,
+      "feature": "content_similarity_observed",
+      "kind": "discrete",
+      "max": 1.0,
+      "mean": 0.9810366624525917,
+      "min": 0.0,
+      "rows": 3955,
+      "unique": 2,
+      "unit": "recipient_row",
+      "values": [
+        0.0,
+        1.0
+      ]
+    },
+    "domain_novel_to_sender": {
+      "counts": [
+        3925,
+        30,
+        0
+      ],
+      "cumulative": false,
+      "feature": "domain_novel_to_sender",
+      "kind": "discrete",
+      "max": 1.0,
+      "mean": 0.007585335018963337,
+      "min": 0.0,
+      "rows": 3955,
+      "unique": 2,
+      "unit": "recipient_row",
+      "values": [
+        0.0,
+        1.0
+      ]
+    },
+    "domain_outbound_count": {
+      "counts": [
+        396,
+        395,
+        396,
+        395,
+        395,
+        396,
+        395,
+        396,
+        395,
+        396
+      ],
+      "cumulative": true,
+      "edges": [
+        1146.0000000000005,
+        18825.4,
+        21794.800000000003,
+        24782.800000000003,
+        27951.0,
+        30921.200000000004,
+        33802.0,
+        36803.4,
+        39752.2
+      ],
+      "feature": "domain_outbound_count",
+      "kind": "quantile",
+      "max": 42807.0,
+      "mean": 26079.56864728192,
+      "min": 0.0,
+      "rows": 3955,
+      "unique": 3025,
+      "unit": "recipient_row"
+    },
+    "domain_seen_in_history": {
+      "counts": [
+        10,
+        3945,
+        0
+      ],
+      "cumulative": false,
+      "feature": "domain_seen_in_history",
+      "kind": "discrete",
+      "max": 1.0,
+      "mean": 0.9974715549936789,
+      "min": 0.0,
+      "rows": 3955,
+      "unique": 2,
+      "unit": "recipient_row",
+      "values": [
+        0.0,
+        1.0
+      ]
+    },
+    "draft_body_blank": {
+      "counts": [
+        2985,
+        15,
+        0
+      ],
+      "cumulative": false,
+      "feature": "draft_body_blank",
+      "kind": "discrete",
+      "max": 1.0,
+      "mean": 0.005,
+      "min": 0.0,
+      "rows": 3000,
+      "unique": 2,
+      "unit": "email",
+      "values": [
+        0.0,
+        1.0
+      ]
+    },
+    "draft_raw_token_count": {
+      "counts": [
+        29,
+        402,
+        551,
+        511,
+        555,
+        263,
+        370,
+        319
+      ],
+      "cumulative": false,
+      "edges": [
+        14.0,
+        15.0,
+        16.0,
+        18.0,
+        24.0,
+        26.0,
+        27.0
+      ],
+      "feature": "draft_raw_token_count",
+      "kind": "quantile",
+      "max": 28.0,
+      "mean": 19.202666666666666,
+      "min": 0.0,
+      "rows": 3000,
+      "unique": 19,
+      "unit": "email"
+    },
+    "draft_subject_blank": {
+      "counts": [
+        2995,
+        5,
+        0
+      ],
+      "cumulative": false,
+      "feature": "draft_subject_blank",
+      "kind": "discrete",
+      "max": 1.0,
+      "mean": 0.0016666666666666668,
+      "min": 0.0,
+      "rows": 3000,
+      "unique": 2,
+      "unit": "email",
+      "values": [
+        0.0,
+        1.0
+      ]
+    },
+    "draft_text_empty": {
+      "counts": [
+        3000,
+        0
+      ],
+      "cumulative": false,
+      "feature": "draft_text_empty",
+      "kind": "constant",
+      "max": 0.0,
+      "mean": 0.0,
+      "min": 0.0,
+      "rows": 3000,
+      "unique": 1,
+      "unit": "email",
+      "values": [
+        0.0
+      ]
+    },
+    "draft_text_oov": {
+      "counts": [
+        2995,
+        5,
+        0
+      ],
+      "cumulative": false,
+      "feature": "draft_text_oov",
+      "kind": "discrete",
+      "max": 1.0,
+      "mean": 0.0016666666666666668,
+      "min": 0.0,
+      "rows": 3000,
+      "unique": 2,
+      "unit": "email",
+      "values": [
+        0.0,
+        1.0
+      ]
+    },
+    "draft_text_short": {
+      "counts": [
+        2980,
+        20,
+        0
+      ],
+      "cumulative": false,
+      "feature": "draft_text_short",
+      "kind": "discrete",
+      "max": 1.0,
+      "mean": 0.006666666666666667,
+      "min": 0.0,
+      "rows": 3000,
+      "unique": 2,
+      "unit": "email",
+      "values": [
+        0.0,
+        1.0
+      ]
+    },
+    "name_similarity_max": {
+      "counts": [
+        318,
+        362,
+        337,
+        533,
+        424,
+        177,
+        463,
+        289,
+        397,
+        655
+      ],
+      "cumulative": false,
+      "edges": [
+        0.4,
+        0.4545454545454546,
+        0.46153846153846156,
+        0.6363636363636364,
+        0.7272727272727273,
+        0.75,
+        0.7692307692307692,
+        0.7777777777777778,
+        0.8181818181818181
+      ],
+      "feature": "name_similarity_max",
+      "kind": "quantile",
+      "max": 0.8888888888888888,
+      "mean": 0.6342355032241253,
+      "min": 0.2727272727272727,
+      "rows": 3955,
+      "unique": 26,
+      "unit": "recipient_row"
+    },
+    "near_name_count": {
+      "counts": [
+        3178,
+        777,
+        0
+      ],
+      "cumulative": false,
+      "feature": "near_name_count",
+      "kind": "discrete",
+      "max": 1.0,
+      "mean": 0.19646017699115045,
+      "min": 0.0,
+      "rows": 3955,
+      "unique": 2,
+      "unit": "recipient_row",
+      "values": [
+        0.0,
+        1.0
+      ]
+    },
+    "pair_inbound_count": {
+      "counts": [
+        395,
+        391,
+        395,
+        398,
+        393,
+        398,
+        397,
+        397,
+        395,
+        396
+      ],
+      "cumulative": true,
+      "edges": [
+        147.0,
+        179.0,
+        211.0,
+        244.0,
+        278.0,
+        313.0,
+        499.0,
+        732.2000000000003,
+        1017.5999999999999
+      ],
+      "feature": "pair_inbound_count",
+      "kind": "quantile",
+      "max": 3049.0,
+      "mean": 485.4032869785082,
+      "min": 0.0,
+      "rows": 3955,
+      "unique": 1124,
+      "unit": "recipient_row"
+    },
+    "pair_inbound_count_28d": {
+      "counts": [
+        307,
+        1770,
+        583,
+        482,
+        227,
+        586
+      ],
+      "cumulative": false,
+      "edges": [
+        20.0,
+        24.0,
+        56.0,
+        68.0,
+        76.0
+      ],
+      "feature": "pair_inbound_count_28d",
+      "kind": "quantile",
+      "max": 192.0,
+      "mean": 43.705689001264226,
+      "min": 0.0,
+      "rows": 3955,
+      "unique": 15,
+      "unit": "recipient_row"
+    },
+    "pair_outbound_count": {
+      "counts": [
+        388,
+        397,
+        394,
+        402,
+        393,
+        397,
+        396,
+        397,
+        394,
+        397
+      ],
+      "cumulative": true,
+      "edges": [
+        155.0,
+        195.0,
+        235.0,
+        277.0,
+        319.0,
+        619.0,
+        889.0,
+        1501.2000000000003,
+        2369.0
+      ],
+      "feature": "pair_outbound_count",
+      "kind": "quantile",
+      "max": 3631.0,
+      "mean": 821.2682680151706,
+      "min": 0.0,
+      "rows": 3955,
+      "unique": 1517,
+      "unit": "recipient_row"
+    },
+    "pair_outbound_count_28d": {
+      "counts": [
+        195,
+        1778,
+        274,
+        247,
+        555,
+        189,
+        717
+      ],
+      "cumulative": false,
+      "edges": [
+        20.0,
+        36.0,
+        56.0,
+        76.0,
+        168.0,
+        204.0
+      ],
+      "feature": "pair_outbound_count_28d",
+      "kind": "quantile",
+      "max": 230.0,
+      "mean": 74.06725663716814,
+      "min": 0.0,
+      "rows": 3955,
+      "unique": 18,
+      "unit": "recipient_row"
+    },
+    "pair_outbound_rate_per_day": {
+      "counts": [
+        396,
+        395,
+        396,
+        395,
+        395,
+        396,
+        395,
+        396,
+        394,
+        397
+      ],
+      "cumulative": false,
+      "edges": [
+        0.7136410794077022,
+        0.715044802631142,
+        0.7167192796802707,
+        0.7182952033672664,
+        1.286731195529575,
+        2.0082207851568765,
+        2.7262173817783903,
+        6.03321883050242,
+        7.325520484986118
+      ],
+      "feature": "pair_outbound_rate_per_day",
+      "kind": "quantile",
+      "max": 8.247366447345993,
+      "mean": 2.6543074697139857,
+      "min": 0.0,
+      "rows": 3955,
+      "unique": 3670,
+      "unit": "recipient_row"
+    },
+    "pair_recency_days": {
+      "counts": [
+        396,
+        392,
+        388,
+        390,
+        406,
+        398,
+        396,
+        394,
+        398,
+        397
+      ],
+      "cumulative": false,
+      "edges": [
+        0.01250000000000002,
+        0.053564814814814815,
+        0.09444444444444444,
+        0.1967824074074074,
+        0.2346990740740741,
+        0.8722222222222222,
+        0.9948842592592593,
+        1.1110185185185186,
+        2.9078935185185184
+      ],
+      "feature": "pair_recency_days",
+      "kind": "quantile",
+      "max": 3650.0,
+      "mean": 65.40598352999017,
+      "min": 0.0020601851851851853,
+      "rows": 3955,
+      "unique": 815,
+      "unit": "recipient_row"
+    },
+    "pair_recency_observed": {
+      "counts": [
+        70,
+        3885,
+        0
+      ],
+      "cumulative": false,
+      "feature": "pair_recency_observed",
+      "kind": "discrete",
+      "max": 1.0,
+      "mean": 0.9823008849557522,
+      "min": 0.0,
+      "rows": 3955,
+      "unique": 2,
+      "unit": "recipient_row",
+      "values": [
+        0.0,
+        1.0
+      ]
+    },
+    "pair_text_message_count": {
+      "counts": [
+        391,
+        390,
+        398,
+        400,
+        394,
+        399,
+        394,
+        398,
+        395,
+        396
+      ],
+      "cumulative": true,
+      "edges": [
+        304.0,
+        384.0,
+        464.0,
+        542.0,
+        622.0,
+        1128.0,
+        1634.0,
+        2172.4000000000005,
+        3061.599999999999
+      ],
+      "feature": "pair_text_message_count",
+      "kind": "quantile",
+      "max": 6675.0,
+      "mean": 1306.4862199747156,
+      "min": 0.0,
+      "rows": 3955,
+      "unique": 1684,
+      "unit": "recipient_row"
+    },
+    "recipient_is_internal": {
+      "counts": [
+        257,
+        3698,
+        0
+      ],
+      "cumulative": false,
+      "feature": "recipient_is_internal",
+      "kind": "discrete",
+      "max": 1.0,
+      "mean": 0.9350189633375474,
+      "min": 0.0,
+      "rows": 3955,
+      "unique": 2,
+      "unit": "recipient_row",
+      "values": [
+        0.0,
+        1.0
+      ]
+    },
+    "recipient_novel_to_sender": {
+      "counts": [
+        3885,
+        70,
+        0
+      ],
+      "cumulative": false,
+      "feature": "recipient_novel_to_sender",
+      "kind": "discrete",
+      "max": 1.0,
+      "mean": 0.017699115044247787,
+      "min": 0.0,
+      "rows": 3955,
+      "unique": 2,
+      "unit": "recipient_row",
+      "values": [
+        0.0,
+        1.0
+      ]
+    },
+    "sender_history_available": {
+      "counts": [
+        10,
+        2990,
+        0
+      ],
+      "cumulative": false,
+      "feature": "sender_history_available",
+      "kind": "discrete",
+      "max": 1.0,
+      "mean": 0.9966666666666667,
+      "min": 0.0,
+      "rows": 3000,
+      "unique": 2,
+      "unit": "email",
+      "values": [
+        0.0,
+        1.0
+      ]
+    },
+    "sender_history_span_days": {
+      "counts": [
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300
+      ],
+      "cumulative": true,
+      "edges": [
+        199.19778935185187,
+        227.09189814814815,
+        254.2590625,
+        282.0896990740741,
+        309.33587962962963,
+        337.19706481481484,
+        364.31320833333336,
+        392.14230092592595,
+        420.0184560185185
+      ],
+      "feature": "sender_history_span_days",
+      "kind": "quantile",
+      "max": 445.3480324074074,
+      "mean": 308.49217875771603,
+      "min": 0.0,
+      "rows": 3000,
+      "unique": 2991,
+      "unit": "email"
+    },
+    "sender_outbound_count": {
+      "counts": [
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300
+      ],
+      "cumulative": true,
+      "edges": [
+        19206.9,
+        22175.2,
+        25063.7,
+        28033.600000000002,
+        30971.0,
+        33849.200000000004,
+        36736.3,
+        39665.200000000004,
+        42581.1
+      ],
+      "feature": "sender_outbound_count",
+      "kind": "quantile",
+      "max": 45505.0,
+      "mean": 30178.771333333334,
+      "min": 0.0,
+      "rows": 3000,
+      "unique": 2987,
+      "unit": "email"
+    }
+  },
+  "latency_reference": {
+    "client_p50_ms": 26.836083503440022,
+    "client_p95_ms": 57.035787153290535,
+    "client_p99_ms": 74.42916479834813,
+    "cold_start_seconds": 7.94746125000529,
+    "environment": {
+      "cpu_count": 10,
+      "machine": "arm64",
+      "platform": "macOS-27.0-arm64-arm-64bit",
+      "processor": "arm"
+    },
+    "measured_calls": 4000,
+    "path": "artifacts/med-api-latency/med-policy-v2/latency.json",
+    "statuses": {
+      "assessed": 4000
+    },
+    "target_p95_ms": 300.0
+  },
+  "monitor_version": "med-monitor-v1",
+  "note": "Train is enriched to 10% misdirected mail. Its recipient mix differs from product-like traffic, so some features sit in the watch band on ordinary validation mail.",
+  "policy_reference": {
+    "T_warn": 0.9996767050340489,
+    "blocking_enabled": false,
+    "highest_legitimate_validation_email_risk": 0.9973707113436169,
+    "policy_version": "med-policy-v2",
+    "selection_subset": "validation_product_like",
+    "validation": {
+      "blocks": 0,
+      "emails": 4000,
+      "false_interventions": 0,
+      "independent_of_selection": false,
+      "legitimate": 3980,
+      "misdirected": 20,
+      "warned_mistakes": 8,
+      "warnings": 8
+    }
+  },
+  "psi": {
+    "alert": 0.25,
+    "max_discrete_values": 12,
+    "pseudo_count": 0.5,
+    "quantile_bins": 10,
+    "watch": 0.1
+  },
+  "recorded_test_pass": {
+    "emails": 6000,
+    "false_interventions": 0,
+    "legitimate": 5970,
+    "misdirected": 30,
+    "note": "Quoted as recorded. Not used to choose a threshold, a window, or a statistic.",
+    "recall": 0.3,
+    "recall_interval_exact": [
+      0.1473451847547011,
+      0.4939590414625536
+    ],
+    "subset": "test_product_like",
+    "warned_mistakes": 9
+  },
+  "rows": 3955,
+  "source": {
+    "checked_against": "artifact_manifest.json",
+    "file": "features_train.csv",
+    "sha256": "7c96eef737cefe7576663d713f0e569e124a7f5a20330b614c7dbb14a201de04"
+  },
+  "subset": "train"
+}

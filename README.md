@@ -2,7 +2,7 @@
 
 A machine learning project exploring how to identify potentially unintended email recipients before a message is sent. The goal is to reduce accidental data loss while keeping interruptions to legitimate communication low.
 
-**Status: Phase 7 complete on the v4 bundle.** Requirements, the fictional dataset `med-synth-v4`, the feature specification `med-features-v2`, and the logistic risk scorer `med-model-v2` (all features, content cosine included) are in place. Warning policy `med-policy-v2` sets one warning cutoff on the risk score, chosen on product-like validation only, with blocking disabled and no calibration. The frozen v4 test subsets were scored once under that policy: 9 of 30 product-like mistakes warned with 0 false warnings on 5,970 legitimate emails. That is a descriptive pass on this corpus, not a confidence-supported budget claim: the exact bound of 0.62 per 1,000 assumes independent emails, and 95% of the test drafts come from one sender. A FastAPI service (`med-api-v1` contract) serves that bundle; its measured p95 latency is 57.04 ms against a 300 ms target. A simulated Streamlit review screen calls that API and shows its decisions, risk scores, codes, and explanations; it makes the limitations visible and does not change them. Lookalike replacements, familiar-recipient topic mistakes, and mistaken first contacts are still missed.
+**Status: Phase 8 complete on the v4 bundle.** Requirements, the fictional dataset `med-synth-v4`, the feature specification `med-features-v2`, and the logistic risk scorer `med-model-v2` (all features, content cosine included) are in place. Warning policy `med-policy-v2` sets one warning cutoff on the risk score, chosen on product-like validation only, with blocking disabled and no calibration. The frozen v4 test subsets were scored once under that policy: 9 of 30 product-like mistakes warned with 0 false warnings on 5,970 legitimate emails. That is a descriptive pass on this corpus, not a confidence-supported budget claim: the exact bound of 0.62 per 1,000 assumes independent emails, and 95% of the test drafts come from one sender. A FastAPI service (`med-api-v1` contract) serves that bundle; its measured p95 latency is 57.04 ms against a 300 ms target. A simulated Streamlit review screen calls that API and shows its decisions, risk scores, codes, and explanations; it makes the limitations visible and does not change them. Lookalike replacements, familiar-recipient topic mistakes, and mistaken first contacts are still missed. A monitoring package replays validation traffic through that API in eight windows and compares each with a train-only input reference and a reference operating period; it reports input drift, decision-rate change, and confirmed performance change as three separate findings, each with a minimum sample size. Reviewed feedback, rollout and rollback notes, and the incident runbook are documents and a labeled simulation, not deployed tooling: no reviewed label exists for the monitored traffic today.
 
 ## Intended behavior
 
@@ -106,14 +106,21 @@ Misdirected_Email_Detection/
 │   │   ├── API_CONTRACT.md
 │   │   ├── SCORING_FLOW.md
 │   │   └── ERROR_BEHAVIOR.md
-│   └── phase_7/
-│       ├── UI_GUIDE.md
-│       ├── WALKTHROUGH.md
-│       └── screenshots/
+│   ├── phase_7/
+│   │   ├── UI_GUIDE.md
+│   │   ├── WALKTHROUGH.md
+│   │   └── screenshots/
+│   └── phase_8/
+│       ├── MONITORING.md
+│       ├── DRIFT_REPLAY.md
+│       ├── FEEDBACK_REVIEW.md
+│       ├── EXPERIMENT_PROPOSAL.md
+│       └── RUNBOOK.md
 ├── artifacts/med-features-v2/ # fitted text transformer and train/validation matrices (v4)
 ├── artifacts/med-model-v2/    # selected scorer and experiment record (v4)
 ├── artifacts/med-policy-v2/   # warning policy, validation scores, one-shot test result (v4)
 ├── artifacts/med-api-latency/ # API latency, one record per served policy bundle
+├── artifacts/med-monitor-v1/  # train-only input reference, replay plan and windows, feedback review, bundle checks (write-once)
 ├── artifacts/*-v1/            # superseded v2 baseline bundle and its API latency, kept unchanged
 ├── src/med_data/              # generator, scoring view, validation
 ├── src/med_features/          # shared feature transform
@@ -121,6 +128,7 @@ Misdirected_Email_Detection/
 ├── src/med_policy/            # threshold selection, decision function, evaluation, reports
 ├── src/med_api/               # FastAPI scoring service, request normalizer, feedback
 ├── src/med_ui/                # Streamlit review screen, API client, walkthrough generator
+├── src/med_monitor/           # monitoring, drift replay, reviewed-feedback workflow, bundle checks, report generator
 └── tests/
 ```
 
@@ -171,6 +179,18 @@ python -m med_ui
 
 The screen composes fictional drafts from the `med-synth-v4` directory, loads curated validation examples chosen by rule, shows the API's decision, risk scores, codes, and explanation sentences, hides a result as stale as soon as the draft changes, sends reviewer feedback to `POST /feedback`, and has a collapsed what-if view over the stored validation scores that never changes the decision. `python -m med_ui walkthrough` regenerates [the walkthrough](docs/phase_7/WALKTHROUGH.md) from the running API. The screen shows limits it does not remove: lookalike replacements (S01), familiar-recipient topic mistakes (S04), and mistaken first contacts (S11) are allowed; a well-formed address outside the directory snapshot is unable to assess, not a warning; scores are risk scores, not probabilities; and blocking is disabled.
 
+Monitor the served bundle (simulation). The commands below read the published validation data and the train feature file only, never a frozen test row, and never fit or change a model, a policy, or the cutoff. Each writes a record under `artifacts/med-monitor-v1/` that it refuses to overwrite; `report` regenerates `docs/phase_8` from those records.
+
+```bash
+python -m med_monitor build-reference   # train-only input reference and the fixed operating numbers
+python -m med_monitor replay            # eight windows through the API in process (about 2 minutes)
+python -m med_monitor feedback          # click and dataset feedback, plus the simulated review of the queue
+python -m med_monitor bundle-checks     # mismatched and corrupted bundles handed to the real API
+python -m med_monitor report            # regenerate docs/phase_8
+```
+
+`replay --api URL` uses a running service instead (it needs the `monitor` extra for `httpx`). The stored records hold aggregates only: no address, name, subject, body, or per-email score, and the API's log allow-list is unchanged. Read [monitoring](docs/phase_8/MONITORING.md), the [drift replay](docs/phase_8/DRIFT_REPLAY.md), the [reviewed feedback review](docs/phase_8/FEEDBACK_REVIEW.md), the [A/B test proposal](docs/phase_8/EXPERIMENT_PROPOSAL.md), and the [runbook](docs/phase_8/RUNBOOK.md) for the metrics, thresholds, minimum samples, the replay, the review workflow, and the rollout, rollback, and incident notes.
+
 Read the [API contract](docs/phase_6/API_CONTRACT.md), [scoring flow](docs/phase_6/SCORING_FLOW.md), and [error behavior](docs/phase_6/ERROR_BEHAVIOR.md) for the service. Read the [evaluation report](docs/phase_5/EVALUATION_REPORT.md), [threshold policy](docs/phase_5/THRESHOLD_POLICY.md), [error analysis](docs/phase_5/ERROR_ANALYSIS.md), [uncertainty and prevalence](docs/phase_5/UNCERTAINTY_AND_PREVALENCE.md), and [model card](docs/phase_5/MODEL_CARD.md) for the policy and its one test pass. Read the [decision record](docs/phase_4/DECISION_RECORD.md), [experiment table](docs/phase_4/EXPERIMENT_TABLE.md), [comparison](docs/phase_4/COMPARISON.md), and [ablations](docs/phase_4/ABLATIONS.md) for the recorded runs. The [feature catalog](docs/phase_3/FEATURE_CATALOG.md), [profile and transform contract](docs/phase_3/PROFILE_AND_TRANSFORM.md), [feature quality report](docs/phase_3/FEATURE_QUALITY_REPORT.md), and [training/serving parity notes](docs/phase_3/TRAINING_SERVING_PARITY.md) describe the signals. The [data dictionary](docs/phase_2/DATA_DICTIONARY.md), [labeling guide](docs/phase_2/LABELING_GUIDE.md), [dataset specification](docs/phase_2/DATASET_SPECIFICATION.md), and [quality and leakage checklist](docs/phase_2/DATA_QUALITY_AND_LEAKAGE.md) describe the tables. The [scenarios](docs/phase_1/SCENARIOS.md), [input/output specification](docs/phase_1/INPUT_OUTPUT_SPECIFICATION.md), and [acceptance criteria](docs/phase_1/ACCEPTANCE_CRITERIA.md) still describe the product contract. Read the [UI guide](docs/phase_7/UI_GUIDE.md) and the [walkthrough](docs/phase_7/WALKTHROUGH.md) for the review screen. Packaging and deployment come in a later phase.
 
 ## Development roadmap
@@ -184,7 +204,7 @@ Read the [API contract](docs/phase_6/API_CONTRACT.md), [scoring flow](docs/phase
 | 5 | Evaluation, calibration if needed, and threshold selection | Complete — `med-policy-v2` |
 | 6 | Scoring API, validation, explanations, and failure handling | Complete — `med-api-v1` contract serving the v4 bundle |
 | 7 | Interactive draft review and simulated decisions | Complete — Streamlit client of `med-api-v1` |
-| 8 | Monitoring, reviewed feedback, drift investigation, and safe iteration | Planned |
+| 8 | Monitoring, reviewed feedback, drift investigation, and safe iteration | Complete — `med-monitor-v1` simulation and documents on the v4 bundle |
 | 9 | Regression tests, reproducible packaging, deployment, and rollback | Planned |
 | 10 | Architecture documentation, results, model card, and usage guide | Planned; initial README available |
 
@@ -197,5 +217,7 @@ Content cosine is a real but strong signal on this generator: alone it separates
 The earlier v2 bundle (`med-synth-v2`, `med-features-v1`, `med-model-v1`, `med-policy-v1`) is kept unchanged as a baseline. It was superseded because its data made content cosine a near-perfect separator (train AUC 0.991), placed 66.5% of legitimate training rows within five minutes of earlier mail to the same recipient and no mistakes, and contained no mistaken first contact, so its behavior-only scorer learned that a new recipient is safe. Its test pass (5 of 10 warned, 0 false warnings on 1,990 legitimate emails, upper bound 1.85 per 1,000) could not support the budget, and its API p95 was 345.84 ms.
 
 The initial scope is English plain-text drafts with 1–20 unique recipients in a fictional environment. Mailbox integration, actual sending or blocking, attachment inspection, enterprise authentication, and production-scale operation are outside scope. Missing intended recipients without an unintended addressee are also outside the detection task.
+
+Monitoring is a simulation over fictional validation mail: there is no production traffic, no real reviewer, and no online experiment, and its thresholds are conventions that no real incident has tested. A train-only input reference is enriched to 10% misdirected mail, so some inputs sit in a watch band on ordinary traffic, and seven lifetime-count inputs leave the train range as time passes; the monitor reports them as structural. Nothing in Phase 8 shows that detection improved.
 
 False positives and missed mistakes are expected risks. Sparse history, legitimate new relationships, and changing topics may make assessments unreliable. An allow decision will not guarantee correctness, and the project should not be relied on to protect real confidential communications.
