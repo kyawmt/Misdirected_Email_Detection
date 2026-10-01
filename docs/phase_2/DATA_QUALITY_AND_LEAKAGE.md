@@ -36,7 +36,7 @@ The executable checks live in `src/med_data/validate.py`. `python -m med_data va
 | Q28 | Non-empty bodies carry the marker phrase of their generator topic. |
 | Q29 | Every manifest row matches its draft on family, split, subset, timestamp, scenario fields, walkthrough flag, and dataset version. `frozen` is true only for the two test subsets. |
 | Q30 | Warmup, train, validation, and test sent mail include Bcc. Train, both validation subsets, and test product-like each include at least one intended Bcc recipient. Train still includes unintended Bcc recipients. |
-| Q31 | Training timing diagnostic compares recent-mail proportions: verifies that the share of intended training recipient rows with same-recipient mail under 5 minutes earlier is < 10% (under balanced interleaved scheduling, observed ~1.40% intended and ~0.63% unintended). |
+| Q31 | Training timing diagnostic compares recent-mail proportions: verifies that the share of intended training recipient rows with same-recipient mail under 5 minutes earlier is < 10% (the observed shares for `med-synth-v4` are in the quality report and under the known limits below). |
 
 ## Leakage rules
 
@@ -67,7 +67,7 @@ Warmup mail is visible to later drafts. That is history, not label leakage. The 
 - Timing: on train, 1.37% of intended and 1.90% of unintended recipient rows have same-recipient mail in the five minutes before the draft (Q31). Scenario sends use seeded jitter rather than one fixed time of day. Q31 fails the build if the intended share reaches 10%.
 - Scenario S11 represents mistaken first contacts. On train, 40 legitimate and 30 misdirected recipient rows are first contacts, so novelty alone does not indicate safety.
 - Replies are one sentence and do not quote earlier text. Threads are a message plus that reply, not a long conversation.
-- Product-like test contains 30 misdirected emails and 5,970 legitimate emails (0.5% prevalence). The larger sample size supports rigorous exact binomial confidence bounds for the 1 per 1,000 warning budget.
+- Product-like test contains 30 misdirected emails and 5,970 legitimate emails (0.5% prevalence). With no false warnings the exact binomial bound on the false-warning rate is small, but it holds only if emails are independent, and that is not established: most product-like test drafts come from one sender (see [uncertainty and prevalence](../phase_5/UNCERTAINTY_AND_PREVALENCE.md#independence)). AC01 is recorded as insufficient evidence.
 - Training enrichment (10%) will inflate precision if a later report uses the train base rate as if it were the deployment mix.
 - Department and directory dates are available in the scoring view because they are directory facts. They are not proof of intent.
 - Invalid fixtures describe refusal cases. Nothing in this phase scores them.

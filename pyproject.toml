@@ -1,7 +1,7 @@
 [project]
 name = "med-data"
-version = "0.9.0"
-description = "Fictional data, features, model comparison, warning policy, scoring API, simulated review UI, monitoring, and local deployment checks for misdirected email detection"
+version = "0.10.0"
+description = "Fictional data, features, model comparison, warning policy, scoring API, simulated review UI, monitoring, local deployment checks, and generated documentation for misdirected email detection"
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.26",
@@ -34,6 +34,7 @@ med-api = "med_api.cli:main"
 med-ui = "med_ui.cli:main"
 med-monitor = "med_monitor.cli:main"
 med-deploy = "med_deploy.cli:main"
+med-docs = "med_docs.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

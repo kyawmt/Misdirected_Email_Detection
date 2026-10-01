@@ -1,68 +1,120 @@
 # Misdirected Email Detection
 
-A machine learning project exploring how to identify potentially unintended email recipients before a message is sent. The goal is to reduce accidental data loss while keeping interruptions to legitimate communication low.
+An employee can address an email to someone they did not intend: a lookalike contact picked by autocomplete, an external address added to a project thread, a familiar colleague sent the wrong topic. This project assesses a draft **before** it is sent. It scores each recipient against what the sender has written before and the draft's own text, aggregates the recipient scores into one email decision (allow or warn), explains the flagged recipients, and shows that decision on a simulated review screen. The goal is to reduce accidental data loss while keeping interruptions to legitimate mail low.
 
-**Status: Phase 9 complete on the v4 bundle.** Requirements, the fictional dataset `med-synth-v4`, the feature specification `med-features-v2`, and the logistic risk scorer `med-model-v2` (all features, content cosine included) are in place. Warning policy `med-policy-v2` sets one warning cutoff on the risk score, chosen on product-like validation only, with blocking disabled and no calibration. The frozen v4 test subsets were scored once under that policy: 9 of 30 product-like mistakes warned with 0 false warnings on 5,970 legitimate emails. That is a descriptive pass on this corpus, not a confidence-supported budget claim: the exact bound of 0.62 per 1,000 assumes independent emails, and 95% of the test drafts come from one sender. A FastAPI service (`med-api-v1` contract) serves that bundle; its measured p95 latency is 57.04 ms against a 300 ms target. A simulated Streamlit review screen calls that API and shows its decisions, risk scores, codes, and explanations; it makes the limitations visible and does not change them. Lookalike replacements, familiar-recipient topic mistakes, and mistaken first contacts are still missed. A monitoring package replays validation traffic through that API in eight windows and compares each with a train-only input reference and a reference operating period; it reports input drift, decision-rate change, and confirmed performance change as three separate findings, each with a minimum sample size. Reviewed feedback, rollout and rollback notes, and the incident runbook are documents and a labeled simulation, not deployed tooling: no reviewed label exists for the monitored traffic today. Phase 9 adds a compact scenario regression suite over recorded validation fixtures, pinned dependencies, two local container images (the API without pyarrow, the review screen separately), a small CI workflow, a warm-latency record, and a rehearsed rollback between a known-good image and failing candidates. It is a local demo: nothing is published to a public host, and the Phase 9 results are in [the test report](docs/phase_9/TEST_REPORT.md).
+It is built for engineers and product reviewers who want to inspect an end-to-end applied machine-learning system: data, features, models, an interruption budget, a scoring service, a review screen, monitoring, tests, and a rehearsed rollback, together with the evidence and the limits of each.
 
-## Intended behavior
+> **This is a simulation on fictional data.** Every person, address, and message is fictional, on reserved `.example` domains. Nothing is sent, stopped, or read from a mailbox, and blocking is disabled. Scores are uncalibrated risk scores, not probabilities. The results describe behavior on synthetic data under the generator's assumptions. They do not show real-world accuracy, a confidence-supported warning budget, or production readiness, and nothing here shows that detection improved.
 
-The planned system will assess each recipient against the draft's content and the sender's earlier communication patterns. Example cases include selecting a lookalike contact, accidentally adding an external recipient, and sending an unusual topic to a familiar contact. Legitimate first contacts and topic changes are equally important counterexamples: unusual communication does not necessarily mean a mistake.
+## What the demo is, and is not
 
-1. Enter a fictional draft with its timestamp, sender, To/Cc/Bcc recipients, subject, body, and a reference to fictional historical context.
-2. Compare each unique recipient with communication history strictly preceding the draft.
-3. Produce recipient risk scores and explanations, then use the highest recipient score as the initial email-level risk.
-4. Apply a versioned threshold policy to return **allow**, **warn**, or **simulated block**. Blocking will remain disabled unless separate evaluation justifies it.
-5. Reassess after edits; optionally collect corrections for later review.
+**It is** a local, reproducible pipeline: a fictional dataset with chronological splits and a frozen test set; a shared feature transform with history strictly before each draft; a comparison of an always-allow baseline, a rules score, logistic regression, and one small tree; one warning cutoff chosen on validation and evaluated once on the frozen test set; a FastAPI scoring service that fails closed; a Streamlit review screen; a monitoring replay and runbook; and pinned dependencies, two local container images, a small CI workflow, and a rehearsed rollback.
 
-A scoring failure will return **unable to assess**, never an automatic allow. Scores will be labeled as risk scores rather than probabilities unless calibration supports that interpretation. All sending and blocking behavior will be simulated.
+**It is not** real mail integration, a hosted service, enterprise authentication, or an automatic blocker. A warning asks a sender to check addresses. It is not proof of a mistake, and an allow is not a check that every recipient is correct.
 
-## Planned architecture
+## Headline results
+
+Product-like mail assumes a simulated, low share of misdirected emails; the assumption is stated in the first bullet below. The numbers are generated from the stored records by `python -m med_docs report`; every denominator and interval, the per-scenario outcomes, and the rule behind each acceptance status are in [results](docs/RESULTS.md).
+
+<!-- med-docs:begin headline -->
+| Product-like emails | `validation_product_like` (chose the cutoff) | `test_product_like` (one frozen pass) |
+| --- | --- | --- |
+| Emails, of which misdirected | 4,000, 20 | 6,000, 30 |
+| Mistakes warned (recall, exact 95% if independent) | 8 / 20 (0.400 [0.191, 0.639]) | 9 / 30 (0.300 [0.147, 0.494]) |
+| Legitimate emails warned | 0 / 3,980 | 0 / 5,970 |
+| Detections, interruptions per 1,000 emails | 2.00, 2.00 | 1.50, 1.50 |
+
+- Product-like mix: 0.5% misdirected, a simulation assumption. Per-1,000 rates use every email in the subset as the denominator.
+- Never warned on any subset: S01, S04, S11. The policy allows these mistakes.
+- AC01 (at most 1 false warning per 1,000 legitimate emails): **insufficient evidence**. 0 / 5,970 is a descriptive pass on this corpus; the exact upper bound, 0.62 per 1,000, holds only if emails are independent, and most test drafts come from one sender.
+- Client p95 latency 57.04 ms in process and 64.47 ms against the container, one request in flight, on one machine; target 300 ms.
+- Acceptance criteria: 7 met, 1 mixed by scenario (AC02), 2 insufficient evidence, 0 not met. See [results](docs/RESULTS.md) for denominators, intervals, and each rule.
+- Scores are uncalibrated risk scores, not probabilities. Blocking is disabled. Nothing here shows that detection improved.
+<!-- med-docs:end headline -->
+
+## Quick start
+
+Python 3.11 or newer is required; Python 3.11.14 is the tested interpreter. From the repository root, install from the pinned dependencies and check the published bundle:
+
+```bash
+python3.11 -m venv .venv && source .venv/bin/activate
+pip install -c constraints.txt -e ".[dev,ui,monitor]"
+python -m med_deploy check-bundle --scope api
+```
+
+Start the scoring API and the review screen, in two terminals:
+
+```bash
+python -m med_api serve
+python -m med_ui
+```
+
+The API is on `http://127.0.0.1:8000` and the screen on `http://127.0.0.1:8501`, both on loopback only. Or run both as containers (needs Docker):
+
+```bash
+mkdir -p var/demo
+docker/build.sh
+docker compose up -d --wait
+```
+
+Check the work:
+
+```bash
+python -m pytest -m "not slow"
+python -m med_deploy smoke --spawn
+python -m med_docs check
+```
+
+The [usage guide](docs/USAGE_GUIDE.md) covers the screen, the walkthrough, monitoring, the regression checks, a rollback rehearsal, and troubleshooting. Never run `python -m med_features build` or `python -m med_models run` with their default paths: they overwrite the published artifacts.
+
+## Demo flow
+
+The [demo script](docs/DEMO_WALKTHROUGH.md) takes about five to seven minutes and follows six steps, each with its honest limit:
+
+1. **A safe email.** A routine project update is allowed.
+2. **A mistaken recipient.** An added external recipient is warned on, with the recipient and its field named; editing the draft hides the old result until it is assessed again.
+3. **The explanation.** One reason tied to the model and several context codes, shown as the API sent them.
+4. **The threshold tradeoff, and a known miss.** Why the cutoff sits where it does, and a lookalike mistake the policy allows.
+5. **A monitoring issue.** A replayed wave of legitimate first contacts moves the inputs and the near-cutoff scores while confirmed performance cannot be stated.
+6. **A rollback.** A broken bundle fails closed, and the known-good image is restored and re-verified.
+
+## Architecture in brief
 
 ```mermaid
 flowchart LR
-    subgraph Offline[Offline preparation]
-        Data[Fictional histories and synthetic examples] --> Prep[Validation and chronological splits]
-        Prep --> Train[Feature engineering and model comparison]
-        Train --> Eval[Evaluation and threshold selection]
-        Eval --> Bundle[Versioned model and policy]
-        Prep --> History[Historical profiles]
+    subgraph Batch["Batch preparation (offline)"]
+        A["Fictional data<br/>med_data"] --> B["Shared features<br/>med_features"] --> C["Model comparison<br/>med_models"] --> D["One warning cutoff<br/>med_policy"]
     end
-    subgraph Scoring[Request-time assessment]
-        UI[Draft review UI] --> API[Scoring API]
-        History --> Features[Shared feature transformations]
-        API --> Features
-        Features --> Decision[Recipient scores and email decision]
-        Bundle --> Decision
-        Decision --> UI
+    D --> E[("Frozen, checksummed bundle")]
+    subgraph Request["Request-time scoring"]
+        F["Review screen<br/>med_ui"] -->|"POST /assess"| G["Scoring API<br/>med_api"]
+        G --> H["Same feature transform,<br/>model, and policy"]
+        H --> G
+        G --> F
     end
-    Decision --> Monitor[Latency, errors, and drift monitoring]
-    UI --> Feedback[Corrections for review]
+    E -.->|"verified at startup"| G
+    F -->|"POST /feedback"| I[("Feedback for review<br/>never read by scoring")]
+    J["Offline monitoring<br/>med_monitor"] -->|"replays validation mail"| G
 ```
 
-Historical profiles must respect each draft's cutoff time. Training and serving will share feature definitions to reduce inconsistencies. Feedback will not trigger automatic retraining.
+Everything left of the frozen bundle runs offline and is finished before a request exists. The service loads and verifies the bundle once, fits nothing, and reads no label. For each draft it builds the history visible strictly before the draft (dropping the draft's family and any earlier copy of its body), scores each unique recipient with the same code that built the training rows, takes the maximum, applies the cutoff, and returns the decision with the versions that produced it. A failure is `unable_to_assess`, with no decision and no score, never an allow. The full picture, the versioned artifacts and their refusal rules, and what was not built (shadow mode, canary, live rollback, real mail) are in [architecture](docs/ARCHITECTURE.md).
 
-Dataset construction uses **Python**, **pandas**, and **NumPy**. Feature preparation and the model comparison use **scikit-learn**. The scoring API uses **FastAPI**. The simulated review UI uses **Streamlit** and talks to the API over HTTP. Model outputs are risk scores, not probabilities. The warning cutoff lives in `med-policy-v2`, not in the model.
+Dataset construction uses Python, pandas, and NumPy. Features and models use scikit-learn. The API uses FastAPI and the screen uses Streamlit. Interpretable methods only: rules, logistic regression, and one small tree.
 
 ## Research basis and techniques
 
-The design draws on published work while keeping the initial methods interpretable and inexpensive to run:
+The design draws on published work while keeping the methods interpretable and inexpensive to run:
 
-| Reference | Relevant technique and planned use |
+| Reference | Relevant technique and use here |
 | --- | --- |
-| Carvalho & Cohen (2007), [*Preventing Information Leaks in Email*](https://doi.org/10.1137/1.9781611972771.7), SDM, pp. 68–77 | Treat message–recipient incompatibility as an outlier problem; combine text similarity, communication frequency, and recipient co-occurrence. |
-| Zilberman, Katz, Shabtai & Elovici (2013), [*Analyzing group E-mail exchange to detect data leakage*](https://doi.org/10.1002/asi.22886), JASIST 64(9), pp. 1780–1790 | Consider shared topic context even without direct prior communication. Motivates legitimate first-contact cases and an optional group-topic experiment. |
-| Stolfo et al. (2006), [*Behavior-based modeling and its application to Email analysis*](https://doi.org/10.1145/1149121.1149125), ACM TOIT 6(2), pp. 187–221 | Combine behavioral profiles and communication-group signals. Its viral-email experiments support anomaly-modeling ideas, not claims about accidental-recipient accuracy. |
-| Balasubramanyan, Carvalho & Cohen (2008), [*CutOnce — Recipient Recommendation and Leak Detection in Action*](https://cdn.aaai.org/Workshops/2008/WS-08-04/WS08-04-001.pdf), AAAI EMAIL Workshop | Use TF-IDF recipient profiles, frequency, recency, and pre-send feedback; evaluate a simple signal combination as an optional comparison. |
+| R1: Carvalho & Cohen (2007), [*Preventing Information Leaks in Email*](https://doi.org/10.1137/1.9781611972771.7), SDM, pp. 68–77 | Treat message–recipient incompatibility as an outlier problem; combine text similarity, communication frequency, and recipient co-occurrence. |
+| R2: Zilberman, Katz, Shabtai & Elovici (2013), [*Analyzing group E-mail exchange to detect data leakage*](https://doi.org/10.1002/asi.22886), JASIST 64(9), pp. 1780–1790 | Consider shared topic context even without direct prior communication. Motivates legitimate first-contact cases and an optional group-topic experiment. |
+| R3: Stolfo et al. (2006), [*Behavior-based modeling and its application to Email analysis*](https://doi.org/10.1145/1149121.1149125), ACM TOIT 6(2), pp. 187–221 | Combine behavioral profiles and communication-group signals. Its viral-email experiments support anomaly-modeling ideas, not claims about accidental-recipient accuracy. |
+| R4: Balasubramanyan, Carvalho & Cohen (2008), [*CutOnce — Recipient Recommendation and Leak Detection in Action*](https://cdn.aaai.org/Workshops/2008/WS-08-04/WS08-04-001.pdf), AAAI EMAIL Workshop | Use TF-IDF recipient profiles, frequency, recency, and pre-send feedback; evaluate a simple signal combination as an optional comparison. |
 
-The recorded comparison is an always-allow baseline, a behavioral rules score, logistic regression, and one depth-limited decision tree. `med-features-v2` implements TF-IDF/cosine content similarity, relationship frequency and recency, co-recipient support, and contact-name/address similarity. No individual novelty signal defines whether a recipient was intended. A group-topic profile is still optional and is not in this feature specification.
+`med-features-v2` implements TF-IDF cosine content similarity, relationship frequency and recency, co-recipient support, and contact-name and address similarity. No single novelty signal defines whether a recipient was intended. A group-topic profile is not implemented.
 
-Maximum-risk aggregation, model choices, calibration, threshold policies, and operational monitoring are project adaptations or engineering extensions. This project is not a full reproduction of these papers, and their reported results are not performance claims for this system. In particular, identifying an injected wrong recipient in a ranking experiment is different from accurately warning on ordinary outbound traffic.
-
-## Evaluation goals
-
-Provisional targets are **at most one false intervention per 1,000 legitimate emails** and **warm local scoring p95 below 300 ms**. Both were measured on this simulation for the v4 bundle; see the [evaluation report](docs/phase_5/EVALUATION_REPORT.md) and [scoring flow](docs/phase_6/SCORING_FLOW.md). Warnings and simulated blocks both count as interventions.
-
-Evaluation will compare detection recall within the interruption budget, report precision–recall metrics at both recipient and email levels, and include uncertainty, sample counts, and assessment coverage. Chronological splits and an untouched final test set will limit leakage. Errors will be examined for new contacts, external recipients, topic changes, and multi-recipient drafts.
+Maximum-risk aggregation, the cutoff rule, fail-closed behavior, monitoring, and the deployment checks are project adaptations or engineering extensions. This project is not a full reproduction of these papers, and their reported results are not performance claims for this system: locating an injected wrong recipient in a ranking experiment is different from warning accurately on ordinary outbound traffic. The [model card](docs/MODEL_CARD.md) labels each technique as adopted, adapted, or a project extension.
 
 ## Repository structure
 
@@ -70,181 +122,58 @@ Evaluation will compare detection recall within the interruption budget, report 
 Misdirected_Email_Detection/
 ├── README.md
 ├── pyproject.toml
-├── data/
-│   ├── med-synth-v4/          # current fictional tables, manifest, quality report
-│   └── med-synth-v2/          # superseded baseline, kept unchanged
-├── docs/
-│   ├── phase_1/
-│   │   ├── PRODUCT_BRIEF.md
-│   │   ├── SCENARIOS.md
-│   │   ├── INPUT_OUTPUT_SPECIFICATION.md
-│   │   └── ACCEPTANCE_CRITERIA.md
-│   ├── phase_2/
-│   │   ├── DATA_DICTIONARY.md
-│   │   ├── LABELING_GUIDE.md
-│   │   ├── DATASET_SPECIFICATION.md
-│   │   └── DATA_QUALITY_AND_LEAKAGE.md
-│   ├── phase_3/
-│   │   ├── FEATURE_CATALOG.md
-│   │   ├── PROFILE_AND_TRANSFORM.md
-│   │   ├── FEATURE_QUALITY_REPORT.md
-│   │   └── TRAINING_SERVING_PARITY.md
-│   ├── phase_4/
-│   │   ├── EXPERIMENT_TABLE.md
-│   │   ├── COMPARISON.md
-│   │   ├── ABLATIONS.md
-│   │   ├── MODEL_ARTIFACT.md
-│   │   └── DECISION_RECORD.md
-│   ├── phase_5/
-│   │   ├── EVALUATION_REPORT.md
-│   │   ├── THRESHOLD_POLICY.md
-│   │   ├── ERROR_ANALYSIS.md
-│   │   ├── UNCERTAINTY_AND_PREVALENCE.md
-│   │   ├── MODEL_CARD.md
-│   │   └── figures/
-│   ├── phase_6/
-│   │   ├── API_CONTRACT.md
-│   │   ├── SCORING_FLOW.md
-│   │   └── ERROR_BEHAVIOR.md
-│   ├── phase_7/
-│   │   ├── UI_GUIDE.md
-│   │   ├── WALKTHROUGH.md
-│   │   └── screenshots/
-│   ├── phase_8/
-│   │   ├── MONITORING.md
-│   │   ├── DRIFT_REPLAY.md
-│   │   ├── FEEDBACK_REVIEW.md
-│   │   ├── EXPERIMENT_PROPOSAL.md
-│   │   └── RUNBOOK.md
-│   └── phase_9/
-│       ├── TEST_REPORT.md
-│       ├── REPRODUCIBILITY.md
-│       ├── LOCAL_DEPLOYMENT.md
-│       └── ROLLBACK_REHEARSAL.md
-├── constraints.txt            # pinned third-party packages (tested with Python 3.11.14, see .python-version)
-├── compose.yaml               # the API and the review screen as two local containers, published on 127.0.0.1 only
-├── docker/                    # one Dockerfile and one default-deny ignore list per image, and a build script
+├── constraints.txt            # pinned third-party packages (Python 3.11.14, see .python-version)
+├── compose.yaml               # the API and the review screen as two local containers, loopback only
+├── docker/                    # a Dockerfile and a default-deny ignore list per image, and a build script
 ├── .github/workflows/ci.yml   # compact CI: pinned install, bundle check, fast suite, smoke
-├── artifacts/med-features-v2/ # fitted text transformer and train/validation matrices (v4)
-├── artifacts/med-model-v2/    # selected scorer and experiment record (v4)
-├── artifacts/med-policy-v2/   # warning policy, validation scores, one-shot test result (v4)
-├── artifacts/med-api-latency/ # API latency, one record per served policy bundle
-├── artifacts/med-monitor-v1/  # train-only input reference, replay plan and windows, feedback review, bundle checks (write-once)
-├── artifacts/med-deploy-v1/   # Phase 9 records: scenario fixtures, smoke, latency, images, rollback rehearsal (write-once)
-├── artifacts/*-v1/            # superseded v2 baseline bundle and its API latency, kept unchanged
+├── data/med-synth-v4/         # fictional tables, manifest, quality report (superseded baseline: med-synth-v2)
+├── artifacts/                 # versioned, checksummed features, model, policy, latency, monitor, and deploy records
+├── docs/
+│   ├── README.md              # documentation index by audience
+│   ├── RESULTS.md  MODEL_CARD.md  ARCHITECTURE.md  USAGE_GUIDE.md
+│   ├── DEMO_WALKTHROUGH.md  LIMITATIONS_AND_FUTURE_WORK.md
+│   └── phase_1 … phase_9/     # contracts, data, features, models, evaluation, API, UI, monitoring, deployment
 ├── src/med_data/              # generator, scoring view, validation
 ├── src/med_features/          # shared feature transform
-├── src/med_models/            # baselines, ablations, and the selected scorer
+├── src/med_models/            # baselines, ablations, selected scorer
 ├── src/med_policy/            # threshold selection, decision function, evaluation, reports
 ├── src/med_api/               # FastAPI scoring service, request normalizer, feedback
 ├── src/med_ui/                # Streamlit review screen, API client, walkthrough generator
-├── src/med_monitor/           # monitoring, drift replay, reviewed-feedback workflow, bundle checks, report generator
-├── src/med_deploy/            # bundle check, scenario regression, smoke, latency, file audit, rollback rehearsal, report generator
+├── src/med_monitor/           # drift replay, reviewed-feedback workflow, bundle checks
+├── src/med_deploy/            # bundle check, scenario regression, smoke, latency, rollback rehearsal
+├── src/med_docs/              # results, model card numbers, and this headline, generated from stored records
 └── tests/
 ```
 
-## Setup and usage
+## Documentation
 
-Python 3.11 or newer is required. From the repository root:
+Start with the [documentation index](docs/README.md). The main documents are [results](docs/RESULTS.md), the [model card](docs/MODEL_CARD.md), [architecture](docs/ARCHITECTURE.md), the [usage guide](docs/USAGE_GUIDE.md), the [demo walkthrough](docs/DEMO_WALKTHROUGH.md), and [limitations and future work](docs/LIMITATIONS_AND_FUTURE_WORK.md). The product contract (scenarios, input and output specification, acceptance criteria) is in [docs/phase_1](docs/phase_1/PRODUCT_BRIEF.md).
 
-```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-pytest
-python -m med_data validate
-python -m med_features build --quality-markdown docs/phase_3/FEATURE_QUALITY_REPORT.md
-python -m med_models run
-python -m med_policy report
-```
-
-Every command reads its default dataset, artifact, and docs paths from one version module per package (`src/*/version.py`), so the defaults above name the v4 bundle. The policy was selected and evaluated once with the commands below. `select` reads validation only, checks that the batch and single-draft scoring paths give identical decisions on every selection draft, and refuses to run after the test result exists. `evaluate-test` refuses to run without `policy.json` and refuses to run a second time. `report` regenerates `docs/phase_5` from the stored results.
-
-```bash
-python -m med_policy select
-python -m med_policy evaluate-test
-```
-
-Start the scoring API (simulation only) on `http://127.0.0.1:8000`:
-
-```bash
-python -m med_api serve
-```
-
-`GET /health` reports that the process is up. `GET /ready` reports that the frozen bundle and the `med-synth-v4` snapshot loaded. `POST /assess` takes one fictional draft (timestamp with timezone, sender, To/Cc/Bcc, subject, body, and `context_snapshot_id: "med-synth-v4"`) and returns a risk score per unique recipient, the email risk score, and `allow` or `warn`. Invalid input and unavailable context both return `unable_to_assess`, never allow. `POST /feedback` appends a reviewed label to a local gitignored file and changes nothing else. `python -m med_api latency` measures the API boundary once per served policy bundle, writes `artifacts/med-api-latency/<policy version>/latency.json`, and refuses to overwrite an existing record. `python -m med_api report` regenerates `docs/phase_6`.
-
-`pytest` rebuilds the dataset from seed `20260926` and checks it against the published files, then checks the feature and model contracts. `validate` reloads `data/med-synth-v4`, verifies SHA-256 checksums and parsed record counts, and runs the quality checklist. `med_features build` fits TF-IDF on sent mail before the validation window and writes recipient-level features for train and validation only. `med_models run` repeats the recorded comparison and rewrites `med-model-v2`. It does not score the frozen test subsets and does not choose a threshold. `med_policy` never fits the transformer, the scaler, or the model; it computes frozen-test features in memory and writes no test feature file. To reproduce the tables, build into a new directory and compare its `dataset_manifest.json` with the published one. The build refuses to write into a directory that already holds a dataset, because a published version's frozen test may already have been evaluated; new generation rules need a new `DATASET_VERSION`:
-
-```bash
-python -m med_data build --output /tmp/med-synth-rebuild
-```
-
-The published build is `med-synth-v4` (generator `1.3.0`). Product-like mail uses a **simulation assumption of 0.5% misdirected emails**. The training subset is enriched to 10% and is not an operating point. `test_product_like` and `test_diagnostic` are frozen for this version. The feature build does not write those subsets.
-
-Start the simulated review screen (install the `ui` extra first) while the API is running. It opens on `http://localhost:8501`:
-
-```bash
-pip install -e ".[ui]"
-python -m med_ui
-```
-
-The screen composes fictional drafts from the `med-synth-v4` directory, loads curated validation examples chosen by rule, shows the API's decision, risk scores, codes, and explanation sentences, hides a result as stale as soon as the draft changes, sends reviewer feedback to `POST /feedback`, and has a collapsed what-if view over the stored validation scores that never changes the decision. `python -m med_ui walkthrough` regenerates [the walkthrough](docs/phase_7/WALKTHROUGH.md) from the running API. The screen shows limits it does not remove: lookalike replacements (S01), familiar-recipient topic mistakes (S04), and mistaken first contacts (S11) are allowed; a well-formed address outside the directory snapshot is unable to assess, not a warning; scores are risk scores, not probabilities; and blocking is disabled.
-
-Monitor the served bundle (simulation). The commands below read the published validation data and the train feature file only, never a frozen test row, and never fit or change a model, a policy, or the cutoff. Each writes a record under `artifacts/med-monitor-v1/` that it refuses to overwrite; `report` regenerates `docs/phase_8` from those records.
-
-```bash
-python -m med_monitor build-reference   # train-only input reference and the fixed operating numbers
-python -m med_monitor replay            # eight windows through the API in process (about 2 minutes)
-python -m med_monitor feedback          # click and dataset feedback, plus the simulated review of the queue
-python -m med_monitor bundle-checks     # mismatched and corrupted bundles handed to the real API
-python -m med_monitor report            # regenerate docs/phase_8
-```
-
-`replay --api URL` uses a running service instead (it needs the `monitor` extra for `httpx`). The stored records hold aggregates only: no address, name, subject, body, or per-email score, and the API's log allow-list is unchanged. Read [monitoring](docs/phase_8/MONITORING.md), the [drift replay](docs/phase_8/DRIFT_REPLAY.md), the [reviewed feedback review](docs/phase_8/FEEDBACK_REVIEW.md), the [A/B test proposal](docs/phase_8/EXPERIMENT_PROPOSAL.md), and the [runbook](docs/phase_8/RUNBOOK.md) for the metrics, thresholds, minimum samples, the replay, the review workflow, and the rollout, rollback, and incident notes.
-
-Phase 9 quick start (install from the pinned dependencies, check the bundle, run the two services, and verify them). Full procedures are in [reproducibility](docs/phase_9/REPRODUCIBILITY.md) and [local deployment](docs/phase_9/LOCAL_DEPLOYMENT.md); every result is in the [test report](docs/phase_9/TEST_REPORT.md).
-
-```bash
-python3.11 -m venv .venv && source .venv/bin/activate       # Python 3.11.14 is the tested interpreter
-pip install -c constraints.txt -e ".[dev,ui,monitor]"
-python -m med_deploy check-bundle --scope api               # artifact versions and checksums (no scoring)
-python -m pytest -m "not slow"                              # the CI selection; the full `pytest` is the release gate
-python -m med_deploy smoke --spawn                          # API process plus the review screen, end to end
-
-docker/build.sh                                             # two local images: med-api (no pyarrow) and med-ui
-mkdir -p var/demo && docker compose up -d --wait            # API on 127.0.0.1:8000, screen on 127.0.0.1:8501
-python -m med_deploy regress --api http://127.0.0.1:8000    # the recorded scenario fixtures against the running API
-```
-
-The scenario regression keeps the known misses (lookalike replacement, familiar-recipient topic mistake, mistaken first contact) in the suite on purpose. Rolling back means restoring the known-good image; see the [rollback rehearsal](docs/phase_9/ROLLBACK_REHEARSAL.md) for what was rehearsed and what was not (there is no live hot swap, canary, or shadow mode).
-
-Read the [API contract](docs/phase_6/API_CONTRACT.md), [scoring flow](docs/phase_6/SCORING_FLOW.md), and [error behavior](docs/phase_6/ERROR_BEHAVIOR.md) for the service. Read the [evaluation report](docs/phase_5/EVALUATION_REPORT.md), [threshold policy](docs/phase_5/THRESHOLD_POLICY.md), [error analysis](docs/phase_5/ERROR_ANALYSIS.md), [uncertainty and prevalence](docs/phase_5/UNCERTAINTY_AND_PREVALENCE.md), and [model card](docs/phase_5/MODEL_CARD.md) for the policy and its one test pass. Read the [decision record](docs/phase_4/DECISION_RECORD.md), [experiment table](docs/phase_4/EXPERIMENT_TABLE.md), [comparison](docs/phase_4/COMPARISON.md), and [ablations](docs/phase_4/ABLATIONS.md) for the recorded runs. The [feature catalog](docs/phase_3/FEATURE_CATALOG.md), [profile and transform contract](docs/phase_3/PROFILE_AND_TRANSFORM.md), [feature quality report](docs/phase_3/FEATURE_QUALITY_REPORT.md), and [training/serving parity notes](docs/phase_3/TRAINING_SERVING_PARITY.md) describe the signals. The [data dictionary](docs/phase_2/DATA_DICTIONARY.md), [labeling guide](docs/phase_2/LABELING_GUIDE.md), [dataset specification](docs/phase_2/DATASET_SPECIFICATION.md), and [quality and leakage checklist](docs/phase_2/DATA_QUALITY_AND_LEAKAGE.md) describe the tables. The [scenarios](docs/phase_1/SCENARIOS.md), [input/output specification](docs/phase_1/INPUT_OUTPUT_SPECIFICATION.md), and [acceptance criteria](docs/phase_1/ACCEPTANCE_CRITERIA.md) still describe the product contract. Read the [UI guide](docs/phase_7/UI_GUIDE.md) and the [walkthrough](docs/phase_7/WALKTHROUGH.md) for the review screen. The Phase 9 documents cover testing, packaging, local deployment, and the rollback rehearsal.
-
-## Development roadmap
+## Roadmap
 
 | Phase | Scope | Status |
 | --- | --- | --- |
-| 1 | Product definition, scenarios, contracts, and measurable requirements | Complete — documentation |
-| 2 | Fictional histories, synthetic mistakes, labeling, and chronological splits | Complete — `med-synth-v4` |
-| 3 | Behavioral and text features with consistent historical lookup | Complete — `med-features-v2` |
-| 4 | Baselines, model comparison, and feature ablations | Complete — `med-model-v2` |
-| 5 | Evaluation, calibration if needed, and threshold selection | Complete — `med-policy-v2` |
-| 6 | Scoring API, validation, explanations, and failure handling | Complete — `med-api-v1` contract serving the v4 bundle |
-| 7 | Interactive draft review and simulated decisions | Complete — Streamlit client of `med-api-v1` |
-| 8 | Monitoring, reviewed feedback, drift investigation, and safe iteration | Complete — `med-monitor-v1` simulation and documents on the v4 bundle |
-| 9 | Regression tests, reproducible packaging, deployment, and rollback | Complete — `med-deploy-v1` records, pinned install, two local images, CI workflow, rehearsed rollback |
-| 10 | Architecture documentation, results, model card, and usage guide | Planned; initial README available |
+| 1 | Product definition, scenarios, contracts, and measurable requirements | Complete: [product brief](docs/phase_1/PRODUCT_BRIEF.md) |
+| 2 | Fictional histories, synthetic mistakes, labeling, and chronological splits | Complete: `med-synth-v4` |
+| 3 | Behavioral and text features with consistent historical lookup | Complete: `med-features-v2` |
+| 4 | Baselines, model comparison, and feature ablations | Complete: `med-model-v2` |
+| 5 | Evaluation, calibration if needed, and the threshold policy | Complete: `med-policy-v2` |
+| 6 | Scoring API, validation, explanations, and failure handling | Complete: `med-api-v1` |
+| 7 | Interactive draft review and simulated decisions | Complete: Streamlit client of `med-api-v1` |
+| 8 | Monitoring, reviewed feedback, drift investigation, and safe iteration | Complete: `med-monitor-v1`, a simulation |
+| 9 | Regression tests, reproducible packaging, deployment, and rollback | Complete: `med-deploy-v1`, local only |
+| 10 | Architecture, results, model card, and usage guide | Complete: [documentation index](docs/README.md) |
+
+The package version is 0.10.0. It remains a simulation demo and is not versioned as a release.
 
 ## Limitations and data disclaimer
 
-The project uses **fictional identities and synthetic email**. `med-synth-v4` is a generated record with stipulated labels, not a sample of real mail. Results show behavior under the generator's assumptions and do not establish real-world detection accuracy. The 0.5% product-like prevalence is a simulation assumption; the 10% training mix is enrichment for fitting. Diagnostic challenge rows are dependent within a `family_id` and are not a substitute for the product-like test. Template language repeats across time, and stripping reference, ticket, and date slots does not remove shared topic wording.
+The data is fictional and the labels are stipulated by the generator, so results describe behavior under its assumptions. The product-like prevalence is a simulation assumption (stated with the headline results), and the training mix is enriched. Diagnostic subsets are scenario challenge sets, not product-like results.
 
-Content cosine is a real but strong signal on this generator: alone it separates training mistakes from ordinary mail with an AUC of 0.932. Off-topic mistakes (S02, S04) sit low on it because the scenarios were written that way. An all-features model was allowed into selection only after three recorded train-only checks passed: the shortcut audit flags no content feature beyond 0.05–0.95, the all-features model beats the behavior-only model in every chronological train fold, and it also beats the content-only model in every fold. The selected `logistic_all_balanced` has product-like validation email average precision 0.831 [0.676, 0.954] on 20 positive emails; the best behavior-only model reaches 0.494. Its regularization constant is 1000, the top of the extended training grid, and its coefficients on overlapping counts are not separate effects. The warning cutoff (risk score 0.99968) was chosen with zero false warnings on 3,980 legitimate validation emails; that validation bound is not independent evidence because validation chose the cutoff. On the one product-like test pass, the policy warned on 9 of 30 misdirected emails (exact 95% recall interval 0.147 to 0.494, if emails were independent) with 0 false warnings on 5,970 legitimate emails. The exact upper 95% bound, 0.62 per 1,000, would be within the budget of 1 only if emails were independent; 5,682 of the 6,000 test drafts come from one sender and routine drafts repeat generated patterns, so AC01 is recorded as insufficient evidence, not met. The warned mistakes are added recipients (S02, S08) and cold-sender cases (S09). Every lookalike replacement (S01), familiar-recipient topic mistake (S04), and mistaken first contact (S11) in the validation and test subsets was allowed: legitimate first contacts score just below the cutoff, so the cutoff sits above most mistakes that look like them. Scores are not calibrated, and blocking is disabled. Every validation warning depends on low draft-text similarity: raising only that recipient's content cosine to the typical training value drops it below the cutoff, and the API reports this as `CONTENT_RELATIONSHIP_MISMATCH`. A well-formed address that is not in the snapshot directory, such as a typo, returns `unable_to_assess` rather than a warning. Measured at the API boundary over all 4,000 product-like validation drafts with one request in flight, p95 latency is 57.04 ms against the 300 ms target, on this machine only. Diagnostic rates are not 0.5% prevalence results.
+- The policy never warns on lookalike replacements (S01), familiar-recipient topic mistakes (S04), or mistaken first contacts (S11): legitimate first contacts score just below the cutoff, so a lower cutoff would warn on legitimate mail.
+- The interruption budget (AC01) is **insufficient evidence**: zero false warnings on the frozen test pass is a descriptive result, and the exact bound that would support a claim assumes independent emails, which most test drafts from one sender do not establish.
+- Content similarity is a strong signal on this generator, scores are uncalibrated, and recall estimates rest on few misdirected emails.
+- A well-formed address outside the directory snapshot is `unable_to_assess`, not a warning. A feedback click is not a label, and no reviewed label exists for the monitored traffic.
+- Latency, containers, and the rollback rehearsal ran on one machine, and no Linux or Windows host was used. CI ran once on GitHub and failed on one test that compared floats bit for bit across platforms; the fix passes the same tests in Linux containers, and a GitHub rerun is pending ([details](docs/LIMITATIONS_AND_FUTURE_WORK.md#ci-on-github)).
 
-The earlier v2 bundle (`med-synth-v2`, `med-features-v1`, `med-model-v1`, `med-policy-v1`) is kept unchanged as a baseline. It was superseded because its data made content cosine a near-perfect separator (train AUC 0.991), placed 66.5% of legitimate training rows within five minutes of earlier mail to the same recipient and no mistakes, and contained no mistaken first contact, so its behavior-only scorer learned that a new recipient is safe. Its test pass (5 of 10 warned, 0 false warnings on 1,990 legitimate emails, upper bound 1.85 per 1,000) could not support the budget, and its API p95 was 345.84 ms.
-
-The initial scope is English plain-text drafts with 1–20 unique recipients in a fictional environment. Mailbox integration, actual sending or blocking, attachment inspection, enterprise authentication, and production-scale operation are outside scope. Missing intended recipients without an unintended addressee are also outside the detection task.
-
-Monitoring is a simulation over fictional validation mail: there is no production traffic, no real reviewer, and no online experiment, and its thresholds are conventions that no real incident has tested. A train-only input reference is enriched to 10% misdirected mail, so some inputs sit in a watch band on ordinary traffic, and seven lifetime-count inputs leave the train range as time passes; the monitor reports them as structural. Nothing in Phase 8 shows that detection improved.
-
-False positives and missed mistakes are expected risks. Sparse history, legitimate new relationships, and changing topics may make assessments unreliable. An allow decision will not guarantee correctness, and the project should not be relied on to protect real confidential communications.
+The earlier dataset revision `med-synth-v2` is kept unchanged as a baseline; why it was superseded is in the [dataset specification](docs/phase_2/DATASET_SPECIFICATION.md). The full list, with the evidence each next step would produce, is in [limitations and future work](docs/LIMITATIONS_AND_FUTURE_WORK.md). The initial scope is English plain-text drafts with one to twenty unique recipients in a fictional organization. The project should not be relied on to protect real confidential communications.

@@ -87,6 +87,8 @@ Record the command, the pass count, and the date in `PROJECT_STATUS.md`. Do not 
 
 `pytest` rebuilds the dataset in memory and compares it to the published files. `validate` checks checksums, parsed CSV record counts, and the quality checks. Quoted newlines inside a body are one record.
 
+Documents generated from stored records are never edited by hand. They are `docs/RESULTS.md` and the blocks between `<!-- med-docs:begin NAME -->` and `<!-- med-docs:end NAME -->` markers in `README.md`, `docs/ARCHITECTURE.md`, `docs/MODEL_CARD.md`, `docs/DEMO_WALKTHROUGH.md`, and `docs/LIMITATIONS_AND_FUTURE_WORK.md`. Regenerate them with `python -m med_docs report`; `python -m med_docs check` fails when one is stale. A number in a public Phase 10 document comes from a stored record through that generator, or the document links to a generated page that states it. `src/med_docs/` uses the standard library only. It reads `test_evaluation.json` through the allow-list of aggregate key paths in `med_docs.version`, discarding the per-draft `outcomes` while the file is parsed. Do not widen that allow-list, do not read `outcomes`, and do not use `med_policy.report.stored_results` or `_context`, which load the whole file.
+
 ## Private context
 
 `project_context/` is local and gitignored. Read it. Do not quote it into public files.

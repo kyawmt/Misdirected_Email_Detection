@@ -1146,7 +1146,8 @@ def runbook(records: Records) -> str:
         "# Phase 8 — Runbook: rollout, rollback, and incident triage",
         "",
         f"Served bundle: {bundle_line(records)}. This runbook describes how a frozen, versioned bundle would be shadowed, canaried, rolled back, and investigated. "
-        "It is a document, not deployment tooling: no container, CI, or live switch between two bundles exists yet, and those belong to the next phase. " + frozen_note(),
+        "It is a document, not deployment tooling: there is no live switch between two bundles, no shadow mode, and no canary. "
+        "Phase 9 later added local containers, a CI workflow, and a rollback rehearsed as an image swap ([rollback rehearsal](../phase_9/ROLLBACK_REHEARSAL.md)); the rollback steps below are the ones it rehearsed. " + frozen_note(),
         "",
         "## The unit of change is a frozen bundle",
         "",
@@ -1205,8 +1206,8 @@ def runbook(records: Records) -> str:
         "4. Confirm the monitor: served versions match, no block decisions, unable-to-assess back to the reference.",
         "5. Write the incident record: trigger, time, bundle versions, counts, decision, and the offline check that must pass before the candidate returns.",
         "",
-        "**Capabilities this needs that do not exist yet:** a way to hold two bundles loadable at once, a per-sender routing switch, a shadow mode that records without showing, and a rehearsed rollback. "
-        "None was built in this phase.",
+        "**Capabilities this needs that do not exist:** a way to hold two bundles loadable at once, a per-sender routing switch, and a shadow mode that records without showing. None was built. "
+        "A rollback to a known-good image was rehearsed later, in Phase 9, as an image swap ([rollback rehearsal](../phase_9/ROLLBACK_REHEARSAL.md)).",
         "",
         "## Alert reference",
         "",
