@@ -458,8 +458,17 @@ def _latency_section(latency: dict, phase6: dict | None) -> list[str]:
     return out
 
 
+def _with_scratch_variable(command: str) -> str:
+    """`--output <scratch>/x` becomes `--output "$SCRATCH/x"`; every other word is kept as recorded."""
+    words = command.split(" ")
+    return " ".join(f'"$SCRATCH/{word[len("<scratch>/"):]}"' if word.startswith("<scratch>/") else word for word in words)
+
+
 def _rebuild_section(rebuild: dict) -> str:
-    lines = [f"**Rebuild into a scratch directory** ({_when(rebuild['date_utc'])}): `{rebuild['commands'][0]}` then `{rebuild['commands'][1]}`, compared with the published files. Published files were not touched: {rebuild['published_files_unchanged']}.\n"]
+    # The record stores `<scratch>` placeholders; printed as a shell variable so a copied command
+    # never turns into a redirection (`SCRATCH` is a scratch directory, for example from `mktemp -d`).
+    shown = [_with_scratch_variable(command) for command in rebuild["commands"]]
+    lines = [f"**Rebuild into a scratch directory** ({_when(rebuild['date_utc'])}, `SCRATCH` a scratch directory): `{shown[0]}` then `{shown[1]}`, compared with the published files. Published files were not touched: {rebuild['published_files_unchanged']}.\n"]
     lines.append(_table(["File", "Identical bytes", "Note"], [[f"`{item['file']}`", "yes" if item["identical"] else "no", item["note"]] for item in rebuild["files"]]) + "\n")
     lines.append(rebuild["summary"] + "\n")
     return "\n".join(lines)
@@ -561,19 +570,24 @@ def rollback_report(rec: dict) -> str:
     out.append("## Commands\n")
     out.append(
         "The published records under `artifacts/med-deploy-v1/` are the outputs of the run described above and are write-once: a command that names one of them is refused. "
-        "To rehearse again, write to a scratch path (the commands below can be run as printed; `<scratch>` is any directory you can write to, for example `mktemp -d`):\n"
+        "To rehearse again, write to a scratch directory. The block below makes one with `mktemp -d` and runs as printed from the repository root:\n"
     )
     out.append(
         "```bash\n"
         "docker/build.sh                                  # build med-api:phase9 and med-ui:phase9\n"
-        "python -m med_deploy images --record <scratch>/images.json\n"
-        "python -m med_deploy rehearse --mode container --record <scratch>/rehearsal_container.json\n"
-        "python -m med_deploy rehearse --mode process   --record <scratch>/rehearsal_process.json\n"
+        "SCRATCH=\"$(mktemp -d)\"\n"
+        "python -m med_deploy images --record \"$SCRATCH/images.json\"\n"
+        "python -m med_deploy rehearse --mode container --record \"$SCRATCH/rehearsal_container.json\"\n"
+        "python -m med_deploy rehearse --mode process   --record \"$SCRATCH/rehearsal_process.json\"\n"
         "```\n"
     )
     out.append(
-        "To roll back the running demo by hand, point compose at the known-good image id and recreate only the API: "
-        "`MED_API_IMAGE=<known-good image id> docker compose up -d --no-build --force-recreate --no-deps api`, then check `GET /ready`, run `python -m med_deploy regress --api http://127.0.0.1:8000`, and confirm the container's image id with `docker inspect`. "
+        "To roll back the running demo by hand, point compose at the known-good image id, read from the images record, and recreate only the API:\n\n"
+        "```bash\n"
+        "KNOWN_GOOD=\"$(python -c 'import json; print(json.load(open(\"artifacts/med-deploy-v1/images.json\"))[\"images\"][\"api\"][\"identity\"][\"id\"])')\"\n"
+        "MED_API_IMAGE=\"$KNOWN_GOOD\" docker compose up -d --no-build --force-recreate --no-deps api\n"
+        "```\n\n"
+        "Then check `GET /ready`, run `python -m med_deploy regress --api http://127.0.0.1:8000`, and confirm the container's image id with `docker inspect`. "
         "Do not edit a bundle inside a running container; a new bundle is a new image.\n"
     )
     out.append(
@@ -667,9 +681,10 @@ def reproducibility_report(rec: dict) -> str:
         "The data build refuses to write into a directory that already holds a dataset. The feature and model commands do **not** refuse to overwrite their default output directories, and `med_models run` also rewrites `docs/phase_4` and trains on the published features by default, "
         "so **never run `python -m med_features build` or `python -m med_models run` with default paths**. A rebuild demonstration sends every output to a scratch directory and trains on the scratch features:\n\n"
         "```bash\n"
-        "python -m med_data build --output <scratch>/data        # into a new directory; compare dataset_manifest.json with the published one\n"
-        "python -m med_features build --output <scratch>/features\n"
-        "python -m med_models run --features <scratch>/features --output <scratch>/model --docs <scratch>/docs\n"
+        "SCRATCH=\"$(mktemp -d)\"\n"
+        "python -m med_data build --output \"$SCRATCH/data\"        # into a new directory; compare dataset_manifest.json with the published one\n"
+        "python -m med_features build --output \"$SCRATCH/features\"\n"
+        "python -m med_models run --features \"$SCRATCH/features\" --output \"$SCRATCH/model\" --docs \"$SCRATCH/docs\"\n"
         "```\n\n"
         "The threshold step (`python -m med_policy select`) and the frozen evaluation (`python -m med_policy evaluate-test`) are one-shot commands and are not part of any rebuild demonstration. "
         "`python -m med_api latency` is the one-shot Phase 6 measurement; Phase 9 measures latency with `python -m med_deploy latency`, which writes a new record.\n"

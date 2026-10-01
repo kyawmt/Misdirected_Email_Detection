@@ -2,10 +2,13 @@
 
 Standard library only. Two rules hold for every read:
 
-* A record is parsed once, members named in `SEALED_KEYS` are discarded while it
+* Members named in `SEALED_KEYS` are removed from the raw text before the JSON
   is parsed, and only explicit key paths are taken from what is left. The
-  frozen test record also holds per-draft outcomes for frozen test drafts; they
-  are never read, kept, or emitted (`read_json`, `allow_listed`).
+  frozen test record also holds per-draft outcomes for frozen test drafts. The
+  scanner reads past their characters to find where each member ends, the way
+  a CSV reader reads past a row it skips, but never decodes them: no per-draft
+  object, string, or number is constructed, kept, or emitted (`strip_members`,
+  `read_json`, `allow_listed`).
 * Nothing here scores, fits, or opens a data table. The dataset is represented by
   its manifest and its quality report, which hold counts and checksums only.
 """
@@ -44,18 +47,105 @@ class RecordError(ValueError):
 # ------------------------------------------------------------------ low level
 
 
-def read_json(path: Path, drop: Iterable[str] = ()) -> Any:
-    """Parse a JSON file and discard every object member named in `drop` as it is parsed."""
+def _string_end(text: str, i: int) -> int:
+    """Index just past the JSON string that starts at `text[i]` (a quote). Escapes are stepped over, not decoded."""
+    i += 1
+    while True:
+        char = text[i]
+        if char == "\\":
+            i += 2
+        elif char == '"':
+            return i + 1
+        else:
+            i += 1
+
+
+def _skip_space(text: str, i: int) -> int:
+    while i < len(text) and text[i] in " \t\r\n":
+        i += 1
+    return i
+
+
+def _value_end(text: str, i: int) -> int:
+    """Index just past the JSON value that starts at or after `i`, found by structure alone."""
+    i = _skip_space(text, i)
+    if text[i] == '"':
+        return _string_end(text, i)
+    if text[i] in "{[":
+        depth = 0
+        while True:
+            char = text[i]
+            if char == '"':
+                i = _string_end(text, i)
+                continue
+            if char in "{[":
+                depth += 1
+            elif char in "}]":
+                depth -= 1
+                if depth == 0:
+                    return i + 1
+            i += 1
+    while i < len(text) and text[i] not in ",}] \t\r\n":
+        i += 1
+    return i
+
+
+def strip_members(text: str, drop: Iterable[str]) -> str:
+    """The JSON text without any object member whose key is in `drop`, at any depth.
+
+    Works on the characters only: a dropped member's value is skipped by matching
+    brackets and strings, never decoded, so none of its content becomes a Python
+    object. Keys are decoded only to compare them with `drop`.
+    """
     dropped = frozenset(drop)
+    if not dropped:
+        return text
+    out: list[str] = []
+    stack: list[str] = []
+    expect_key = False
+    i, n = 0, len(text)
+    while i < n:
+        char = text[i]
+        if char == '"':
+            end = _string_end(text, i)
+            if stack and stack[-1] == "{" and expect_key and json.loads(text[i:end]) in dropped:
+                colon = _skip_space(text, end)
+                if text[colon] != ":":
+                    raise RecordError("A record is not valid JSON")
+                after = _value_end(text, colon + 1)
+                while out and out[-1].isspace():
+                    out.pop()
+                if out and out[-1] == ",":
+                    out.pop()  # a later member: drop the comma before it
+                else:
+                    after = _skip_space(text, after)
+                    if after < n and text[after] == ",":
+                        after += 1  # the first member: drop the comma after it
+                i = after
+                continue
+            out.append(text[i:end])
+            expect_key = False
+            i = end
+            continue
+        if char in "{[":
+            stack.append(char)
+            expect_key = char == "{"
+        elif char in "}]":
+            stack.pop()
+            expect_key = False
+        elif char == ",":
+            expect_key = bool(stack) and stack[-1] == "{"
+        out.append(char)
+        i += 1
+    return "".join(out)
+
+
+def read_json(path: Path, drop: Iterable[str] = ()) -> Any:
+    """Parse a JSON file after removing every object member named in `drop` from its text."""
     path = Path(path)
     if not path.is_file():
         raise RecordError(f"{path} does not exist. The documents are generated from stored records only.")
-
-    def keep(pairs):
-        return {key: value for key, value in pairs if key not in dropped}
-
-    with path.open("rb") as handle:
-        return json.load(handle, object_pairs_hook=keep)
+    return json.loads(strip_members(path.read_text(encoding="utf-8"), drop))
 
 
 def pick(tree: Any, path: str) -> Any:

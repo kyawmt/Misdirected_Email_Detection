@@ -187,7 +187,7 @@ def test_the_key_numbers_trace_to_record_fields():
     experiments = _raw("artifacts/med-model-v2/experiments.json")
 
     # The recorded test pass, read here only at its aggregate paths.
-    test_tree = json.loads(_text(ROOT / "artifacts/med-policy-v2/test_evaluation.json"), object_pairs_hook=lambda pairs: {k: v for k, v in pairs if k not in docs_version.SEALED_KEYS})
+    test_tree = records.read_json(ROOT / "artifacts/med-policy-v2/test_evaluation.json", docs_version.SEALED_KEYS)
     for subset in ("test_product_like",):
         policy_block = test_tree["subsets"][subset]["policy"]
         email, fi = policy_block["email"], policy_block["interventions"]
@@ -222,7 +222,7 @@ def test_the_key_numbers_trace_to_record_fields():
     assert [row[0] for row in table] == [f"AC{i:02d}" for i in range(1, 11)]
     assert dict(table)["AC01"] == "insufficient evidence"
     assert dict(table)["AC04"] == "met"
-    assert all(status in ("met", "not met", "insufficient evidence") or status.startswith(("met for", "partly met", "not met for")) for _, status in table)
+    assert all(status in ("met", "not met", "insufficient evidence") for _, status in table), table
 
 
 def test_statuses_and_numbers_agree_with_the_earlier_generated_documents():
@@ -234,6 +234,12 @@ def test_statuses_and_numbers_agree_with_the_earlier_generated_documents():
             earlier = re.search(r"AC07: \*\*([^*]+)\*\*", phase5)
         now = re.search(rf"^\| {criterion} \| [^|]+ \| \*\*([^*]+)\*\*", results, re.M)
         assert earlier and now, criterion
+        if criterion == "AC02":
+            # Phase 5 printed a per-scenario reading; the final table judges the criterion as a whole
+            # and keeps that reading in the measured text.
+            assert now.group(1) in ("met", "not met")
+            assert f"Per scenario (the Phase 5 reading): {earlier.group(1)}." in results
+            continue
         assert earlier.group(1) == now.group(1), f"{criterion}: Phase 5 says {earlier.group(1)!r}, results say {now.group(1)!r}"
     assert re.search(r"AC05 \*\*([^*]+)\*\*", _text(DOCS / "phase_5/EVALUATION_REPORT.md")).group(1) == "met"
     assert re.search(r"^\| AC05 \| [^|]+ \| \*\*met\*\*", results, re.M)
@@ -533,12 +539,18 @@ SENTINEL = "SENTINEL-FROZEN-DRAFT"
 
 
 def _with_outcomes(tmp_path: Path, name: str, replace) -> Path:
-    """A copy of the scratch tree whose frozen record has its per-draft outcomes replaced. They are overwritten, never inspected."""
+    """A copy of the scratch tree whose frozen record has its per-draft outcomes replaced.
+
+    The real outcomes are removed from the text by `strip_members` before anything is
+    parsed, so this test never constructs them either; only the aggregate-only
+    remainder is parsed, and synthetic outcomes are added to it.
+    """
     root = _scratch_root(tmp_path / name)
     target = root / "artifacts/med-policy-v2/test_evaluation.json"
-    tree = json.loads(_text(target))
+    tree = json.loads(records.strip_members(_text(target), ["outcomes"]))
     for block in tree["subsets"].values():
-        block["outcomes"] = replace()
+        if replace is not None:
+            block["outcomes"] = replace()
     target.write_text(json.dumps(tree), encoding="utf-8")
     return root
 
@@ -546,7 +558,7 @@ def _with_outcomes(tmp_path: Path, name: str, replace) -> Path:
 def test_the_per_draft_outcomes_of_the_frozen_record_are_never_read(tmp_path):
     expected = documents.build(ROOT)
     garbage = lambda: [{"draft_id": SENTINEL, "scenario_id": "S99", "email_risk": 123.0, "subject": SENTINEL, "warned": True} for _ in range(5)]  # noqa: E731
-    for name, replace in (("removed", lambda: None), ("sentinel", garbage), ("nested", lambda: {"warned_mistakes": garbage(), "missed_mistakes": garbage(), "x": {"y": [garbage()]}})):
+    for name, replace in (("removed", None), ("null", lambda: None), ("sentinel", garbage), ("nested", lambda: {"warned_mistakes": garbage(), "missed_mistakes": garbage(), "x": {"y": [garbage()]}})):
         root = _with_outcomes(tmp_path, name, replace)
         built = documents.build(root)
         assert built == expected, f"the output changed when the per-draft outcomes were replaced ({name})"
@@ -694,3 +706,68 @@ def test_the_model_card_labels_every_technique_and_cites_the_references():
     assert "phase_5/MODEL_CARD.md" in card
     for heading in ("Intended use", "Out-of-scope use", "Model and inputs", "Training data", "Evaluation data and the one test pass", "Operating point and how it was chosen", "Results", "Known failure modes", "Calibration status", "Fairness and privacy notes", "Monitoring, feedback, and rollback", "Versions"):
         assert f"## {heading}" in card, heading
+
+
+def _without(tree, key):
+    if isinstance(tree, dict):
+        return {name: _without(value, key) for name, value in tree.items() if name != key}
+    if isinstance(tree, list):
+        return [_without(value, key) for value in tree]
+    return tree
+
+
+def test_strip_members_removes_a_member_without_decoding_it():
+    """Synthetic records only: strings with brackets, escapes, nesting, first, middle, and last members."""
+    cases = [
+        '{"a": 1, "outcomes": {"x": [{"draft_id": "d1", "s": "a}\\"]{"}]}, "b": 2}',
+        '{"outcomes": [1, 2, {"y": "}"}] , "b": {"outcomes": null, "c": "outcomes"}}',
+        '{"b": [{"outcomes": "z", "k": {"outcomes": {"q": 1}}}], "outcomes": -1.5e3}',
+        '{"outcomes": {}}',
+        "{}",
+        '[{"outcomes": 1}, {"keep": [true, false, null]}]',
+        '{"a": "\\u00e9\\\\", "outcomes": true}',
+        '{\n  "a": 1,\n  "outcomes": {"deep": [[{"draft_id": "d2"}]]}\n}',
+    ]
+    for text in cases:
+        assert json.loads(records.strip_members(text, ["outcomes"])) == _without(json.loads(text), "outcomes"), text
+    assert records.strip_members('{"a": 1}', []) == '{"a": 1}'
+
+
+def test_no_per_draft_object_is_constructed_when_the_frozen_record_is_read():
+    """The text is stripped first, so a key-recording parser never sees a per-draft field."""
+    seen = set()
+
+    def spy(pairs):
+        seen.update(key for key, _ in pairs)
+        return dict(pairs)
+
+    for name in ("test_evaluation.json", "validation_evaluation.json"):
+        text = (ROOT / "artifacts/med-policy-v2" / name).read_text(encoding="utf-8")
+        json.loads(records.strip_members(text, docs_version.SEALED_KEYS), object_pairs_hook=spy)
+    assert not seen & {"draft_id", "subject", "n_recipients", "outcomes", "examples", "examples_validation"}
+
+
+
+def _public_markdown():
+    return [ROOT / "README.md", *sorted(DOCS.rglob("*.md"))]
+
+
+def test_printed_commands_have_no_shell_redirection_or_angle_placeholders():
+    """A `<placeholder>/path` in a shell command is a redirection, so commands use a real variable instead."""
+    problems = []
+    for path in _public_markdown():
+        text = path.read_text(encoding="utf-8")
+        lines = []
+        for block in re.findall(r"```(?:bash|sh|shell)\n(.*?)```", text, re.S):
+            lines += block.replace("\\\n", " ").splitlines()
+        lines += [span for span in re.findall(r"`([^`\n]+)`", text) if span.startswith(("python -m ", "SCRATCH=", "MED_API_IMAGE=", "docker "))]
+        for line in lines:
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            lexer = shlex.shlex(line, posix=True, punctuation_chars=True)
+            lexer.whitespace_split = True
+            lexer.commenters = "#"
+            tokens = list(lexer)
+            if any(set(token) & set("<>") for token in tokens):
+                problems.append(f"{path.relative_to(ROOT)}: {line.strip()}")
+    assert problems == []

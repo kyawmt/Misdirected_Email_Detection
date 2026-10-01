@@ -77,7 +77,7 @@ Start the API and the screen as in the [usage guide](USAGE_GUIDE.md#start-the-de
 
 ## Step 5: a monitoring issue
 
-**Do.** Open the [drift replay](phase_8/DRIFT_REPLAY.md) and read the timeline and the three findings. To regenerate the documents from the stored records into a scratch folder, run `python -m med_monitor report --docs <scratch>/phase_8`.
+**Do.** Open the [drift replay](phase_8/DRIFT_REPLAY.md) and read the timeline and the three findings. To regenerate the documents from the stored records into a scratch folder, run `SCRATCH="$(mktemp -d)" && python -m med_monitor report --docs "$SCRATCH/phase_8"`.
 
 **What it shows.**
 
@@ -94,7 +94,7 @@ Start the API and the screen as in the [usage guide](USAGE_GUIDE.md#start-the-de
 
 ## Step 6: rollback
 
-**Do.** Open the [rollback rehearsal](phase_9/ROLLBACK_REHEARSAL.md). To rehearse again into a scratch record, run `python -m med_deploy rehearse --mode container --record <scratch>/rehearsal_container.json`.
+**Do.** Open the [rollback rehearsal](phase_9/ROLLBACK_REHEARSAL.md). To rehearse again into a scratch record, run `SCRATCH="$(mktemp -d)" && python -m med_deploy rehearse --mode container --record "$SCRATCH/rehearsal_container.json"`.
 
 **What it shows.**
 

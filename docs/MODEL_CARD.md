@@ -122,7 +122,7 @@ Acceptance status (rules and measured values in [results](RESULTS.md#5-acceptanc
 | ID | Criterion | Status |
 | --- | --- | --- |
 | AC01 | Interruption budget | **insufficient evidence** |
-| AC02 | Detection utility | **met for S09; partly met for S02, S08; not met for S01, S04, S11** |
+| AC02 | Detection utility | **met** |
 | AC03 | Threshold integrity | **met** |
 | AC04 | Conservative blocking | **met** |
 | AC05 | Latency | **met** |

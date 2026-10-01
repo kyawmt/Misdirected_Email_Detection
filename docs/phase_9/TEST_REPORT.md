@@ -270,7 +270,7 @@ In the fresh environment 52 third-party packages were installed; 53 are pinned; 
 
 Both images are built from `python:3.11.14-slim-bookworm@sha256:65a93d69fa75478d554f4ad27c85c1e69fa184956261b4301ebaf6dbb0a3543d` (Python 3.11.14). Installs used wheels only (`pip --only-binary=:all:`).
 
-**Rebuild into a scratch directory** (2026-09-30 17:57:28 UTC): `python -m med_features build --output <scratch>/features` then `python -m med_models run --features <scratch>/features --output <scratch>/model --docs <scratch>/docs`, compared with the published files. Published files were not touched: True.
+**Rebuild into a scratch directory** (2026-09-30 17:57:28 UTC, `SCRATCH` a scratch directory): `python -m med_features build --output "$SCRATCH/features"` then `python -m med_models run --features "$SCRATCH/features" --output "$SCRATCH/model" --docs "$SCRATCH/docs"`, compared with the published files. Published files were not touched: True.
 
 | File | Identical bytes | Note |
 | --- | --- | --- |

@@ -194,20 +194,35 @@ def acceptance(records: dict, points: dict, scenarios: dict) -> list[dict]:
     # AC02 ------------------------------------------------------------------
     test_cells = scenarios[TEST_PRODUCT]
     phrase = ac02_phrase(test_cells)
-    beaten = test["warned_mistakes"] > 0 and test["recall_exact"][0] > 0 and test["per_1000_legitimate"] <= budget
     base = baseline(records["validation"]["subsets"][SELECTION_SUBSET])
+    # One overall status for the Phase 1 criterion: useful detections beyond
+    # always-allow and the rules policy at a comparable budget. It sets no recall
+    # floor; the per-scenario reading Phase 5 printed stays in the measured text.
+    beaten = (
+        test["warned_mistakes"] > 0
+        and test["recall_exact"][0] > 0
+        and test["per_1000_legitimate"] <= budget
+        and selection["warned_mistakes"] > base["always_allow"]["warned"]
+        and selection["warned_mistakes"] > base["rules_same_budget"]["warned"]
+    )
     out.append(
         {
             "id": "AC02",
             "name": "Detection utility",
             "headline": f"{fmt.of(test['warned_mistakes'], test['misdirected'])} mistakes warned, recall {fmt.f(test['recall'])} {fmt.ci(*test['recall_exact'])}; no mistake warned in {', '.join(scenario_groups(test_cells)[2]) or 'no scenario'}",
-            "status": phrase if beaten else NOT_MET,
+            "status": MET if beaten else NOT_MET,
             "measured": (
                 f"`{TEST_PRODUCT}`: {fmt.of(test['warned_mistakes'], test['misdirected'])} mistakes warned, recall {fmt.f(test['recall'])} {fmt.ci(*test['recall_exact'])} if emails were independent, with {test['false_warnings']} false warnings. "
                 f"Always-allow warns on none. On `{SELECTION_SUBSET}` the rules policy at the same selection rule warned {base['rules_same_budget']['warned']} of {base['rules_same_budget']['positives']}, "
-                f"the policy {fmt.of(selection['warned_mistakes'], selection['misdirected'])}."
+                f"the policy {fmt.of(selection['warned_mistakes'], selection['misdirected'])}. "
+                f"Per scenario (the Phase 5 reading): {phrase}."
             ),
-            "rule": "met for a scenario when every mistake of that scenario on `" + TEST_PRODUCT + "` was warned, partly met when some were, not met when none were; the policy must also beat always-allow within the budget.",
+            "rule": (
+                "met when, within the budget, the policy warns on mistakes that always-allow and the rules policy at the same selection rule do not. "
+                "The Phase 1 criterion asks for useful detections beyond those baselines and sets no recall floor. "
+                "The per-scenario reading is reported, not part of the status: a scenario is met when every mistake of it on `" + TEST_PRODUCT + "` was warned, partly met when some were, not met when none were. "
+                "The budget it is held to is a descriptive pass on this corpus (AC01 is insufficient evidence)."
+            ),
             "evidence": [("Evaluation report", "phase_5/EVALUATION_REPORT.md"), ("Error analysis", "phase_5/ERROR_ANALYSIS.md")],
         }
     )

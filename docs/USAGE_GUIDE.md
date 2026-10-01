@@ -2,7 +2,7 @@
 
 How to run the demo, use the review screen, and re-run the checks. Everything is a local simulation on fictional data: nothing is sent, stopped, or hosted, both ports are bound to the loopback interface, and a failure is `unable_to_assess`, never an allow. Read [results](RESULTS.md) and [limitations and future work](LIMITATIONS_AND_FUTURE_WORK.md) to know what the numbers do and do not show.
 
-This page links to the detailed documents and does not repeat them. `<scratch>` in a command stands for any directory you can write to, for example one made with `mktemp -d`. The published records under `artifacts/` are write-once, so commands that would write a record are given scratch paths and can be run as printed.
+This page links to the detailed documents and does not repeat them. Commands that write a record or a document use a scratch directory made in the same block with `SCRATCH="$(mktemp -d)"`, because the published records under `artifacts/` are write-once. Every command block on this page runs as printed from the repository root; nothing in it needs to be substituted.
 
 ## What you need
 
@@ -77,7 +77,8 @@ The [UI guide](phase_7/UI_GUIDE.md) describes every part of the screen. In short
 The generated [walkthrough](phase_7/WALKTHROUGH.md) lists each step with the desired outcome beside the measured one. To regenerate it from a running API without replacing the published copy:
 
 ```bash
-python -m med_ui walkthrough --api http://127.0.0.1:8000 --output <scratch>/WALKTHROUGH.md
+SCRATCH="$(mktemp -d)"
+python -m med_ui walkthrough --api http://127.0.0.1:8000 --output "$SCRATCH/WALKTHROUGH.md"
 ```
 
 The [demo script](DEMO_WALKTHROUGH.md) follows the same steps as a short spoken demonstration.
@@ -87,9 +88,10 @@ The [demo script](DEMO_WALKTHROUGH.md) follows the same steps as a short spoken 
 The stored results are in [monitoring](phase_8/MONITORING.md), the [drift replay](phase_8/DRIFT_REPLAY.md), the [feedback review](phase_8/FEEDBACK_REVIEW.md), the [A/B test proposal](phase_8/EXPERIMENT_PROPOSAL.md), and the [runbook](phase_8/RUNBOOK.md). To regenerate those documents from the stored records, or to run the replay again, write to scratch:
 
 ```bash
-python -m med_monitor report --docs <scratch>/phase_8
-python -m med_monitor replay --plan-output <scratch>/replay_plan.json --output <scratch>/replay.json
-python -m med_monitor bundle-checks --output <scratch>/bundle_checks.json
+SCRATCH="$(mktemp -d)"
+python -m med_monitor report --docs "$SCRATCH/phase_8"
+python -m med_monitor replay --plan-output "$SCRATCH/replay_plan.json" --output "$SCRATCH/replay.json"
+python -m med_monitor bundle-checks --output "$SCRATCH/bundle_checks.json"
 ```
 
 The replay drives the real API in process through the test client and takes a couple of minutes; `--api http://127.0.0.1:8000` uses a running service instead. It reads validation mail and the train-only reference, never a frozen test row, and it never changes a model, a policy, or the cutoff. The monitor is a simulation: there is no production traffic and no real reviewer.
@@ -116,7 +118,8 @@ python -m med_docs check
 `med_docs check` fails if a generated document no longer matches the stored records. Check that the regression catches changes, using the recorded one-line mutations applied to a scratch copy of the source:
 
 ```bash
-python -m med_deploy mutation-check --record <scratch>/mutation_checks.json
+SCRATCH="$(mktemp -d)"
+python -m med_deploy mutation-check --record "$SCRATCH/mutation_checks.json"
 ```
 
 The results of all of these are in the [test report](phase_9/TEST_REPORT.md).
@@ -127,14 +130,16 @@ A rollback here means restoring a known-good image after a failing candidate. Th
 
 ```bash
 docker/build.sh
-python -m med_deploy rehearse --mode container --record <scratch>/rehearsal_container.json
-python -m med_deploy rehearse --mode process --record <scratch>/rehearsal_process.json
+SCRATCH="$(mktemp -d)"
+python -m med_deploy rehearse --mode container --record "$SCRATCH/rehearsal_container.json"
+python -m med_deploy rehearse --mode process --record "$SCRATCH/rehearsal_process.json"
 ```
 
-To roll back the running demo by hand, point compose at the known-good image id and recreate only the API, then check `GET /ready` and run the regression:
+To roll back the running demo by hand, point compose at the known-good image id (read from the images record) and recreate only the API, then check `GET /ready` and run the regression:
 
 ```bash
-MED_API_IMAGE=<known-good-image-id> docker compose up -d --no-build --force-recreate --no-deps api
+KNOWN_GOOD="$(python -c 'import json; print(json.load(open("artifacts/med-deploy-v1/images.json"))["images"]["api"]["identity"]["id"])')"
+MED_API_IMAGE="$KNOWN_GOOD" docker compose up -d --no-build --force-recreate --no-deps api
 python -m med_deploy regress --api http://127.0.0.1:8000
 ```
 
@@ -145,7 +150,8 @@ Do not edit a bundle inside a running container; a new bundle is a new image. Th
 Rebuilding the features and the model takes several minutes and must write to scratch, because the feature and model commands overwrite their default output directories:
 
 ```bash
-python -m med_deploy rebuild-demo --record <scratch>/rebuild_comparison.json
+SCRATCH="$(mktemp -d)"
+python -m med_deploy rebuild-demo --record "$SCRATCH/rebuild_comparison.json"
 ```
 
 It builds into a scratch directory, compares the result with the published files, and reports what is byte-identical.

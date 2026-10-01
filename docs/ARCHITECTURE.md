@@ -123,7 +123,7 @@ A draft is assessed against what existed before it was written, and nothing else
 - **History.** Sent mail with a send time strictly earlier than the draft. The draft's own family is dropped, and so is any earlier copy of its non-empty body. Empty bodies may repeat.
 - **Model inputs.** Only the scoring view's allow-list. The model never receives scenario ids, variants, generator topics, withheld contacts, counterfactual flags, family ids, splits, subsets, labels, stipulations, feedback, or fixture reasons. The API rejects such fields by name, at any depth, before reading their values.
 - **Learned preprocessing.** The text vocabulary and weights are fit on mail from before the validation window; the scaler and the model are fit on training data only.
-- **Frozen subsets.** Features, model, and cutoff are never chosen on the frozen test subsets, which were scored once. The documentation generator reads an allow-list of aggregate fields of that record and discards the per-draft outcomes it also stores.
+- **Frozen subsets.** Features, model, and cutoff are never chosen on the frozen test subsets, which were scored once. The documentation generator reads an allow-list of aggregate fields of that record. It removes the per-draft outcomes the record also stores from the text before parsing, so none of them is ever decoded.
 - **Template wording repeats on purpose.** A shared template phrase is not proof of a copied thread, and the hash check does not remove shortcut risk from repeated wording. See the [leakage checklist](phase_2/DATA_QUALITY_AND_LEAKAGE.md).
 
 ## Training and serving parity

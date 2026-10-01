@@ -28,7 +28,7 @@ Product-like mail assumes a simulated, low share of misdirected emails; the assu
 - Never warned on any subset: S01, S04, S11. The policy allows these mistakes.
 - AC01 (at most 1 false warning per 1,000 legitimate emails): **insufficient evidence**. 0 / 5,970 is a descriptive pass on this corpus; the exact upper bound, 0.62 per 1,000, holds only if emails are independent, and most test drafts come from one sender.
 - Client p95 latency 57.04 ms in process and 64.47 ms against the container, one request in flight, on one machine; target 300 ms.
-- Acceptance criteria: 7 met, 1 mixed by scenario (AC02), 2 insufficient evidence, 0 not met. See [results](docs/RESULTS.md) for denominators, intervals, and each rule.
+- Acceptance criteria: 8 met, 2 insufficient evidence, 0 not met. See [results](docs/RESULTS.md) for denominators, intervals, and each rule.
 - Scores are uncalibrated risk scores, not probabilities. Blocking is disabled. Nothing here shows that detection improved.
 <!-- med-docs:end headline -->
 
@@ -174,6 +174,6 @@ The data is fictional and the labels are stipulated by the generator, so results
 - The interruption budget (AC01) is **insufficient evidence**: zero false warnings on the frozen test pass is a descriptive result, and the exact bound that would support a claim assumes independent emails, which most test drafts from one sender do not establish.
 - Content similarity is a strong signal on this generator, scores are uncalibrated, and recall estimates rest on few misdirected emails.
 - A well-formed address outside the directory snapshot is `unable_to_assess`, not a warning. A feedback click is not a label, and no reviewed label exists for the monitored traffic.
-- Latency, containers, and the rollback rehearsal ran on one machine, and no Linux or Windows host was used. CI ran once on GitHub and failed on one test that compared floats bit for bit across platforms; the fix passes the same tests in Linux containers, and a GitHub rerun is pending ([details](docs/LIMITATIONS_AND_FUTURE_WORK.md#ci-on-github)).
+- Latency, containers, and the rollback rehearsal ran on one machine, and no Linux or Windows host was used. CI on GitHub runs the fast test selection: its first run failed on one test that compared floats bit for bit across platforms, and after the fix it [passed](https://github.com/kyawmt/Misdirected_Email_Detection/actions/runs/36811479847) on commit `50b82bd` ([details](docs/LIMITATIONS_AND_FUTURE_WORK.md#ci-on-github)).
 
 The earlier dataset revision `med-synth-v2` is kept unchanged as a baseline; why it was superseded is in the [dataset specification](docs/phase_2/DATASET_SPECIFICATION.md). The full list, with the evidence each next step would produce, is in [limitations and future work](docs/LIMITATIONS_AND_FUTURE_WORK.md). The initial scope is English plain-text drafts with one to twenty unique recipients in a fictional organization. The project should not be relied on to protect real confidential communications.

@@ -108,16 +108,24 @@ Published bundle files on disk (policy, model, manifests) are byte-identical bef
 
 ## Commands
 
-The published records under `artifacts/med-deploy-v1/` are the outputs of the run described above and are write-once: a command that names one of them is refused. To rehearse again, write to a scratch path (the commands below can be run as printed; `<scratch>` is any directory you can write to, for example `mktemp -d`):
+The published records under `artifacts/med-deploy-v1/` are the outputs of the run described above and are write-once: a command that names one of them is refused. To rehearse again, write to a scratch directory. The block below makes one with `mktemp -d` and runs as printed from the repository root:
 
 ```bash
 docker/build.sh                                  # build med-api:phase9 and med-ui:phase9
-python -m med_deploy images --record <scratch>/images.json
-python -m med_deploy rehearse --mode container --record <scratch>/rehearsal_container.json
-python -m med_deploy rehearse --mode process   --record <scratch>/rehearsal_process.json
+SCRATCH="$(mktemp -d)"
+python -m med_deploy images --record "$SCRATCH/images.json"
+python -m med_deploy rehearse --mode container --record "$SCRATCH/rehearsal_container.json"
+python -m med_deploy rehearse --mode process   --record "$SCRATCH/rehearsal_process.json"
 ```
 
-To roll back the running demo by hand, point compose at the known-good image id and recreate only the API: `MED_API_IMAGE=<known-good image id> docker compose up -d --no-build --force-recreate --no-deps api`, then check `GET /ready`, run `python -m med_deploy regress --api http://127.0.0.1:8000`, and confirm the container's image id with `docker inspect`. Do not edit a bundle inside a running container; a new bundle is a new image.
+To roll back the running demo by hand, point compose at the known-good image id, read from the images record, and recreate only the API:
+
+```bash
+KNOWN_GOOD="$(python -c 'import json; print(json.load(open("artifacts/med-deploy-v1/images.json"))["images"]["api"]["identity"]["id"])')"
+MED_API_IMAGE="$KNOWN_GOOD" docker compose up -d --no-build --force-recreate --no-deps api
+```
+
+Then check `GET /ready`, run `python -m med_deploy regress --api http://127.0.0.1:8000`, and confirm the container's image id with `docker inspect`. Do not edit a bundle inside a running container; a new bundle is a new image.
 
 ## What this does not cover
 

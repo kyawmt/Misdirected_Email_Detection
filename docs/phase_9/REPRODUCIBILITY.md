@@ -66,16 +66,17 @@ Streamlit requires pyarrow. When pyarrow is importable, pandas 3 stores strings 
 **Rebuilding** is a separate procedure, not part of installing, an image build, or CI. The frozen test subsets of `med-synth-v4` were evaluated once for `med-policy-v2`; a new policy needs a new version and a new frozen dataset version. The data build refuses to write into a directory that already holds a dataset. The feature and model commands do **not** refuse to overwrite their default output directories, and `med_models run` also rewrites `docs/phase_4` and trains on the published features by default, so **never run `python -m med_features build` or `python -m med_models run` with default paths**. A rebuild demonstration sends every output to a scratch directory and trains on the scratch features:
 
 ```bash
-python -m med_data build --output <scratch>/data        # into a new directory; compare dataset_manifest.json with the published one
-python -m med_features build --output <scratch>/features
-python -m med_models run --features <scratch>/features --output <scratch>/model --docs <scratch>/docs
+SCRATCH="$(mktemp -d)"
+python -m med_data build --output "$SCRATCH/data"        # into a new directory; compare dataset_manifest.json with the published one
+python -m med_features build --output "$SCRATCH/features"
+python -m med_models run --features "$SCRATCH/features" --output "$SCRATCH/model" --docs "$SCRATCH/docs"
 ```
 
 The threshold step (`python -m med_policy select`) and the frozen evaluation (`python -m med_policy evaluate-test`) are one-shot commands and are not part of any rebuild demonstration. `python -m med_api latency` is the one-shot Phase 6 measurement; Phase 9 measures latency with `python -m med_deploy latency`, which writes a new record.
 
 ### Rebuild demonstration
 
-**Rebuild into a scratch directory** (2026-09-30 17:57:28 UTC): `python -m med_features build --output <scratch>/features` then `python -m med_models run --features <scratch>/features --output <scratch>/model --docs <scratch>/docs`, compared with the published files. Published files were not touched: True.
+**Rebuild into a scratch directory** (2026-09-30 17:57:28 UTC, `SCRATCH` a scratch directory): `python -m med_features build --output "$SCRATCH/features"` then `python -m med_models run --features "$SCRATCH/features" --output "$SCRATCH/model" --docs "$SCRATCH/docs"`, compared with the published files. Published files were not touched: True.
 
 | File | Identical bytes | Note |
 | --- | --- | --- |

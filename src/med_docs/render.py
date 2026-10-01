@@ -319,20 +319,19 @@ def acceptance_table(facts: dict) -> str:
 
 
 def acceptance_counts(facts: dict) -> dict[str, int]:
-    counts = {MET: 0, NOT_MET: 0, INSUFFICIENT: 0, "partly": 0}
+    counts = {MET: 0, NOT_MET: 0, INSUFFICIENT: 0}
     for item in facts["acceptance"]:
         status = item["status"]
-        if status in (MET, NOT_MET, INSUFFICIENT):
-            counts[status] += 1
-        else:
-            counts["partly"] += 1
+        if status not in counts:
+            raise ValueError(f"{item['id']} has status {status!r}; a final status is met, not met, or insufficient evidence")
+        counts[status] += 1
     return counts
 
 
 def acceptance_summary(facts: dict) -> str:
-    """One line: how many criteria landed where. A criterion whose status is a per-scenario sentence counts as mixed."""
+    """One line: how many criteria landed where."""
     counts = acceptance_counts(facts)
-    parts = [f"{counts[MET]} met", f"{counts['partly']} mixed by scenario (AC02)", f"{counts[INSUFFICIENT]} insufficient evidence", f"{counts[NOT_MET]} not met"]
+    parts = [f"{counts[MET]} met", f"{counts[INSUFFICIENT]} insufficient evidence", f"{counts[NOT_MET]} not met"]
     return ", ".join(parts)
 
 
@@ -491,7 +490,7 @@ def results(facts: dict) -> str:
     add("")
     add(
         f"The criteria are defined in the [acceptance criteria](phase_1/ACCEPTANCE_CRITERIA.md), which is the product contract and keeps its Phase 1 wording. This is the final status of each, on this simulation only: {acceptance_summary(facts)}. "
-        "A status is **met**, **not met**, or **insufficient evidence**; AC02 reads per scenario."
+        "Each status is **met**, **not met**, or **insufficient evidence**. AC02 is judged as a whole; its per-scenario results are in its row and in section 2."
     )
     add("")
     add(acceptance_table(facts))
@@ -561,9 +560,9 @@ def results(facts: dict) -> str:
     add(fmt.table(["Record"], [[f"`{path}`"] for path in sources]))
     add("")
     add(
-        f"`artifacts/{policy['policy_version']}/test_evaluation.json` also stores, under each subset, per-draft outcomes for frozen test drafts. The generator discards those members while parsing the file and reads only these key paths: "
+        f"`artifacts/{policy['policy_version']}/test_evaluation.json` also stores, under each subset, per-draft outcomes for frozen test drafts. The generator removes those members from the file's text before parsing it (it reads past their characters to find where each member ends but never decodes them, so no per-draft value is constructed) and then reads only these key paths: "
         "the top-level policy and version fields, and for each test subset the `policy` counts, intervals, interventions, and coverage and `slices/email_by_scenario`. "
-        "The validation record is read through the same allow-list, and its per-draft outcomes are discarded the same way."
+        "The validation record is read through the same allow-list, and its per-draft outcomes are removed the same way."
     )
     add("")
     return "\n".join(lines)
