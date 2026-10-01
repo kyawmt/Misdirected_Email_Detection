@@ -25,7 +25,7 @@ from med_ui.config import (
     EXPLORATION_SCORES_FILE,
     TRADEOFF_MAX_FALSE_WARNINGS,
 )
-from med_ui.presentation import ExpectedBundle
+from med_ui.presentation import ExpectedBundle, format_score
 
 
 @dataclass(frozen=True)
@@ -153,5 +153,7 @@ def position_sentence(position: dict) -> str:
     return (
         f"On validation, {position['legitimate_at_or_above']} of {position['legitimate']} legitimate and "
         f"{position['mistakes_at_or_above']} of {position['mistakes']} misdirected emails score at or above "
-        f"this draft's email risk score ({position['email_risk']!r})."
+        # Rounded like every other live score: the API's last digits differ by platform
+        # (about 2e-16 between macOS arm64 and Linux x86_64).
+        f"this draft's email risk score ({format_score(position['email_risk'])})."
     )

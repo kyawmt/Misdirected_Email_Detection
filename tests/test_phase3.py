@@ -386,6 +386,10 @@ def test_real_training_fit_excludes_later_text_and_slots(dataset, fitted_real):
     assert changed
 
 
+# Same bound as the scoring-path parity check in med_policy (SCORE_PARITY_BOUND).
+FEATURE_PARITY_BOUND = 1e-12
+
+
 def test_published_artifact_matches_training_fit(dataset, fitted_real):
     """The published feature artifact equals a fresh fit on the dataset it names."""
     import json
@@ -431,8 +435,14 @@ def test_published_artifact_matches_training_fit(dataset, fitted_real):
         for draft_id in (ids.iloc[0], ids.iloc[len(ids) // 2], ids.iloc[-1]):
             fresh = transform_draft(directory, index, transformer, query_from_dataset(source, str(draft_id)))
             stored = frame.loc[frame["draft_id"] == draft_id].reset_index(drop=True)
-            # Lossless CSV: the stored floats are the in-memory floats, bit for bit.
-            pd.testing.assert_frame_equal(fresh, stored, check_exact=True)
+            # Keys, integers, and flags must match exactly. Floats are compared within
+            # FEATURE_PARITY_BOUND: the artifact was fitted on macOS arm64, and a fresh
+            # fit on Linux can differ in the last bits of a float sum (content_cosine
+            # differed by about 3e-17). Lossless CSV storage is still checked bit for bit
+            # in test_feature_csv_round_trips_every_float.
+            pd.testing.assert_frame_equal(fresh, stored, check_exact=False, rtol=0, atol=FEATURE_PARITY_BOUND)
+            floats = fresh.select_dtypes(include="float").columns
+            pd.testing.assert_frame_equal(fresh.drop(columns=floats), stored.drop(columns=floats), check_exact=True)
             assert validate_feature_frame(fresh) == []
     assert not (artifact / "features_test_product_like.csv").exists()
     assert not (artifact / "features_test_diagnostic.csv").exists()
