@@ -1,0 +1,151 @@
+{
+  "kind": "clean_checkout",
+  "deploy_version": "med-deploy-v1",
+  "date_utc": "2026-10-01T00:51:31Z",
+  "what": "every CI step, run in a scratch copy of the working tree (tracked files and new files that are not ignored) inside a fresh virtual environment",
+  "files_copied": 256,
+  "venv_python": "3.11.14",
+  "tested_python": "3.11.14",
+  "environment_of_the_fresh_venv": {
+    "kind": "environment",
+    "python": "3.11.14",
+    "python_matches_tested": true,
+    "tested_python": "3.11.14",
+    "platform": "macOS-27.0.1-arm64-arm-64bit",
+    "machine": "arm64",
+    "project_version": "0.9.0",
+    "packages": 52,
+    "key_packages": {
+      "numpy": "2.4.6",
+      "pandas": "3.0.6",
+      "scikit-learn": "1.9.1",
+      "scipy": "1.17.1",
+      "fastapi": "0.141.1",
+      "uvicorn": "0.54.0",
+      "httpx": "0.28.1",
+      "streamlit": "1.64.0",
+      "pyarrow": "25.0.1",
+      "pytest": "9.1.1"
+    },
+    "pyarrow_importable": true,
+    "pyarrow_version": "25.0.1",
+    "pandas_string_storage": {
+      "option": "auto",
+      "series_dtype": "str",
+      "backend": "ArrowStringArray"
+    },
+    "constraints": {
+      "file": "constraints.txt",
+      "pinned": 53,
+      "installed_but_not_pinned": [],
+      "version_differs": {},
+      "pinned_but_not_installed": [
+        "watchdog"
+      ]
+    },
+    "matches_constraints": true
+  },
+  "steps": [
+    {
+      "step": "install from the pinned dependencies",
+      "command": "python -m pip install -c constraints.txt -e \".[dev,ui,monitor]\"",
+      "exit_code": 0,
+      "seconds": 15.0,
+      "output_tail": [
+        "",
+        "Successfully installed MarkupSafe-3.0.3 altair-6.3.0 annotated-doc-0.0.5 annotated-types-0.8.0 anyio-4.15.1 attrs-26.1.0 certifi-2026.7.22 charset_normalizer-3.5.1 click-8.5.0 cloudpickle-3.1.2 fastapi-0.141.1 h11-0.16.0 httpcore-1.0.9 httptools-0.8.0 httpx-0.28.1 idna-3.20 iniconfig-2.3.0 itsdangerous-2.2.0 jinja2-3.1.6 joblib-1.6.0 jsonschema-4.26.0 jsonschema-specifications-2025.9.1 med-data-0.9.0 narwhals-2.26.0 numpy-2.4.6 packaging-26.3 pandas-3.0.6 pillow-12.3.0 pluggy-1.6.0 protobuf-7.36.2 pyarrow-25.0.1 pydantic-2.13.5 pydantic-core-2.46.5 pydeck-0.9.3 pygments-2.21.0 pytest-9.1.1 python-dateutil-2.9.0.post0 python-multipart-0.0.32 referencing-0.37.0 requests-2.34.2 rpds-py-2026.6.3 scikit-learn-1.9.1 scipy-1.17.1 six-1.17.0 starlette-1.7.0 streamlit-1.64.0 threadpoolctl-3.7.0 toml-0.10.2 typing-extensions-4.16.0 typing-inspection-0.4.4 urllib3-2.8.0 uvicorn-0.54.0 websockets-16.1.1",
+        "",
+        "",
+        "[notice] A new release of pip is available: 25.3 -> 26.2.1",
+        "[notice] To update, run: /private/var/folders/tt/h086jz8n7_d1dcw55n9vlhv00000gn/T/med-clean-checkout-0s7_ya9t/venv/bin/python -m pip install --upgrade pip"
+      ]
+    },
+    {
+      "step": "dependency consistency",
+      "command": "python -m pip check",
+      "exit_code": 0,
+      "seconds": 0.2,
+      "output_tail": [
+        "No broken requirements found."
+      ]
+    },
+    {
+      "step": "environment matches the pins",
+      "command": "python -m med_deploy environment --constraints constraints.txt --check",
+      "exit_code": 0,
+      "seconds": 2.5,
+      "output_tail": [
+        "    ]",
+        "  },",
+        "  \"matches_constraints\": true",
+        "}",
+        "",
+        "environment check: passed"
+      ]
+    },
+    {
+      "step": "api bundle versions and checksums",
+      "command": "python -m med_deploy check-bundle --scope api",
+      "exit_code": 0,
+      "seconds": 5.3,
+      "output_tail": [
+        "ok   policy_matches_snapshot: policy dataset med-synth-v4",
+        "ok   text_transformer: loads without refitting",
+        "ok   no_frozen_features: no features_test_* file in the feature artifact",
+        "ok   anchored_digests: 1 file(s) equal the digests anchored in bundle_digests.json: policy.json",
+        "{\"dataset_version\": \"med-synth-v4\", \"feature_spec_version\": \"med-features-v2\", \"model_version\": \"med-model-v2\", \"policy_version\": \"med-policy-v2\", \"T_warn\": 0.9996767050340489, \"blocking_enabled\": false}",
+        "bundle check (api): passed"
+      ]
+    },
+    {
+      "step": "ui bundle versions and checksums",
+      "command": "python -m med_deploy check-bundle --scope ui",
+      "exit_code": 0,
+      "seconds": 1.2,
+      "output_tail": [
+        "ok   policy_file: versions match this code, blocking disabled, cutoff finite",
+        "ok   validation_files: validation_scores.csv warns on 8 drafts, as policy.json records; validation_evaluation.json parses",
+        "ok   dataset_files: 5 tables match dataset_manifest.json (checksums and record counts)",
+        "ok   anchored_digests: 3 file(s) equal the digests anchored in bundle_digests.json: policy.json, validation_evaluation.json, validation_scores.csv",
+        "{\"dataset_version\": \"med-synth-v4\", \"feature_spec_version\": \"med-features-v2\", \"model_version\": \"med-model-v2\", \"policy_version\": \"med-policy-v2\", \"T_warn\": 0.9996767050340489, \"blocking_enabled\": false}",
+        "bundle check (ui): passed"
+      ]
+    },
+    {
+      "step": "compact suite and public-doc checks",
+      "command": "python -m pytest -m \"not slow\" -q",
+      "exit_code": 0,
+      "seconds": 120.0,
+      "output_tail": [
+        "../venv/lib/python3.11/site-packages/fastapi/testclient.py:1",
+        "  /private/var/folders/tt/h086jz8n7_d1dcw55n9vlhv00000gn/T/med-clean-checkout-0s7_ya9t/venv/lib/python3.11/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.",
+        "    from starlette.testclient import TestClient as TestClient  # noqa",
+        "",
+        "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+        "192 passed, 1 skipped, 7 deselected, 1 warning in 118.56s (0:01:58)"
+      ]
+    },
+    {
+      "step": "api startup and end-to-end smoke",
+      "command": "python -m med_deploy smoke --spawn",
+      "exit_code": 0,
+      "seconds": 12.2,
+      "output_tail": [
+        "ok   screen_feedback: one click added one line (no address) to the disposable feedback file; no bundle file changed; the next assessment is identical",
+        "ok   screen_no_local_scoring: the screen process never imported the scoring modules",
+        "ok   bundle_files_unchanged: policy, model, and manifest files on disk have the same SHA-256 before and after",
+        "smoke (process): passed",
+        "",
+        "2026-10-01 08:51:27.824 WARNING streamlit.runtime.scriptrunner_utils.script_run_context: Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode."
+      ]
+    }
+  ],
+  "passed": true,
+  "not_verified": "GitHub Actions itself: the workflow file was not executed by a GitHub runner from this machine",
+  "machine": {
+    "platform": "macOS-27.0.1-arm64-arm-64bit",
+    "machine": "arm64",
+    "python": "3.11.14",
+    "cpu_count": 10
+  }
+}

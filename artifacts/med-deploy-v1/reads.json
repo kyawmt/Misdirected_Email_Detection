@@ -1,0 +1,101 @@
+{
+  "kind": "reads",
+  "deploy_version": "med-deploy-v1",
+  "date_utc": "2026-09-30T17:45:30Z",
+  "method": "each process ran under a Python audit hook that logs open events; the API was started as `python -m med_api serve` and stopped with SIGTERM, the review screen was driven by the smoke check (AppTest) against it with file hashing off",
+  "workload": {
+    "api": "startup, then the smoke check's assessments (allow, warn, edits, invalid_input, unavailable) and one feedback click",
+    "ui": "page load, every curated example's catalog build, readiness, assessments, edits, and one feedback click",
+    "smoke_passed": true,
+    "feedback_lines_written_to_the_disposable_file": 1
+  },
+  "policy_dir": "artifacts/med-policy-v2",
+  "processes": {
+    "api": {
+      "read": [
+        "artifacts/med-features-v2/artifact_manifest.json",
+        "artifacts/med-features-v2/feature_schema.json",
+        "artifacts/med-features-v2/features_train.csv",
+        "artifacts/med-features-v2/features_validation_diagnostic.csv",
+        "artifacts/med-features-v2/features_validation_product_like.csv",
+        "artifacts/med-features-v2/fit_metadata.json",
+        "artifacts/med-features-v2/quality_report.json",
+        "artifacts/med-features-v2/text_transformer.joblib",
+        "artifacts/med-model-v2/model.joblib",
+        "artifacts/med-policy-v2/policy.json",
+        "data/med-synth-v4/contacts.csv",
+        "data/med-synth-v4/dataset_manifest.json",
+        "data/med-synth-v4/draft_recipients.csv",
+        "data/med-synth-v4/drafts.csv",
+        "data/med-synth-v4/invalid_fixtures.csv",
+        "data/med-synth-v4/labels.csv",
+        "data/med-synth-v4/message_recipients.csv",
+        "data/med-synth-v4/messages.csv",
+        "data/med-synth-v4/quality_report.json",
+        "data/med-synth-v4/reviewer_feedback.csv",
+        "data/med-synth-v4/split_manifest.csv"
+      ],
+      "expected_by_bundle_check": [
+        "artifacts/med-features-v2/artifact_manifest.json",
+        "artifacts/med-features-v2/feature_schema.json",
+        "artifacts/med-features-v2/features_train.csv",
+        "artifacts/med-features-v2/features_validation_diagnostic.csv",
+        "artifacts/med-features-v2/features_validation_product_like.csv",
+        "artifacts/med-features-v2/fit_metadata.json",
+        "artifacts/med-features-v2/quality_report.json",
+        "artifacts/med-features-v2/text_transformer.joblib",
+        "artifacts/med-model-v2/model.joblib",
+        "artifacts/med-policy-v2/policy.json",
+        "data/med-synth-v4/contacts.csv",
+        "data/med-synth-v4/dataset_manifest.json",
+        "data/med-synth-v4/draft_recipients.csv",
+        "data/med-synth-v4/drafts.csv",
+        "data/med-synth-v4/invalid_fixtures.csv",
+        "data/med-synth-v4/labels.csv",
+        "data/med-synth-v4/message_recipients.csv",
+        "data/med-synth-v4/messages.csv",
+        "data/med-synth-v4/quality_report.json",
+        "data/med-synth-v4/reviewer_feedback.csv",
+        "data/med-synth-v4/split_manifest.csv"
+      ],
+      "matches_expected": true,
+      "read_but_not_expected": [],
+      "expected_but_not_read": [],
+      "written_under_root": [],
+      "files_written_outside_root": 1
+    },
+    "ui": {
+      "read": [
+        "artifacts/med-policy-v2/policy.json",
+        "artifacts/med-policy-v2/validation_evaluation.json",
+        "artifacts/med-policy-v2/validation_scores.csv",
+        "data/med-synth-v4/contacts.csv",
+        "data/med-synth-v4/draft_recipients.csv",
+        "data/med-synth-v4/drafts.csv",
+        "data/med-synth-v4/labels.csv",
+        "data/med-synth-v4/split_manifest.csv"
+      ],
+      "expected_by_bundle_check": [
+        "artifacts/med-policy-v2/policy.json",
+        "artifacts/med-policy-v2/validation_evaluation.json",
+        "artifacts/med-policy-v2/validation_scores.csv",
+        "data/med-synth-v4/contacts.csv",
+        "data/med-synth-v4/draft_recipients.csv",
+        "data/med-synth-v4/drafts.csv",
+        "data/med-synth-v4/labels.csv",
+        "data/med-synth-v4/split_manifest.csv"
+      ],
+      "matches_expected": true,
+      "read_but_not_expected": [],
+      "expected_but_not_read": [],
+      "written_under_root": [],
+      "files_written_outside_root": 2
+    }
+  },
+  "machine": {
+    "platform": "macOS-27.0.1-arm64-arm-64bit",
+    "machine": "arm64",
+    "python": "3.11.14",
+    "cpu_count": 10
+  }
+}

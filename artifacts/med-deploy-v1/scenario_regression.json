@@ -1,0 +1,1156 @@
+{
+  "deploy_version": "med-deploy-v1",
+  "kind": "scenario_regression",
+  "recorded_at": "2026-09-30T15:39:13Z",
+  "subset": "validation_product_like",
+  "bundle": {
+    "contract_version": "med-api-v1",
+    "snapshot_id": "med-synth-v4",
+    "model_version": "med-model-v2",
+    "feature_spec_version": "med-features-v2",
+    "policy_version": "med-policy-v2",
+    "T_warn": 0.9996767050340489,
+    "blocking_enabled": false
+  },
+  "sources": {
+    "selection": "artifacts/med-policy-v2/validation_scores.csv: the policy's stored decisions on validation_product_like, chosen by rule",
+    "requests": "rebuilt from data/med-synth-v4 validation drafts by draft id, streamed so that no frozen record is kept; no address, subject, or body is stored here",
+    "expected": "recorded once from the frozen bundle through the API; each decision and email risk agrees with the stored validation table to 1e-12",
+    "desired": "the product intent in docs/phase_1/SCENARIOS.md: a misdirected email should warn and a legitimate one should allow"
+  },
+  "score_tolerance": 1e-09,
+  "fixtures": [
+    {
+      "key": "routine_allow",
+      "title": "Routine project mail",
+      "kind": "draft",
+      "guards": "The no-intervention path: an allow with no flagged recipient.",
+      "source": {
+        "draft_id": "d003390",
+        "subset": "validation_product_like",
+        "selection": "The S05 internal project draft at the median email risk score among those allowed.",
+        "stored_decision": "allow",
+        "stored_email_risk": 8.215784132392904e-12
+      },
+      "scenario": {
+        "id": "S05",
+        "variant": "internal_project",
+        "note": "audit metadata: never part of a request"
+      },
+      "misdirected": false,
+      "desired": "allow",
+      "known_miss": false,
+      "expected": {
+        "status_code": 200,
+        "status": "assessed",
+        "decision": "allow",
+        "email_risk_score": 8.215784132392904e-12,
+        "recipients": [
+          {
+            "roles": [
+              "to"
+            ],
+            "risk_score": 8.931272944408717e-27,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": []
+          },
+          {
+            "roles": [
+              "to"
+            ],
+            "risk_score": 8.215784132392904e-12,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": []
+          },
+          {
+            "roles": [
+              "to"
+            ],
+            "risk_score": 4.422921221042517e-12,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": []
+          },
+          {
+            "roles": [
+              "cc"
+            ],
+            "risk_score": 6.213298939335974e-17,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": []
+          }
+        ],
+        "explanation": [
+          "Risk scores come from sender-recipient history, recency, co-recipient support, and contact similarity. Draft-text similarity to earlier mail with each recipient was also an input to this model.",
+          "Scores are risk scores, not probabilities.",
+          "Allow means no intervention under this policy. It does not guarantee that every recipient is correct."
+        ],
+        "provenance": {
+          "model_version": "med-model-v2",
+          "feature_spec_version": "med-features-v2",
+          "policy_version": "med-policy-v2",
+          "T_warn": 0.9996767050340489,
+          "blocking_enabled": false,
+          "snapshot_id": "med-synth-v4",
+          "effective_cutoff": "2025-04-02T09:19:24.000000Z",
+          "history_rule": "sent mail strictly earlier than the cutoff"
+        }
+      }
+    },
+    {
+      "key": "added_recipient_warn",
+      "title": "Added external recipient",
+      "kind": "draft",
+      "guards": "A warning on an added recipient, with the API's codes on the flagged recipient.",
+      "source": {
+        "draft_id": "d003027",
+        "subset": "validation_product_like",
+        "selection": "Among S02 added-recipient mistakes that were warned: the fewest recipients, then the highest email risk score.",
+        "stored_decision": "warn",
+        "stored_email_risk": 0.9997260118789929
+      },
+      "scenario": {
+        "id": "S02",
+        "variant": "added_external",
+        "note": "audit metadata: never part of a request"
+      },
+      "misdirected": true,
+      "desired": "warn",
+      "known_miss": false,
+      "expected": {
+        "status_code": 200,
+        "status": "assessed",
+        "decision": "warn",
+        "email_risk_score": 0.9997260118789929,
+        "recipients": [
+          {
+            "roles": [
+              "to"
+            ],
+            "risk_score": 0.01473212775936426,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": []
+          },
+          {
+            "roles": [
+              "cc"
+            ],
+            "risk_score": 0.9997260118789929,
+            "flagged": true,
+            "reason_codes": [
+              {
+                "code": "EXTERNAL_RECIPIENT",
+                "text": "The address is outside the fictional organization; context, not proof of a mistake."
+              },
+              {
+                "code": "UNUSUAL_RECIPIENT_COMBINATION",
+                "text": "These addressees have little support as a group in the available prior communication."
+              },
+              {
+                "code": "CONTENT_RELATIONSHIP_MISMATCH",
+                "text": "This draft differs from prior topics exchanged with this recipient."
+              }
+            ],
+            "evidence_limitations": []
+          }
+        ],
+        "explanation": [
+          "Risk scores come from sender-recipient history, recency, co-recipient support, and contact similarity. Draft-text similarity to earlier mail with each recipient was also an input to this model.",
+          "Scores are risk scores, not probabilities.",
+          "Warn asks the sender to review the flagged recipients. It is not a finding about the sender's intent."
+        ],
+        "provenance": {
+          "model_version": "med-model-v2",
+          "feature_spec_version": "med-features-v2",
+          "policy_version": "med-policy-v2",
+          "T_warn": 0.9996767050340489,
+          "blocking_enabled": false,
+          "snapshot_id": "med-synth-v4",
+          "effective_cutoff": "2025-04-21T14:02:18.000000Z",
+          "history_rule": "sent mail strictly earlier than the cutoff"
+        }
+      }
+    },
+    {
+      "key": "legitimate_first_contact_allow",
+      "title": "New legitimate collaborator",
+      "kind": "draft",
+      "guards": "Legitimate novelty stays allowed, with a limited-history limitation and not a warning.",
+      "source": {
+        "draft_id": "d003216",
+        "subset": "validation_product_like",
+        "selection": "The S03 legitimate first contact allowed with the highest email risk score, the one closest to the cutoff.",
+        "stored_decision": "allow",
+        "stored_email_risk": 0.9973707113436169
+      },
+      "scenario": {
+        "id": "S03",
+        "variant": "legitimate_first_contact",
+        "note": "audit metadata: never part of a request"
+      },
+      "misdirected": false,
+      "desired": "allow",
+      "known_miss": false,
+      "expected": {
+        "status_code": 200,
+        "status": "assessed",
+        "decision": "allow",
+        "email_risk_score": 0.9973707113436169,
+        "recipients": [
+          {
+            "roles": [
+              "to"
+            ],
+            "risk_score": 0.9973707113436169,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": [
+              {
+                "code": "LIMITED_RELATIONSHIP_HISTORY",
+                "text": "Little or no prior communication is available; an evidence limitation, not a verdict."
+              }
+            ]
+          }
+        ],
+        "explanation": [
+          "Risk scores come from sender-recipient history, recency, co-recipient support, and contact similarity. Draft-text similarity to earlier mail with each recipient was also an input to this model.",
+          "Scores are risk scores, not probabilities.",
+          "Allow means no intervention under this policy. It does not guarantee that every recipient is correct."
+        ],
+        "provenance": {
+          "model_version": "med-model-v2",
+          "feature_spec_version": "med-features-v2",
+          "policy_version": "med-policy-v2",
+          "T_warn": 0.9996767050340489,
+          "blocking_enabled": false,
+          "snapshot_id": "med-synth-v4",
+          "effective_cutoff": "2025-05-13T19:45:37.000000Z",
+          "history_rule": "sent mail strictly earlier than the cutoff"
+        }
+      }
+    },
+    {
+      "key": "new_domain_allow",
+      "title": "Uncommon external domain",
+      "kind": "draft",
+      "guards": "A legitimate first contact at a new external domain stays allowed.",
+      "source": {
+        "draft_id": "d003240",
+        "subset": "validation_product_like",
+        "selection": "The S06 legitimate new-domain draft allowed with the highest email risk score.",
+        "stored_decision": "allow",
+        "stored_email_risk": 9.604143384212192e-27
+      },
+      "scenario": {
+        "id": "S06",
+        "variant": "legitimate_new_domain",
+        "note": "audit metadata: never part of a request"
+      },
+      "misdirected": false,
+      "desired": "allow",
+      "known_miss": false,
+      "expected": {
+        "status_code": 200,
+        "status": "assessed",
+        "decision": "allow",
+        "email_risk_score": 9.604143384211714e-27,
+        "recipients": [
+          {
+            "roles": [
+              "to"
+            ],
+            "risk_score": 9.604143384211714e-27,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": [
+              {
+                "code": "LIMITED_RELATIONSHIP_HISTORY",
+                "text": "Little or no prior communication is available; an evidence limitation, not a verdict."
+              }
+            ]
+          }
+        ],
+        "explanation": [
+          "Risk scores come from sender-recipient history, recency, co-recipient support, and contact similarity. Draft-text similarity to earlier mail with each recipient was also an input to this model.",
+          "Scores are risk scores, not probabilities.",
+          "Allow means no intervention under this policy. It does not guarantee that every recipient is correct."
+        ],
+        "provenance": {
+          "model_version": "med-model-v2",
+          "feature_spec_version": "med-features-v2",
+          "policy_version": "med-policy-v2",
+          "T_warn": 0.9996767050340489,
+          "blocking_enabled": false,
+          "snapshot_id": "med-synth-v4",
+          "effective_cutoff": "2025-06-13T20:15:41.000000Z",
+          "history_rule": "sent mail strictly earlier than the cutoff"
+        }
+      }
+    },
+    {
+      "key": "topic_change_allow",
+      "title": "Legitimate topic change",
+      "kind": "draft",
+      "guards": "A topic change alone is not a mistake.",
+      "source": {
+        "draft_id": "d003251",
+        "subset": "validation_product_like",
+        "selection": "The S07 legitimate topic change allowed with the highest email risk score.",
+        "stored_decision": "allow",
+        "stored_email_risk": 0.519308306016665
+      },
+      "scenario": {
+        "id": "S07",
+        "variant": "legitimate_topic_change",
+        "note": "audit metadata: never part of a request"
+      },
+      "misdirected": false,
+      "desired": "allow",
+      "known_miss": false,
+      "expected": {
+        "status_code": 200,
+        "status": "assessed",
+        "decision": "allow",
+        "email_risk_score": 0.5193083060166647,
+        "recipients": [
+          {
+            "roles": [
+              "to"
+            ],
+            "risk_score": 0.5193083060166647,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": []
+          }
+        ],
+        "explanation": [
+          "Risk scores come from sender-recipient history, recency, co-recipient support, and contact similarity. Draft-text similarity to earlier mail with each recipient was also an input to this model.",
+          "Scores are risk scores, not probabilities.",
+          "Allow means no intervention under this policy. It does not guarantee that every recipient is correct."
+        ],
+        "provenance": {
+          "model_version": "med-model-v2",
+          "feature_spec_version": "med-features-v2",
+          "policy_version": "med-policy-v2",
+          "T_warn": 0.9996767050340489,
+          "blocking_enabled": false,
+          "snapshot_id": "med-synth-v4",
+          "effective_cutoff": "2025-04-08T16:52:51.000000Z",
+          "history_rule": "sent mail strictly earlier than the cutoff"
+        }
+      }
+    },
+    {
+      "key": "known_miss_lookalike",
+      "title": "Lookalike replacement (S01)",
+      "kind": "draft",
+      "guards": "A known miss: the policy allows a lookalike replacement. It must not change silently.",
+      "source": {
+        "draft_id": "d003002",
+        "subset": "validation_product_like",
+        "selection": "The S01 lookalike mistake that was allowed, with the highest email risk score.",
+        "stored_decision": "allow",
+        "stored_email_risk": 0.9818356570134112
+      },
+      "scenario": {
+        "id": "S01",
+        "variant": "lookalike_replacement",
+        "note": "audit metadata: never part of a request"
+      },
+      "misdirected": true,
+      "desired": "warn",
+      "known_miss": true,
+      "expected": {
+        "status_code": 200,
+        "status": "assessed",
+        "decision": "allow",
+        "email_risk_score": 0.9818356570134115,
+        "recipients": [
+          {
+            "roles": [
+              "to"
+            ],
+            "risk_score": 0.9818356570134115,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": []
+          }
+        ],
+        "explanation": [
+          "Risk scores come from sender-recipient history, recency, co-recipient support, and contact similarity. Draft-text similarity to earlier mail with each recipient was also an input to this model.",
+          "Scores are risk scores, not probabilities.",
+          "Allow means no intervention under this policy. It does not guarantee that every recipient is correct."
+        ],
+        "provenance": {
+          "model_version": "med-model-v2",
+          "feature_spec_version": "med-features-v2",
+          "policy_version": "med-policy-v2",
+          "T_warn": 0.9996767050340489,
+          "blocking_enabled": false,
+          "snapshot_id": "med-synth-v4",
+          "effective_cutoff": "2025-03-31T08:40:22.000000Z",
+          "history_rule": "sent mail strictly earlier than the cutoff"
+        }
+      }
+    },
+    {
+      "key": "known_miss_topic",
+      "title": "Familiar recipient, unusual topic (S04)",
+      "kind": "draft",
+      "guards": "A known miss: the policy allows a familiar-recipient topic mistake.",
+      "source": {
+        "draft_id": "d003049",
+        "subset": "validation_product_like",
+        "selection": "The S04 familiar-recipient topic mistake that was allowed, with the highest email risk score.",
+        "stored_decision": "allow",
+        "stored_email_risk": 0.9943188301820353
+      },
+      "scenario": {
+        "id": "S04",
+        "variant": "familiar_topic_mismatch",
+        "note": "audit metadata: never part of a request"
+      },
+      "misdirected": true,
+      "desired": "warn",
+      "known_miss": true,
+      "expected": {
+        "status_code": 200,
+        "status": "assessed",
+        "decision": "allow",
+        "email_risk_score": 0.9943188301820353,
+        "recipients": [
+          {
+            "roles": [
+              "to"
+            ],
+            "risk_score": 0.9943188301820353,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": []
+          }
+        ],
+        "explanation": [
+          "Risk scores come from sender-recipient history, recency, co-recipient support, and contact similarity. Draft-text similarity to earlier mail with each recipient was also an input to this model.",
+          "Scores are risk scores, not probabilities.",
+          "Allow means no intervention under this policy. It does not guarantee that every recipient is correct."
+        ],
+        "provenance": {
+          "model_version": "med-model-v2",
+          "feature_spec_version": "med-features-v2",
+          "policy_version": "med-policy-v2",
+          "T_warn": 0.9996767050340489,
+          "blocking_enabled": false,
+          "snapshot_id": "med-synth-v4",
+          "effective_cutoff": "2025-04-01T08:33:52.000000Z",
+          "history_rule": "sent mail strictly earlier than the cutoff"
+        }
+      }
+    },
+    {
+      "key": "known_miss_first_contact",
+      "title": "Mistaken first contact (S11)",
+      "kind": "draft",
+      "guards": "A known miss: the policy allows a mistaken first contact.",
+      "source": {
+        "draft_id": "d003074",
+        "subset": "validation_product_like",
+        "selection": "The S11 mistaken first contact that was allowed, with the highest email risk score.",
+        "stored_decision": "allow",
+        "stored_email_risk": 0.981467677712242
+      },
+      "scenario": {
+        "id": "S11",
+        "variant": "mistaken_first_contact",
+        "note": "audit metadata: never part of a request"
+      },
+      "misdirected": true,
+      "desired": "warn",
+      "known_miss": true,
+      "expected": {
+        "status_code": 200,
+        "status": "assessed",
+        "decision": "allow",
+        "email_risk_score": 0.9814676777122417,
+        "recipients": [
+          {
+            "roles": [
+              "to"
+            ],
+            "risk_score": 0.9814676777122417,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": [
+              {
+                "code": "LIMITED_RELATIONSHIP_HISTORY",
+                "text": "Little or no prior communication is available; an evidence limitation, not a verdict."
+              }
+            ]
+          }
+        ],
+        "explanation": [
+          "Risk scores come from sender-recipient history, recency, co-recipient support, and contact similarity. Draft-text similarity to earlier mail with each recipient was also an input to this model.",
+          "Scores are risk scores, not probabilities.",
+          "Allow means no intervention under this policy. It does not guarantee that every recipient is correct."
+        ],
+        "provenance": {
+          "model_version": "med-model-v2",
+          "feature_spec_version": "med-features-v2",
+          "policy_version": "med-policy-v2",
+          "T_warn": 0.9996767050340489,
+          "blocking_enabled": false,
+          "snapshot_id": "med-synth-v4",
+          "effective_cutoff": "2025-04-11T09:51:10.000000Z",
+          "history_rule": "sent mail strictly earlier than the cutoff"
+        }
+      }
+    },
+    {
+      "key": "cold_start_allow",
+      "title": "Cold-start sender",
+      "kind": "draft",
+      "guards": "A sender with no earlier mail is assessed with a visible limitation, not forced to allow or warn.",
+      "source": {
+        "draft_id": "d003272",
+        "subset": "validation_product_like",
+        "selection": "The S09 cold-start draft at the median email risk score among those allowed.",
+        "stored_decision": "allow",
+        "stored_email_risk": 7.126395791478155e-35
+      },
+      "scenario": {
+        "id": "S09",
+        "variant": "cold_start_legitimate",
+        "note": "audit metadata: never part of a request"
+      },
+      "misdirected": false,
+      "desired": "allow",
+      "known_miss": false,
+      "expected": {
+        "status_code": 200,
+        "status": "assessed",
+        "decision": "allow",
+        "email_risk_score": 7.126395791478155e-35,
+        "recipients": [
+          {
+            "roles": [
+              "to"
+            ],
+            "risk_score": 7.126395791478155e-35,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": [
+              {
+                "code": "LIMITED_RELATIONSHIP_HISTORY",
+                "text": "Little or no prior communication is available; an evidence limitation, not a verdict."
+              }
+            ]
+          },
+          {
+            "roles": [
+              "to"
+            ],
+            "risk_score": 5.30337751865057e-36,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": [
+              {
+                "code": "LIMITED_RELATIONSHIP_HISTORY",
+                "text": "Little or no prior communication is available; an evidence limitation, not a verdict."
+              }
+            ]
+          }
+        ],
+        "explanation": [
+          "Risk scores come from sender-recipient history, recency, co-recipient support, and contact similarity. Draft-text similarity to earlier mail with each recipient was also an input to this model.",
+          "Scores are risk scores, not probabilities.",
+          "Allow means no intervention under this policy. It does not guarantee that every recipient is correct."
+        ],
+        "provenance": {
+          "model_version": "med-model-v2",
+          "feature_spec_version": "med-features-v2",
+          "policy_version": "med-policy-v2",
+          "T_warn": 0.9996767050340489,
+          "blocking_enabled": false,
+          "snapshot_id": "med-synth-v4",
+          "effective_cutoff": "2025-04-17T20:55:17.000000Z",
+          "history_rule": "sent mail strictly earlier than the cutoff"
+        }
+      }
+    },
+    {
+      "key": "little_text_allow",
+      "title": "Little text, legitimate",
+      "kind": "draft",
+      "guards": "Empty or tiny text is assessed with a LIMITED_TEXT limitation.",
+      "source": {
+        "draft_id": "d003289",
+        "subset": "validation_product_like",
+        "selection": "The S09 little-text legitimate draft allowed with the highest email risk score.",
+        "stored_decision": "allow",
+        "stored_email_risk": 1.3853908332924207e-09
+      },
+      "scenario": {
+        "id": "S09",
+        "variant": "little_text_legitimate",
+        "note": "audit metadata: never part of a request"
+      },
+      "misdirected": false,
+      "desired": "allow",
+      "known_miss": false,
+      "expected": {
+        "status_code": 200,
+        "status": "assessed",
+        "decision": "allow",
+        "email_risk_score": 1.3853908332924304e-09,
+        "recipients": [
+          {
+            "roles": [
+              "to"
+            ],
+            "risk_score": 1.3853908332924304e-09,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": [
+              {
+                "code": "LIMITED_TEXT",
+                "text": "Little text is available for content assessment; an evidence limitation."
+              }
+            ]
+          }
+        ],
+        "explanation": [
+          "Risk scores come from sender-recipient history, recency, co-recipient support, and contact similarity. Draft-text similarity to earlier mail with each recipient was also an input to this model.",
+          "Scores are risk scores, not probabilities.",
+          "Allow means no intervention under this policy. It does not guarantee that every recipient is correct."
+        ],
+        "provenance": {
+          "model_version": "med-model-v2",
+          "feature_spec_version": "med-features-v2",
+          "policy_version": "med-policy-v2",
+          "T_warn": 0.9996767050340489,
+          "blocking_enabled": false,
+          "snapshot_id": "med-synth-v4",
+          "effective_cutoff": "2025-05-07T21:36:21.000000Z",
+          "history_rule": "sent mail strictly earlier than the cutoff"
+        }
+      }
+    },
+    {
+      "key": "little_text_mistake_warn",
+      "title": "Little text, unintended recipient",
+      "kind": "draft",
+      "guards": "Little text does not stop a warning on a swapped recipient.",
+      "source": {
+        "draft_id": "d003170",
+        "subset": "validation_product_like",
+        "selection": "The S09 little-text unintended draft that was warned (one on validation).",
+        "stored_decision": "warn",
+        "stored_email_risk": 0.9999998984218362
+      },
+      "scenario": {
+        "id": "S09",
+        "variant": "little_text_unintended",
+        "note": "audit metadata: never part of a request"
+      },
+      "misdirected": true,
+      "desired": "warn",
+      "known_miss": false,
+      "expected": {
+        "status_code": 200,
+        "status": "assessed",
+        "decision": "warn",
+        "email_risk_score": 0.9999998984218362,
+        "recipients": [
+          {
+            "roles": [
+              "to"
+            ],
+            "risk_score": 0.9999998984218362,
+            "flagged": true,
+            "reason_codes": [
+              {
+                "code": "LOOKALIKE_CONTACT_CONTEXT",
+                "text": "A similar contact identity and other context warrant review; similarity alone is not a mistake finding."
+              },
+              {
+                "code": "CONTENT_RELATIONSHIP_MISMATCH",
+                "text": "This draft differs from prior topics exchanged with this recipient."
+              }
+            ],
+            "evidence_limitations": [
+              {
+                "code": "LIMITED_TEXT",
+                "text": "Little text is available for content assessment; an evidence limitation."
+              }
+            ]
+          }
+        ],
+        "explanation": [
+          "Risk scores come from sender-recipient history, recency, co-recipient support, and contact similarity. Draft-text similarity to earlier mail with each recipient was also an input to this model.",
+          "Scores are risk scores, not probabilities.",
+          "Warn asks the sender to review the flagged recipients. It is not a finding about the sender's intent."
+        ],
+        "provenance": {
+          "model_version": "med-model-v2",
+          "feature_spec_version": "med-features-v2",
+          "policy_version": "med-policy-v2",
+          "T_warn": 0.9996767050340489,
+          "blocking_enabled": false,
+          "snapshot_id": "med-synth-v4",
+          "effective_cutoff": "2025-03-31T11:02:18.000000Z",
+          "history_rule": "sent mail strictly earlier than the cutoff"
+        }
+      }
+    },
+    {
+      "key": "multi_recipient_warn",
+      "title": "Several recipients, one or more flagged",
+      "kind": "draft",
+      "guards": "Maximum aggregation: the email risk is the highest recipient risk and every recipient at or above the cutoff is flagged.",
+      "source": {
+        "draft_id": "d003139",
+        "subset": "validation_product_like",
+        "selection": "Among S08 multi-recipient mistakes that were warned: the most recipients, then the highest email risk score.",
+        "stored_decision": "warn",
+        "stored_email_risk": 0.9999999872383297
+      },
+      "scenario": {
+        "id": "S08",
+        "variant": "two_unintended",
+        "note": "audit metadata: never part of a request"
+      },
+      "misdirected": true,
+      "desired": "warn",
+      "known_miss": false,
+      "expected": {
+        "status_code": 200,
+        "status": "assessed",
+        "decision": "warn",
+        "email_risk_score": 0.9999999872383297,
+        "recipients": [
+          {
+            "roles": [
+              "to"
+            ],
+            "risk_score": 2.6677475976705182e-25,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": []
+          },
+          {
+            "roles": [
+              "to"
+            ],
+            "risk_score": 4.9458507613798117e-11,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": []
+          },
+          {
+            "roles": [
+              "to"
+            ],
+            "risk_score": 4.401467385156316e-11,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": []
+          },
+          {
+            "roles": [
+              "cc"
+            ],
+            "risk_score": 3.6560372851798126e-17,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": []
+          },
+          {
+            "roles": [
+              "cc"
+            ],
+            "risk_score": 0.9999999872383297,
+            "flagged": true,
+            "reason_codes": [
+              {
+                "code": "UNUSUAL_RECIPIENT_COMBINATION",
+                "text": "These addressees have little support as a group in the available prior communication."
+              }
+            ],
+            "evidence_limitations": []
+          },
+          {
+            "roles": [
+              "bcc"
+            ],
+            "risk_score": 0.9999970252445172,
+            "flagged": true,
+            "reason_codes": [
+              {
+                "code": "EXTERNAL_RECIPIENT",
+                "text": "The address is outside the fictional organization; context, not proof of a mistake."
+              },
+              {
+                "code": "UNUSUAL_RECIPIENT_COMBINATION",
+                "text": "These addressees have little support as a group in the available prior communication."
+              },
+              {
+                "code": "CONTENT_RELATIONSHIP_MISMATCH",
+                "text": "This draft differs from prior topics exchanged with this recipient."
+              }
+            ],
+            "evidence_limitations": []
+          }
+        ],
+        "explanation": [
+          "Risk scores come from sender-recipient history, recency, co-recipient support, and contact similarity. Draft-text similarity to earlier mail with each recipient was also an input to this model.",
+          "Scores are risk scores, not probabilities.",
+          "Warn asks the sender to review the flagged recipients. It is not a finding about the sender's intent."
+        ],
+        "provenance": {
+          "model_version": "med-model-v2",
+          "feature_spec_version": "med-features-v2",
+          "policy_version": "med-policy-v2",
+          "T_warn": 0.9996767050340489,
+          "blocking_enabled": false,
+          "snapshot_id": "med-synth-v4",
+          "effective_cutoff": "2025-07-14T10:58:50.000000Z",
+          "history_rule": "sent mail strictly earlier than the cutoff"
+        }
+      }
+    },
+    {
+      "key": "multi_recipient_allow",
+      "title": "Several recipients, none flagged",
+      "kind": "draft",
+      "guards": "Maximum aggregation on an allowed draft: the email risk is the highest recipient risk.",
+      "source": {
+        "draft_id": "d007066",
+        "subset": "validation_product_like",
+        "selection": "Among routine drafts that were allowed: the most recipients, then the highest email risk score.",
+        "stored_decision": "allow",
+        "stored_email_risk": 0.9703902441590506
+      },
+      "scenario": {
+        "id": "S05",
+        "variant": "internal_project",
+        "note": "audit metadata: never part of a request"
+      },
+      "misdirected": false,
+      "desired": "allow",
+      "known_miss": false,
+      "expected": {
+        "status_code": 200,
+        "status": "assessed",
+        "decision": "allow",
+        "email_risk_score": 0.9703902441590506,
+        "recipients": [
+          {
+            "roles": [
+              "to"
+            ],
+            "risk_score": 9.321601663634227e-25,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": []
+          },
+          {
+            "roles": [
+              "to"
+            ],
+            "risk_score": 1.5579751944178206e-10,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": []
+          },
+          {
+            "roles": [
+              "to"
+            ],
+            "risk_score": 1.4004067122859097e-10,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": []
+          },
+          {
+            "roles": [
+              "cc"
+            ],
+            "risk_score": 1.1719842368351325e-16,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": []
+          },
+          {
+            "roles": [
+              "bcc"
+            ],
+            "risk_score": 0.9703902441590506,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": []
+          }
+        ],
+        "explanation": [
+          "Risk scores come from sender-recipient history, recency, co-recipient support, and contact similarity. Draft-text similarity to earlier mail with each recipient was also an input to this model.",
+          "Scores are risk scores, not probabilities.",
+          "Allow means no intervention under this policy. It does not guarantee that every recipient is correct."
+        ],
+        "provenance": {
+          "model_version": "med-model-v2",
+          "feature_spec_version": "med-features-v2",
+          "policy_version": "med-policy-v2",
+          "T_warn": 0.9996767050340489,
+          "blocking_enabled": false,
+          "snapshot_id": "med-synth-v4",
+          "effective_cutoff": "2025-08-25T09:35:46.000000Z",
+          "history_rule": "sent mail strictly earlier than the cutoff"
+        }
+      }
+    },
+    {
+      "key": "threshold_equality_warn",
+      "title": "Score exactly at the cutoff",
+      "kind": "draft",
+      "guards": "Equality warns: the lowest-scoring warned mistake scores exactly T_warn, and a score equal to the cutoff must warn.",
+      "source": {
+        "draft_id": "d003028",
+        "subset": "validation_product_like",
+        "selection": "The warned mistake with the lowest email risk score on validation_product_like.",
+        "stored_decision": "warn",
+        "stored_email_risk": 0.9996767050340489
+      },
+      "scenario": {
+        "id": "S02",
+        "variant": "added_external",
+        "note": "audit metadata: never part of a request"
+      },
+      "misdirected": true,
+      "desired": "warn",
+      "known_miss": false,
+      "expected": {
+        "status_code": 200,
+        "status": "assessed",
+        "decision": "warn",
+        "email_risk_score": 0.9996767050340489,
+        "recipients": [
+          {
+            "roles": [
+              "to"
+            ],
+            "risk_score": 0.0009664412467289453,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": []
+          },
+          {
+            "roles": [
+              "cc"
+            ],
+            "risk_score": 0.9996767050340489,
+            "flagged": true,
+            "reason_codes": [
+              {
+                "code": "EXTERNAL_RECIPIENT",
+                "text": "The address is outside the fictional organization; context, not proof of a mistake."
+              },
+              {
+                "code": "UNUSUAL_RECIPIENT_COMBINATION",
+                "text": "These addressees have little support as a group in the available prior communication."
+              },
+              {
+                "code": "CONTENT_RELATIONSHIP_MISMATCH",
+                "text": "This draft differs from prior topics exchanged with this recipient."
+              }
+            ],
+            "evidence_limitations": []
+          }
+        ],
+        "explanation": [
+          "Risk scores come from sender-recipient history, recency, co-recipient support, and contact similarity. Draft-text similarity to earlier mail with each recipient was also an input to this model.",
+          "Scores are risk scores, not probabilities.",
+          "Warn asks the sender to review the flagged recipients. It is not a finding about the sender's intent."
+        ],
+        "provenance": {
+          "model_version": "med-model-v2",
+          "feature_spec_version": "med-features-v2",
+          "policy_version": "med-policy-v2",
+          "T_warn": 0.9996767050340489,
+          "blocking_enabled": false,
+          "snapshot_id": "med-synth-v4",
+          "effective_cutoff": "2025-05-01T12:56:10.000000Z",
+          "history_rule": "sent mail strictly earlier than the cutoff"
+        }
+      }
+    },
+    {
+      "key": "duplicate_roles",
+      "title": "Repeated address across roles",
+      "kind": "derived",
+      "derived_from": "routine_allow",
+      "derivation": "The routine request with its first To address repeated in Cc (upper case, padded with spaces). The API merges it into one recipient with both roles and scores it as before.",
+      "guards": "Repeated addresses merge across roles into one recipient, keeping every role; scores do not change.",
+      "source": {
+        "draft_id": "d003390",
+        "subset": "validation_product_like"
+      },
+      "expected": {
+        "status_code": 200,
+        "status": "assessed",
+        "decision": "allow",
+        "email_risk_score": 8.215784132392904e-12,
+        "recipients": [
+          {
+            "roles": [
+              "to",
+              "cc"
+            ],
+            "risk_score": 8.931272944408717e-27,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": []
+          },
+          {
+            "roles": [
+              "to"
+            ],
+            "risk_score": 8.215784132392904e-12,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": []
+          },
+          {
+            "roles": [
+              "to"
+            ],
+            "risk_score": 4.422921221042517e-12,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": []
+          },
+          {
+            "roles": [
+              "cc"
+            ],
+            "risk_score": 6.213298939335974e-17,
+            "flagged": false,
+            "reason_codes": [],
+            "evidence_limitations": []
+          }
+        ],
+        "explanation": [
+          "Risk scores come from sender-recipient history, recency, co-recipient support, and contact similarity. Draft-text similarity to earlier mail with each recipient was also an input to this model.",
+          "Scores are risk scores, not probabilities.",
+          "Allow means no intervention under this policy. It does not guarantee that every recipient is correct."
+        ],
+        "provenance": {
+          "model_version": "med-model-v2",
+          "feature_spec_version": "med-features-v2",
+          "policy_version": "med-policy-v2",
+          "T_warn": 0.9996767050340489,
+          "blocking_enabled": false,
+          "snapshot_id": "med-synth-v4",
+          "effective_cutoff": "2025-04-02T09:19:24.000000Z",
+          "history_rule": "sent mail strictly earlier than the cutoff"
+        }
+      }
+    },
+    {
+      "key": "invalid_malformed_address",
+      "title": "Malformed address",
+      "kind": "derived",
+      "derived_from": "routine_allow",
+      "derivation": "The routine request with '@' in its first To address replaced by '.'.",
+      "guards": "A malformed address is invalid_input: no decision, no score.",
+      "source": {
+        "draft_id": "d003390",
+        "subset": "validation_product_like"
+      },
+      "expected": {
+        "status_code": 422,
+        "status": "unable_to_assess",
+        "category": "invalid_input",
+        "message": "An address is malformed",
+        "provenance_reported": true
+      }
+    },
+    {
+      "key": "invalid_no_recipients",
+      "title": "No recipients",
+      "kind": "derived",
+      "derived_from": "routine_allow",
+      "derivation": "The routine request with To, Cc, and Bcc emptied.",
+      "guards": "A draft with no recipient is invalid_input.",
+      "source": {
+        "draft_id": "d003390",
+        "subset": "validation_product_like"
+      },
+      "expected": {
+        "status_code": 422,
+        "status": "unable_to_assess",
+        "category": "invalid_input",
+        "message": "At least one recipient is required",
+        "provenance_reported": true
+      }
+    },
+    {
+      "key": "invalid_label_field",
+      "title": "Answer field in the request",
+      "kind": "derived",
+      "derived_from": "routine_allow",
+      "derivation": "The routine request plus a top-level scenario_id field.",
+      "guards": "A label, scenario, split, or score field is rejected by name and never read.",
+      "source": {
+        "draft_id": "d003390",
+        "subset": "validation_product_like"
+      },
+      "expected": {
+        "status_code": 422,
+        "status": "unable_to_assess",
+        "category": "invalid_input",
+        "message": "Label, scenario, split, family, or score fields are not accepted",
+        "provenance_reported": true
+      }
+    },
+    {
+      "key": "unavailable_unknown_address",
+      "title": "Address outside the directory",
+      "kind": "derived",
+      "derived_from": "routine_allow",
+      "derivation": "The routine request with the last letter of its first To address removed.",
+      "guards": "A well-formed address outside the snapshot directory is unavailable, never a warning or an allow.",
+      "source": {
+        "draft_id": "d003390",
+        "subset": "validation_product_like"
+      },
+      "expected": {
+        "status_code": 503,
+        "status": "unable_to_assess",
+        "category": "unavailable",
+        "message": "A recipient is not in the context snapshot directory",
+        "provenance_reported": true
+      }
+    },
+    {
+      "key": "unavailable_unknown_snapshot",
+      "title": "Unknown snapshot",
+      "kind": "derived",
+      "derived_from": "routine_allow",
+      "derivation": "The routine request with context_snapshot_id set to an unknown id.",
+      "guards": "An unknown snapshot is unavailable.",
+      "source": {
+        "draft_id": "d003390",
+        "subset": "validation_product_like"
+      },
+      "expected": {
+        "status_code": 503,
+        "status": "unable_to_assess",
+        "category": "unavailable",
+        "message": "The context snapshot is not available",
+        "provenance_reported": true
+      }
+    }
+  ]
+}

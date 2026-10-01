@@ -1,0 +1,35 @@
+{
+  "kind": "bundle_digests",
+  "deploy_version": "med-deploy-v1",
+  "date_utc": "2026-09-30T21:30:20Z",
+  "why": "nothing else checksums these files: policy.json holds the model and feature-manifest checksums but no checksum of itself, and the two validation files are read by the review screen",
+  "verified_against": {
+    "git_ref": "main",
+    "commit": "0f29ae02a152ebf4837f1a20e2080e1c2fc20f79",
+    "how": "each digest equals the SHA-256 of the blob at that commit"
+  },
+  "scopes": {
+    "api": [
+      "artifacts/med-policy-v2/policy.json"
+    ],
+    "ui": [
+      "artifacts/med-policy-v2/policy.json",
+      "artifacts/med-policy-v2/validation_evaluation.json",
+      "artifacts/med-policy-v2/validation_scores.csv"
+    ]
+  },
+  "files": {
+    "artifacts/med-policy-v2/policy.json": {
+      "sha256": "be39929a3c92cf978dc00c1773f9bf9dd6bdbdfc73984381033979b46152e8e5",
+      "bytes": 3597
+    },
+    "artifacts/med-policy-v2/validation_evaluation.json": {
+      "sha256": "39c1165f7052095bb1d9e01df58db1a6ca5c547df98d87c02e68add5eca41aa1",
+      "bytes": 1582570
+    },
+    "artifacts/med-policy-v2/validation_scores.csv": {
+      "sha256": "ee03e70a0f8c1683dc15e042c64d5d9d22415af684413a272a898f39dda4d23f",
+      "bytes": 217744
+    }
+  }
+}

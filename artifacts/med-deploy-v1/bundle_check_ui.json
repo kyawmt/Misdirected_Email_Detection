@@ -1,0 +1,84 @@
+{
+  "kind": "bundle_check",
+  "deploy_version": "med-deploy-v1",
+  "scope": "ui",
+  "ok": true,
+  "bundle": {
+    "policy_version": "med-policy-v2",
+    "model_version": "med-model-v2",
+    "feature_spec_version": "med-features-v2",
+    "dataset_version": "med-synth-v4",
+    "T_warn": 0.9996767050340489,
+    "blocking_enabled": false,
+    "calibration": "not_fit",
+    "scores_are": "risk_scores",
+    "frozen_subsets": [
+      "test_product_like",
+      "test_diagnostic"
+    ]
+  },
+  "checks": [
+    {
+      "name": "policy_file",
+      "passed": true,
+      "detail": "versions match this code, blocking disabled, cutoff finite"
+    },
+    {
+      "name": "validation_files",
+      "passed": true,
+      "detail": "validation_scores.csv warns on 8 drafts, as policy.json records; validation_evaluation.json parses"
+    },
+    {
+      "name": "dataset_files",
+      "passed": true,
+      "detail": "5 tables match dataset_manifest.json (checksums and record counts)"
+    },
+    {
+      "name": "anchored_digests",
+      "passed": true,
+      "detail": "3 file(s) equal the digests anchored in bundle_digests.json: policy.json, validation_evaluation.json, validation_scores.csv"
+    }
+  ],
+  "files": [
+    {
+      "path": "artifacts/med-policy-v2/policy.json",
+      "bytes": 3597,
+      "sha256": "be39929a3c92cf978dc00c1773f9bf9dd6bdbdfc73984381033979b46152e8e5"
+    },
+    {
+      "path": "artifacts/med-policy-v2/validation_evaluation.json",
+      "bytes": 1582570,
+      "sha256": "39c1165f7052095bb1d9e01df58db1a6ca5c547df98d87c02e68add5eca41aa1"
+    },
+    {
+      "path": "artifacts/med-policy-v2/validation_scores.csv",
+      "bytes": 217744,
+      "sha256": "ee03e70a0f8c1683dc15e042c64d5d9d22415af684413a272a898f39dda4d23f"
+    },
+    {
+      "path": "data/med-synth-v4/contacts.csv",
+      "bytes": 39993,
+      "sha256": "a4770802579ded45d5852dc6f3d2b0fa0a50e8d8a0432ef197cfb096c186b480"
+    },
+    {
+      "path": "data/med-synth-v4/draft_recipients.csv",
+      "bytes": 392653,
+      "sha256": "8fa99a3dff8dceac765f3cecc8c42b58da1f005aebc807903e79959309ccac0f"
+    },
+    {
+      "path": "data/med-synth-v4/drafts.csv",
+      "bytes": 6257081,
+      "sha256": "0ac162ef401649400e26e853da4e3c84b79ed4c6c6af5fcba98d0f08e26400e0"
+    },
+    {
+      "path": "data/med-synth-v4/labels.csv",
+      "bytes": 2313478,
+      "sha256": "96a991dd6d4503ac8a0880fa6a87fb0c9ca23b1a3747e9f7f311392240e49021"
+    },
+    {
+      "path": "data/med-synth-v4/split_manifest.csv",
+      "bytes": 1658218,
+      "sha256": "831b3553e99e34c3bc5ced094eb44934c18db7ab70b171db8dac32086e3fc184"
+    }
+  ]
+}

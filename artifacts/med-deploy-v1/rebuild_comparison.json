@@ -1,0 +1,115 @@
+{
+  "kind": "rebuild_comparison",
+  "deploy_version": "med-deploy-v1",
+  "date_utc": "2026-09-30T17:57:28Z",
+  "commands": [
+    "python -m med_features build --output <scratch>/features",
+    "python -m med_models run --features <scratch>/features --output <scratch>/model --docs <scratch>/docs"
+  ],
+  "seconds": {
+    "features_build": 176.7,
+    "models_run": 264.7
+  },
+  "published_files_unchanged": true,
+  "published_files_hashed": {
+    "artifacts/med-features-v2": 8,
+    "artifacts/med-model-v2": 3,
+    "docs/phase_4": 5
+  },
+  "files": [
+    {
+      "file": "artifacts/med-features-v2/artifact_manifest.json",
+      "identical": true,
+      "note": "byte-identical"
+    },
+    {
+      "file": "artifacts/med-features-v2/feature_schema.json",
+      "identical": true,
+      "note": "byte-identical"
+    },
+    {
+      "file": "artifacts/med-features-v2/features_train.csv",
+      "identical": true,
+      "note": "byte-identical"
+    },
+    {
+      "file": "artifacts/med-features-v2/features_validation_diagnostic.csv",
+      "identical": true,
+      "note": "byte-identical"
+    },
+    {
+      "file": "artifacts/med-features-v2/features_validation_product_like.csv",
+      "identical": true,
+      "note": "byte-identical"
+    },
+    {
+      "file": "artifacts/med-features-v2/fit_metadata.json",
+      "identical": true,
+      "note": "byte-identical"
+    },
+    {
+      "file": "artifacts/med-features-v2/quality_report.json",
+      "identical": true,
+      "note": "byte-identical"
+    },
+    {
+      "file": "artifacts/med-features-v2/text_transformer.joblib",
+      "identical": true,
+      "note": "byte-identical"
+    },
+    {
+      "file": "artifacts/med-model-v2/experiments.json",
+      "identical": false,
+      "note": "1 differing value(s), for example: /eligibility/recomputed (present only in the published file)"
+    },
+    {
+      "file": "artifacts/med-model-v2/model.joblib",
+      "identical": true,
+      "note": "byte-identical"
+    },
+    {
+      "file": "artifacts/med-model-v2/model_metadata.json",
+      "identical": true,
+      "note": "byte-identical"
+    },
+    {
+      "file": "docs/phase_4/ABLATIONS.md",
+      "identical": false,
+      "note": "11 of 33 lines differ, only in the table column(s): Fit seconds, Score seconds / 1,000 rows"
+    },
+    {
+      "file": "docs/phase_4/COMPARISON.md",
+      "identical": false,
+      "note": "4 of 19 lines differ, only in the table column(s): Fit seconds, Score seconds / 1,000 rows"
+    },
+    {
+      "file": "docs/phase_4/DECISION_RECORD.md",
+      "identical": true,
+      "note": "byte-identical"
+    },
+    {
+      "file": "docs/phase_4/EXPERIMENT_TABLE.md",
+      "identical": false,
+      "note": "11 of 74 lines differ, only in the table column(s): Fit seconds, Score seconds / 1,000 rows"
+    },
+    {
+      "file": "docs/phase_4/MODEL_ARTIFACT.md",
+      "identical": true,
+      "note": "byte-identical"
+    }
+  ],
+  "scores_on_published_validation_features": {
+    "rows": 4970,
+    "same_feature_columns": true,
+    "same_run_name": true,
+    "max_abs_score_difference": 0.0,
+    "identical_scores": true
+  },
+  "summary": "12 of 16 compared files are byte-identical. Scoring the published validation features (4,970 rows) with the rebuilt model and the published model gives identical scores; same feature columns: True; same selected run: True. Files that are not byte-identical are listed with what differs. The rebuilt files were written to a scratch directory and discarded; the published files were not used as outputs.",
+  "machine": {
+    "platform": "macOS-27.0.1-arm64-arm-64bit",
+    "machine": "arm64",
+    "python": "3.11.14",
+    "cpu_count": 10
+  }
+}

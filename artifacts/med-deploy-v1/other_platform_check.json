@@ -1,0 +1,47 @@
+{
+  "kind": "other_platform_check",
+  "deploy_version": "med-deploy-v1",
+  "date_utc": "2026-10-01T00:44:29Z",
+  "platform": "linux/amd64",
+  "architecture": "x86_64",
+  "image": {
+    "id": "sha256:059513728f434965284bb12035d4d7104f100ef5ddf5b3eaa8f7b5e3563551a8",
+    "architecture": "amd64",
+    "size_bytes": 559589322
+  },
+  "build_seconds": 29.9,
+  "seconds_until_ready": 14.1,
+  "ready_http": 200,
+  "environment": {
+    "python": "3.11.14",
+    "platform": "Linux-6.12.76-linuxkit-x86_64-with-glibc2.36",
+    "pyarrow_importable": false,
+    "packages": 23,
+    "matches_constraints": true,
+    "key_packages": {
+      "numpy": "2.4.6",
+      "pandas": "3.0.6",
+      "scikit-learn": "1.9.1",
+      "scipy": "1.17.1",
+      "fastapi": "0.141.1",
+      "uvicorn": "0.54.0"
+    }
+  },
+  "regression": {
+    "passed": 20,
+    "failed": 0,
+    "failed_fixtures": []
+  },
+  "max_abs_email_risk_difference_from_the_record": 8.881784197001252e-16,
+  "cutoff_fixture": {
+    "email_risk_score_equals_T_warn": true,
+    "decision": "warn"
+  },
+  "note": "Built and served for this platform (emulated when it is not the host's). The pins installed as wheels for it, every fixture was replayed, and the cutoff fixture was checked for an exact score at T_warn. Timing under emulation is not meaningful and is not reported.",
+  "machine": {
+    "platform": "macOS-27.0.1-arm64-arm-64bit",
+    "machine": "arm64",
+    "python": "3.11.14",
+    "cpu_count": 10
+  }
+}

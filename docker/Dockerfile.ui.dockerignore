@@ -1,0 +1,33 @@
+# Build context for docker/Dockerfile.ui: default deny, then only what the review
+# screen needs. These are the files it opens, measured with
+# `python -m med_deploy reads` (docs/phase_9/LOCAL_DEPLOYMENT.md). The dataset
+# manifest is in the context only so the build can check the five tables
+# against it; the Dockerfile bind-mounts it and does not copy it.
+*
+!constraints.txt
+!pyproject.toml
+!src
+**/__pycache__
+**/*.py[cod]
+src/*.egg-info
+# Of the deployment-check package, the images need only the bundle check and the
+# environment report (both run at build time and by hand). The other modules
+# drive checks from the host and stay out, so editing one does not change an image.
+src/med_deploy/*
+!src/med_deploy/__init__.py
+!src/med_deploy/__main__.py
+!src/med_deploy/bundle.py
+!src/med_deploy/cli.py
+!src/med_deploy/environment.py
+!src/med_deploy/version.py
+!data/med-synth-v4/contacts.csv
+!data/med-synth-v4/draft_recipients.csv
+!data/med-synth-v4/drafts.csv
+!data/med-synth-v4/labels.csv
+!data/med-synth-v4/split_manifest.csv
+!data/med-synth-v4/dataset_manifest.json
+!artifacts/med-policy-v2/policy.json
+!artifacts/med-policy-v2/validation_evaluation.json
+!artifacts/med-policy-v2/validation_scores.csv
+# Bind-mounted by the build's bundle check only (the Dockerfile does not copy it).
+!artifacts/med-deploy-v1/bundle_digests.json

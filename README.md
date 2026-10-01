@@ -2,7 +2,7 @@
 
 A machine learning project exploring how to identify potentially unintended email recipients before a message is sent. The goal is to reduce accidental data loss while keeping interruptions to legitimate communication low.
 
-**Status: Phase 8 complete on the v4 bundle.** Requirements, the fictional dataset `med-synth-v4`, the feature specification `med-features-v2`, and the logistic risk scorer `med-model-v2` (all features, content cosine included) are in place. Warning policy `med-policy-v2` sets one warning cutoff on the risk score, chosen on product-like validation only, with blocking disabled and no calibration. The frozen v4 test subsets were scored once under that policy: 9 of 30 product-like mistakes warned with 0 false warnings on 5,970 legitimate emails. That is a descriptive pass on this corpus, not a confidence-supported budget claim: the exact bound of 0.62 per 1,000 assumes independent emails, and 95% of the test drafts come from one sender. A FastAPI service (`med-api-v1` contract) serves that bundle; its measured p95 latency is 57.04 ms against a 300 ms target. A simulated Streamlit review screen calls that API and shows its decisions, risk scores, codes, and explanations; it makes the limitations visible and does not change them. Lookalike replacements, familiar-recipient topic mistakes, and mistaken first contacts are still missed. A monitoring package replays validation traffic through that API in eight windows and compares each with a train-only input reference and a reference operating period; it reports input drift, decision-rate change, and confirmed performance change as three separate findings, each with a minimum sample size. Reviewed feedback, rollout and rollback notes, and the incident runbook are documents and a labeled simulation, not deployed tooling: no reviewed label exists for the monitored traffic today.
+**Status: Phase 9 complete on the v4 bundle.** Requirements, the fictional dataset `med-synth-v4`, the feature specification `med-features-v2`, and the logistic risk scorer `med-model-v2` (all features, content cosine included) are in place. Warning policy `med-policy-v2` sets one warning cutoff on the risk score, chosen on product-like validation only, with blocking disabled and no calibration. The frozen v4 test subsets were scored once under that policy: 9 of 30 product-like mistakes warned with 0 false warnings on 5,970 legitimate emails. That is a descriptive pass on this corpus, not a confidence-supported budget claim: the exact bound of 0.62 per 1,000 assumes independent emails, and 95% of the test drafts come from one sender. A FastAPI service (`med-api-v1` contract) serves that bundle; its measured p95 latency is 57.04 ms against a 300 ms target. A simulated Streamlit review screen calls that API and shows its decisions, risk scores, codes, and explanations; it makes the limitations visible and does not change them. Lookalike replacements, familiar-recipient topic mistakes, and mistaken first contacts are still missed. A monitoring package replays validation traffic through that API in eight windows and compares each with a train-only input reference and a reference operating period; it reports input drift, decision-rate change, and confirmed performance change as three separate findings, each with a minimum sample size. Reviewed feedback, rollout and rollback notes, and the incident runbook are documents and a labeled simulation, not deployed tooling: no reviewed label exists for the monitored traffic today. Phase 9 adds a compact scenario regression suite over recorded validation fixtures, pinned dependencies, two local container images (the API without pyarrow, the review screen separately), a small CI workflow, a warm-latency record, and a rehearsed rollback between a known-good image and failing candidates. It is a local demo: nothing is published to a public host, and the Phase 9 results are in [the test report](docs/phase_9/TEST_REPORT.md).
 
 ## Intended behavior
 
@@ -110,17 +110,27 @@ Misdirected_Email_Detection/
 │   │   ├── UI_GUIDE.md
 │   │   ├── WALKTHROUGH.md
 │   │   └── screenshots/
-│   └── phase_8/
-│       ├── MONITORING.md
-│       ├── DRIFT_REPLAY.md
-│       ├── FEEDBACK_REVIEW.md
-│       ├── EXPERIMENT_PROPOSAL.md
-│       └── RUNBOOK.md
+│   ├── phase_8/
+│   │   ├── MONITORING.md
+│   │   ├── DRIFT_REPLAY.md
+│   │   ├── FEEDBACK_REVIEW.md
+│   │   ├── EXPERIMENT_PROPOSAL.md
+│   │   └── RUNBOOK.md
+│   └── phase_9/
+│       ├── TEST_REPORT.md
+│       ├── REPRODUCIBILITY.md
+│       ├── LOCAL_DEPLOYMENT.md
+│       └── ROLLBACK_REHEARSAL.md
+├── constraints.txt            # pinned third-party packages (tested with Python 3.11.14, see .python-version)
+├── compose.yaml               # the API and the review screen as two local containers, published on 127.0.0.1 only
+├── docker/                    # one Dockerfile and one default-deny ignore list per image, and a build script
+├── .github/workflows/ci.yml   # compact CI: pinned install, bundle check, fast suite, smoke
 ├── artifacts/med-features-v2/ # fitted text transformer and train/validation matrices (v4)
 ├── artifacts/med-model-v2/    # selected scorer and experiment record (v4)
 ├── artifacts/med-policy-v2/   # warning policy, validation scores, one-shot test result (v4)
 ├── artifacts/med-api-latency/ # API latency, one record per served policy bundle
 ├── artifacts/med-monitor-v1/  # train-only input reference, replay plan and windows, feedback review, bundle checks (write-once)
+├── artifacts/med-deploy-v1/   # Phase 9 records: scenario fixtures, smoke, latency, images, rollback rehearsal (write-once)
 ├── artifacts/*-v1/            # superseded v2 baseline bundle and its API latency, kept unchanged
 ├── src/med_data/              # generator, scoring view, validation
 ├── src/med_features/          # shared feature transform
@@ -129,6 +139,7 @@ Misdirected_Email_Detection/
 ├── src/med_api/               # FastAPI scoring service, request normalizer, feedback
 ├── src/med_ui/                # Streamlit review screen, API client, walkthrough generator
 ├── src/med_monitor/           # monitoring, drift replay, reviewed-feedback workflow, bundle checks, report generator
+├── src/med_deploy/            # bundle check, scenario regression, smoke, latency, file audit, rollback rehearsal, report generator
 └── tests/
 ```
 
@@ -191,7 +202,23 @@ python -m med_monitor report            # regenerate docs/phase_8
 
 `replay --api URL` uses a running service instead (it needs the `monitor` extra for `httpx`). The stored records hold aggregates only: no address, name, subject, body, or per-email score, and the API's log allow-list is unchanged. Read [monitoring](docs/phase_8/MONITORING.md), the [drift replay](docs/phase_8/DRIFT_REPLAY.md), the [reviewed feedback review](docs/phase_8/FEEDBACK_REVIEW.md), the [A/B test proposal](docs/phase_8/EXPERIMENT_PROPOSAL.md), and the [runbook](docs/phase_8/RUNBOOK.md) for the metrics, thresholds, minimum samples, the replay, the review workflow, and the rollout, rollback, and incident notes.
 
-Read the [API contract](docs/phase_6/API_CONTRACT.md), [scoring flow](docs/phase_6/SCORING_FLOW.md), and [error behavior](docs/phase_6/ERROR_BEHAVIOR.md) for the service. Read the [evaluation report](docs/phase_5/EVALUATION_REPORT.md), [threshold policy](docs/phase_5/THRESHOLD_POLICY.md), [error analysis](docs/phase_5/ERROR_ANALYSIS.md), [uncertainty and prevalence](docs/phase_5/UNCERTAINTY_AND_PREVALENCE.md), and [model card](docs/phase_5/MODEL_CARD.md) for the policy and its one test pass. Read the [decision record](docs/phase_4/DECISION_RECORD.md), [experiment table](docs/phase_4/EXPERIMENT_TABLE.md), [comparison](docs/phase_4/COMPARISON.md), and [ablations](docs/phase_4/ABLATIONS.md) for the recorded runs. The [feature catalog](docs/phase_3/FEATURE_CATALOG.md), [profile and transform contract](docs/phase_3/PROFILE_AND_TRANSFORM.md), [feature quality report](docs/phase_3/FEATURE_QUALITY_REPORT.md), and [training/serving parity notes](docs/phase_3/TRAINING_SERVING_PARITY.md) describe the signals. The [data dictionary](docs/phase_2/DATA_DICTIONARY.md), [labeling guide](docs/phase_2/LABELING_GUIDE.md), [dataset specification](docs/phase_2/DATASET_SPECIFICATION.md), and [quality and leakage checklist](docs/phase_2/DATA_QUALITY_AND_LEAKAGE.md) describe the tables. The [scenarios](docs/phase_1/SCENARIOS.md), [input/output specification](docs/phase_1/INPUT_OUTPUT_SPECIFICATION.md), and [acceptance criteria](docs/phase_1/ACCEPTANCE_CRITERIA.md) still describe the product contract. Read the [UI guide](docs/phase_7/UI_GUIDE.md) and the [walkthrough](docs/phase_7/WALKTHROUGH.md) for the review screen. Packaging and deployment come in a later phase.
+Phase 9 quick start (install from the pinned dependencies, check the bundle, run the two services, and verify them). Full procedures are in [reproducibility](docs/phase_9/REPRODUCIBILITY.md) and [local deployment](docs/phase_9/LOCAL_DEPLOYMENT.md); every result is in the [test report](docs/phase_9/TEST_REPORT.md).
+
+```bash
+python3.11 -m venv .venv && source .venv/bin/activate       # Python 3.11.14 is the tested interpreter
+pip install -c constraints.txt -e ".[dev,ui,monitor]"
+python -m med_deploy check-bundle --scope api               # artifact versions and checksums (no scoring)
+python -m pytest -m "not slow"                              # the CI selection; the full `pytest` is the release gate
+python -m med_deploy smoke --spawn                          # API process plus the review screen, end to end
+
+docker/build.sh                                             # two local images: med-api (no pyarrow) and med-ui
+mkdir -p var/demo && docker compose up -d --wait            # API on 127.0.0.1:8000, screen on 127.0.0.1:8501
+python -m med_deploy regress --api http://127.0.0.1:8000    # the recorded scenario fixtures against the running API
+```
+
+The scenario regression keeps the known misses (lookalike replacement, familiar-recipient topic mistake, mistaken first contact) in the suite on purpose. Rolling back means restoring the known-good image; see the [rollback rehearsal](docs/phase_9/ROLLBACK_REHEARSAL.md) for what was rehearsed and what was not (there is no live hot swap, canary, or shadow mode).
+
+Read the [API contract](docs/phase_6/API_CONTRACT.md), [scoring flow](docs/phase_6/SCORING_FLOW.md), and [error behavior](docs/phase_6/ERROR_BEHAVIOR.md) for the service. Read the [evaluation report](docs/phase_5/EVALUATION_REPORT.md), [threshold policy](docs/phase_5/THRESHOLD_POLICY.md), [error analysis](docs/phase_5/ERROR_ANALYSIS.md), [uncertainty and prevalence](docs/phase_5/UNCERTAINTY_AND_PREVALENCE.md), and [model card](docs/phase_5/MODEL_CARD.md) for the policy and its one test pass. Read the [decision record](docs/phase_4/DECISION_RECORD.md), [experiment table](docs/phase_4/EXPERIMENT_TABLE.md), [comparison](docs/phase_4/COMPARISON.md), and [ablations](docs/phase_4/ABLATIONS.md) for the recorded runs. The [feature catalog](docs/phase_3/FEATURE_CATALOG.md), [profile and transform contract](docs/phase_3/PROFILE_AND_TRANSFORM.md), [feature quality report](docs/phase_3/FEATURE_QUALITY_REPORT.md), and [training/serving parity notes](docs/phase_3/TRAINING_SERVING_PARITY.md) describe the signals. The [data dictionary](docs/phase_2/DATA_DICTIONARY.md), [labeling guide](docs/phase_2/LABELING_GUIDE.md), [dataset specification](docs/phase_2/DATASET_SPECIFICATION.md), and [quality and leakage checklist](docs/phase_2/DATA_QUALITY_AND_LEAKAGE.md) describe the tables. The [scenarios](docs/phase_1/SCENARIOS.md), [input/output specification](docs/phase_1/INPUT_OUTPUT_SPECIFICATION.md), and [acceptance criteria](docs/phase_1/ACCEPTANCE_CRITERIA.md) still describe the product contract. Read the [UI guide](docs/phase_7/UI_GUIDE.md) and the [walkthrough](docs/phase_7/WALKTHROUGH.md) for the review screen. The Phase 9 documents cover testing, packaging, local deployment, and the rollback rehearsal.
 
 ## Development roadmap
 
@@ -205,7 +232,7 @@ Read the [API contract](docs/phase_6/API_CONTRACT.md), [scoring flow](docs/phase
 | 6 | Scoring API, validation, explanations, and failure handling | Complete — `med-api-v1` contract serving the v4 bundle |
 | 7 | Interactive draft review and simulated decisions | Complete — Streamlit client of `med-api-v1` |
 | 8 | Monitoring, reviewed feedback, drift investigation, and safe iteration | Complete — `med-monitor-v1` simulation and documents on the v4 bundle |
-| 9 | Regression tests, reproducible packaging, deployment, and rollback | Planned |
+| 9 | Regression tests, reproducible packaging, deployment, and rollback | Complete — `med-deploy-v1` records, pinned install, two local images, CI workflow, rehearsed rollback |
 | 10 | Architecture documentation, results, model card, and usage guide | Planned; initial README available |
 
 ## Limitations and data disclaimer

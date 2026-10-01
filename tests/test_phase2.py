@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PUBLISHED = ROOT / DATA_DIR
 
 
+@pytest.mark.slow
 def test_published_contract_passes_validation(dataset):
     checks = assert_valid(dataset)
     ids = [check.check_id for check in checks]
@@ -71,6 +72,7 @@ def test_walkthrough_history_respects_relationships(dataset):
     assert _involvements(dataset, "c_blake", s11["sent_at"]) == 0
 
 
+@pytest.mark.slow
 def test_scoring_view_hides_labels(dataset):
     draft_id = dataset.split_manifest.loc[
         dataset.split_manifest["is_walkthrough"] & (dataset.split_manifest["scenario_id"] == "S02"),
@@ -109,6 +111,7 @@ def test_two_generations_match(dataset):
     assert dataset.labels["intended"].tolist() == again.labels["intended"].tolist()
 
 
+@pytest.mark.slow
 def test_roundtrip_and_published_checksums(dataset, tmp_path):
     written = write_dataset(dataset, tmp_path / "fresh", validate=False)
     loaded = read_dataset(written)
@@ -131,6 +134,7 @@ def test_csv_record_count_ignores_embedded_newlines(tmp_path):
     assert physical_rows == 4
 
 
+@pytest.mark.slow
 def test_swapped_manifest_assignment_is_rejected(dataset):
     manifest = dataset.split_manifest.copy()
     train_index = manifest.index[manifest["subset"].eq("train")][0]
@@ -144,6 +148,7 @@ def test_swapped_manifest_assignment_is_rejected(dataset):
         assert_valid(broken)
 
 
+@pytest.mark.slow
 def test_manifest_timestamp_and_family_must_match_draft(dataset):
     manifest = dataset.split_manifest.copy()
     train_index = manifest.index[manifest["subset"].eq("train")][0]

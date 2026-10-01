@@ -23,6 +23,8 @@ DEFAULT_API_URL = "http://127.0.0.1:8000"
 CONNECT_TIMEOUT_SECONDS = 2.0
 READ_TIMEOUT_SECONDS = 10.0
 DEFAULT_UI_PORT = 8501
+# Loopback only: the screen is a local demo and is not published to other machines by default.
+DEFAULT_UI_HOST = "127.0.0.1"
 
 # The Phase 1 request fields. The UI sends these and nothing else: no draft
 # reference, and never a label, scenario, split, family, or score.

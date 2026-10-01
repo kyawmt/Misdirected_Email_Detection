@@ -1,0 +1,53 @@
+# Review screen image (simulation): a Streamlit client of the scoring API.
+#
+# It scores nothing. It has no model, no feature artifact, and no frozen
+# outcome file, so it cannot score even by mistake; every decision it shows
+# comes from the API over HTTP. Streamlit brings pyarrow, which is why this
+# process is not the one that scores. What the image holds is exactly what the
+# screen reads; docker/Dockerfile.ui.dockerignore lists it and the build checks it.
+FROM python:3.11.14-slim-bookworm@sha256:65a93d69fa75478d554f4ad27c85c1e69fa184956261b4301ebaf6dbb0a3543d
+
+LABEL org.opencontainers.image.title="med-ui" \
+      org.opencontainers.image.description="Simulated draft-review screen, a client of the scoring API" \
+      org.opencontainers.image.base.name="python:3.11.14-slim-bookworm"
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /build
+COPY constraints.txt pyproject.toml ./
+COPY src ./src
+RUN pip install --only-binary=:all: -c constraints.txt ".[ui]" \
+    && cd / && rm -rf /build \
+    && test -f /usr/local/lib/python3.11/site-packages/med_ui/app.py
+
+# The published fictional directory and curated examples, and the stored
+# validation files. Only validation records are kept in memory by the screen.
+WORKDIR /app
+COPY data/med-synth-v4/contacts.csv data/med-synth-v4/draft_recipients.csv data/med-synth-v4/drafts.csv \
+     data/med-synth-v4/labels.csv data/med-synth-v4/split_manifest.csv ./data/med-synth-v4/
+COPY artifacts/med-policy-v2/policy.json artifacts/med-policy-v2/validation_evaluation.json \
+     artifacts/med-policy-v2/validation_scores.csv ./artifacts/med-policy-v2/
+
+# Fail the build on a missing, extra, or incompatible file, and on a policy.json or stored validation file that is
+# not the anchored published one. The dataset manifest and the digest manifest are bind-mounted for this check only;
+# neither is copied into the image.
+RUN --mount=type=bind,source=data/med-synth-v4/dataset_manifest.json,target=/tmp/dataset_manifest.json \
+    --mount=type=bind,source=artifacts/med-deploy-v1/bundle_digests.json,target=/tmp/bundle_digests.json \
+    python -m med_deploy check-bundle --scope ui --root /app --image --dataset-manifest /tmp/dataset_manifest.json --digests /tmp/bundle_digests.json
+
+RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin med
+USER 10001
+
+# Streamlit keeps a little state under HOME; the container's root filesystem is read-only, so use /tmp (a tmpfs).
+ENV HOME=/tmp \
+    MED_UI_ROOT=/app \
+    MED_UI_API_URL=http://api:8000
+EXPOSE 8501
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
+    CMD ["python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=4)"]
+CMD ["python", "-m", "streamlit", "run", "/usr/local/lib/python3.11/site-packages/med_ui/app.py", \
+     "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true", \
+     "--browser.gatherUsageStats=false", "--client.toolbarMode=minimal"]

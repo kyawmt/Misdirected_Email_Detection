@@ -1,0 +1,176 @@
+{
+  "kind": "images",
+  "deploy_version": "med-deploy-v1",
+  "date_utc": "2026-10-01T00:40:34Z",
+  "docker": {
+    "server_version": "29.4.0",
+    "operating_system": "Docker Desktop",
+    "architecture": "aarch64",
+    "cpus": 10,
+    "memory_bytes": 8217059328,
+    "storage_driver": "overlay2",
+    "client_version": "29.4.0"
+  },
+  "images": {
+    "api": {
+      "identity": {
+        "reference": "med-api:phase9",
+        "id": "sha256:85d67e46cbf709ac8fedb7d3fa0219929bba940f3f109a4c582714650707d8ee",
+        "repo_tags": [
+          "med-api:phase9"
+        ],
+        "architecture": "arm64",
+        "os": "linux",
+        "size_bytes": 601372486,
+        "created": "2026-10-01T00:26:03.881603792Z",
+        "user": "10001",
+        "exposed_ports": [
+          "8000/tcp"
+        ],
+        "healthcheck": [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/ready', timeout=4)"
+        ],
+        "layers": 15
+      },
+      "dockerfile": "docker/Dockerfile.api",
+      "base_image": "python:3.11.14-slim-bookworm@sha256:65a93d69fa75478d554f4ad27c85c1e69fa184956261b4301ebaf6dbb0a3543d",
+      "environment": {
+        "python": "3.11.14",
+        "python_matches_tested": true,
+        "platform": "Linux-6.12.76-linuxkit-aarch64-with-glibc2.36",
+        "packages": 23,
+        "key_packages": {
+          "numpy": "2.4.6",
+          "pandas": "3.0.6",
+          "scikit-learn": "1.9.1",
+          "scipy": "1.17.1",
+          "fastapi": "0.141.1",
+          "uvicorn": "0.54.0"
+        },
+        "pyarrow_importable": false,
+        "pandas_string_storage": {
+          "option": "auto",
+          "series_dtype": "str",
+          "backend": "StringArray"
+        },
+        "installed_but_not_pinned": [],
+        "version_differs": {},
+        "matches_constraints": true,
+        "pinned_but_not_installed_count": 30
+      },
+      "files_in_app": {
+        "artifacts/med-features-v2/artifact_manifest.json": 1087,
+        "artifacts/med-features-v2/feature_schema.json": 4978,
+        "artifacts/med-features-v2/features_train.csv": 895724,
+        "artifacts/med-features-v2/features_validation_diagnostic.csv": 137091,
+        "artifacts/med-features-v2/features_validation_product_like.csv": 1124844,
+        "artifacts/med-features-v2/fit_metadata.json": 4272,
+        "artifacts/med-features-v2/quality_report.json": 68694,
+        "artifacts/med-features-v2/text_transformer.joblib": 36678,
+        "artifacts/med-model-v2/model.joblib": 5244,
+        "artifacts/med-policy-v2/policy.json": 3597,
+        "data/med-synth-v4/contacts.csv": 39993,
+        "data/med-synth-v4/dataset_manifest.json": 4107,
+        "data/med-synth-v4/draft_recipients.csv": 392653,
+        "data/med-synth-v4/drafts.csv": 6257081,
+        "data/med-synth-v4/invalid_fixtures.csv": 611,
+        "data/med-synth-v4/labels.csv": 2313478,
+        "data/med-synth-v4/message_recipients.csv": 3724475,
+        "data/med-synth-v4/messages.csv": 52325110,
+        "data/med-synth-v4/quality_report.json": 5271,
+        "data/med-synth-v4/reviewer_feedback.csv": 588,
+        "data/med-synth-v4/split_manifest.csv": 1658218
+      },
+      "write_probes": {
+        "as_the_container_user": {
+          "uid": 10001,
+          "target": "/app/artifacts/med-model-v2/model.joblib",
+          "outcome": "PermissionError: Permission denied"
+        },
+        "root_on_a_read_only_filesystem": {
+          "uid": 0,
+          "target": "/app/artifacts/med-model-v2/model.joblib",
+          "outcome": "OSError: Read-only file system"
+        }
+      }
+    },
+    "ui": {
+      "identity": {
+        "reference": "med-ui:phase9",
+        "id": "sha256:d1983f4f61227a49b9a566b9d5ad4978f6143c318bbf22cbe5560605db9781a1",
+        "repo_tags": [
+          "med-ui:phase9"
+        ],
+        "architecture": "arm64",
+        "os": "linux",
+        "size_bytes": 823662632,
+        "created": "2026-10-01T00:30:02.518982295Z",
+        "user": "10001",
+        "exposed_ports": [
+          "8501/tcp"
+        ],
+        "healthcheck": [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request as u; u.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=4)"
+        ],
+        "layers": 13
+      },
+      "dockerfile": "docker/Dockerfile.ui",
+      "base_image": "python:3.11.14-slim-bookworm@sha256:65a93d69fa75478d554f4ad27c85c1e69fa184956261b4301ebaf6dbb0a3543d",
+      "environment": {
+        "python": "3.11.14",
+        "python_matches_tested": true,
+        "platform": "Linux-6.12.76-linuxkit-aarch64-with-glibc2.36",
+        "packages": 49,
+        "key_packages": {
+          "numpy": "2.4.6",
+          "pandas": "3.0.6",
+          "scikit-learn": "1.9.1",
+          "scipy": "1.17.1",
+          "fastapi": "0.141.1",
+          "uvicorn": "0.54.0",
+          "httpx": "0.28.1",
+          "streamlit": "1.64.0",
+          "pyarrow": "25.0.1"
+        },
+        "pyarrow_importable": true,
+        "pandas_string_storage": {
+          "option": "auto",
+          "series_dtype": "str",
+          "backend": "ArrowStringArray"
+        },
+        "installed_but_not_pinned": [],
+        "version_differs": {},
+        "matches_constraints": true,
+        "pinned_but_not_installed_count": 4
+      },
+      "files_in_app": {
+        "artifacts/med-policy-v2/policy.json": 3597,
+        "artifacts/med-policy-v2/validation_evaluation.json": 1582570,
+        "artifacts/med-policy-v2/validation_scores.csv": 217744,
+        "data/med-synth-v4/contacts.csv": 39993,
+        "data/med-synth-v4/draft_recipients.csv": 392653,
+        "data/med-synth-v4/drafts.csv": 6257081,
+        "data/med-synth-v4/labels.csv": 2313478,
+        "data/med-synth-v4/split_manifest.csv": 1658218
+      },
+      "write_probes": {
+        "as_the_container_user": {
+          "uid": 10001,
+          "target": "/app/data/med-synth-v4/drafts.csv",
+          "outcome": "PermissionError: Permission denied"
+        },
+        "root_on_a_read_only_filesystem": {
+          "uid": 0,
+          "target": "/app/data/med-synth-v4/drafts.csv",
+          "outcome": "OSError: Read-only file system"
+        }
+      }
+    }
+  }
+}

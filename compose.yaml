@@ -1,0 +1,56 @@
+# Local demo: the scoring API and the review screen as two containers.
+#
+#   mkdir -p var/demo
+#   docker/build.sh                 # check the bundle, then build both images
+#   docker compose up -d --wait     # wait until both report healthy
+#   open http://127.0.0.1:8501      # the review screen; the API is on http://127.0.0.1:8000
+#   docker compose down             # stop and remove the containers; the feedback folder var/demo is kept
+#
+# Both ports are published on 127.0.0.1 only. Nothing here is meant for a public
+# host. The images are built locally and never pulled (`pull_policy: never`).
+# Set MED_API_IMAGE to an image id or tag to run a different API image; that is
+# how a rollback swaps the known-good image back in (docs/phase_9/ROLLBACK_REHEARSAL.md).
+name: med-demo
+
+x-hardening: &hardening
+  read_only: true            # the frozen bundle inside the image cannot be edited
+  tmpfs:
+    - /tmp
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  restart: "no"
+
+services:
+  api:
+    <<: *hardening
+    image: ${MED_API_IMAGE:-med-api:phase9}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    pull_policy: never
+    ports:
+      - "127.0.0.1:${MED_API_PORT:-8000}:8000"
+    volumes:
+      # The only writable path: reviewed-label clicks, one JSON line each, never read back into scoring.
+      - ${MED_FEEDBACK_DIR:-./var/demo}:/feedback
+    cpus: 2
+    mem_limit: 2g
+
+  ui:
+    <<: *hardening
+    image: ${MED_UI_IMAGE:-med-ui:phase9}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.ui
+    pull_policy: never
+    depends_on:
+      api:
+        condition: service_healthy   # the API's /ready, not just a running process
+    environment:
+      MED_UI_API_URL: http://api:8000
+    ports:
+      - "127.0.0.1:${MED_UI_PORT:-8501}:8501"
+    cpus: 1
+    mem_limit: 1g

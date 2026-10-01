@@ -12,7 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from med_ui.config import DEFAULT_UI_PORT, DOCS_DIR, WALKTHROUGH_FILE, UiSettings
+from med_ui.config import DEFAULT_UI_HOST, DEFAULT_UI_PORT, DOCS_DIR, WALKTHROUGH_FILE, UiSettings
 
 APP_PATH = Path(__file__).with_name("app.py")
 
@@ -22,6 +22,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command")
     serve = sub.add_parser("serve", help="start the Streamlit screen")
     serve.add_argument("--port", default=DEFAULT_UI_PORT, type=int)
+    serve.add_argument("--host", default=DEFAULT_UI_HOST, help="address to listen on (default: loopback only)")
     serve.add_argument("--api", default=None, help="scoring API base URL (default: MED_UI_API_URL or http://127.0.0.1:8000)")
     walk = sub.add_parser("walkthrough", help="regenerate the walkthrough document from the running API")
     walk.add_argument("--api", default=None)
@@ -33,9 +34,11 @@ def main(argv: list[str] | None = None) -> int:
         if getattr(args, "api", None):
             env["MED_UI_API_URL"] = args.api
         port = getattr(args, "port", DEFAULT_UI_PORT)
+        host = getattr(args, "host", DEFAULT_UI_HOST)
         command = [
             sys.executable, "-m", "streamlit", "run", str(APP_PATH),
             "--server.port", str(port),
+            "--server.address", host,
             "--server.headless", "true",
             "--browser.gatherUsageStats", "false",
             "--client.toolbarMode", "minimal",

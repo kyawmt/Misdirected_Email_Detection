@@ -26,7 +26,7 @@ Start the UI in another terminal. It opens on `http://localhost:8501` and calls 
 python -m med_ui
 ```
 
-`python -m med_ui serve --port 8501 --api http://127.0.0.1:8000` sets both explicitly, and `streamlit run src/med_ui/app.py` also works. Environment variables: `MED_UI_API_URL` (API base URL), `MED_UI_ROOT` (repository root, default the working directory), `MED_UI_DATA` and `MED_UI_POLICY_DIR` (the published dataset and policy directory). All UI settings, including the curated example rules, live in [config.py](../../src/med_ui/config.py). It reads versions and paths from `med_api.version` and `med_policy.version`.
+`python -m med_ui serve --port 8501 --api http://127.0.0.1:8000` sets both explicitly. The screen listens on `127.0.0.1` only; `--host` changes that (the container image listens on all interfaces inside the container and is published on `127.0.0.1` only, see [local deployment](../phase_9/LOCAL_DEPLOYMENT.md)). `streamlit run src/med_ui/app.py` also works, but Streamlit then listens on every interface unless `--server.address` is given. Environment variables: `MED_UI_API_URL` (API base URL), `MED_UI_ROOT` (repository root, default the working directory), `MED_UI_DATA` and `MED_UI_POLICY_DIR` (the published dataset and policy directory). All UI settings, including the curated example rules, live in [config.py](../../src/med_ui/config.py). It reads versions and paths from `med_api.version` and `med_policy.version`.
 
 `python -m med_ui walkthrough` regenerates the [walkthrough](WALKTHROUGH.md) from the running API.
 

@@ -454,6 +454,7 @@ def test_feature_csv_round_trips_every_float(tmp_path):
     assert back["b"].dtype == np.int64
 
 
+@pytest.mark.slow
 def test_real_history_and_scoring_view_agree(dataset, fitted_real):
     transformer, index, directory = fitted_real
     sample = _sample_drafts(dataset)

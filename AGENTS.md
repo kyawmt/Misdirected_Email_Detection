@@ -79,6 +79,10 @@ Rebuild only when generation rules change, then validate the new version:
 python -m med_data build --output data/med-synth-v2
 ```
 
+Install from the pinned versions with `pip install -c constraints.txt -e ".[dev,ui,monitor]"` (Python 3.11.14 is the tested interpreter). The full `pytest` is the release gate. CI and quick iteration use `pytest -m "not slow"`, which deselects the tests marked `slow` and stays under about three minutes.
+
+**Never run `python -m med_features build` or `python -m med_models run` with their default paths.** They overwrite the published `artifacts/med-features-v2` and `artifacts/med-model-v2` without refusing, `med_models run` also rewrites `docs/phase_4`, and the frozen test subsets of `med-synth-v4` have been evaluated once. A rebuild demonstration sends every output to a scratch directory (`python -m med_deploy rebuild-demo` does this and compares the result with the published files). Image builds and CI never fit, retrain, select a cutoff, or evaluate the frozen subsets.
+
 Record the command, the pass count, and the date in `PROJECT_STATUS.md`. Do not report a check as passed unless you ran it in that session or you are quoting a result already written there.
 
 `pytest` rebuilds the dataset in memory and compares it to the published files. `validate` checks checksums, parsed CSV record counts, and the quality checks. Quoted newlines inside a body are one record.

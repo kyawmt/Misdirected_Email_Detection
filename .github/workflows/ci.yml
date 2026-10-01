@@ -1,0 +1,43 @@
+# Compact CI: install from the pinned dependencies, run the fast suite, verify the
+# published bundle, and start the API with the review screen.
+#
+# It uses only the fictional data in the repository. It never fits, retrains,
+# selects a cutoff, or runs the frozen test evaluation, and it does not run the
+# release gate (the full `pytest`, about nine minutes, and `python -m med_data
+# validate`); see docs/phase_9/TEST_REPORT.md. A missing or incompatible bundle
+# fails the check-bundle steps. The steps below are defined once in
+# src/med_deploy/ci.py, and a test requires this file to contain every one.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11.14"
+          cache: pip
+          cache-dependency-path: constraints.txt
+      - name: install from the pinned dependencies
+        run: python -m pip install -c constraints.txt -e ".[dev,ui,monitor]"
+      - name: dependency consistency
+        run: python -m pip check
+      - name: environment matches the pins
+        run: python -m med_deploy environment --constraints constraints.txt --check
+      - name: api bundle versions and checksums
+        run: python -m med_deploy check-bundle --scope api
+      - name: ui bundle versions and checksums
+        run: python -m med_deploy check-bundle --scope ui
+      - name: compact suite and public-doc checks
+        run: python -m pytest -m "not slow" -q
+      - name: api startup and end-to-end smoke
+        run: python -m med_deploy smoke --spawn

@@ -1,0 +1,216 @@
+{
+  "kind": "latency",
+  "deploy_version": "med-deploy-v1",
+  "date_utc": "2026-10-01T00:42:04Z",
+  "claim": "AC05 measurement on this machine",
+  "boundary": "an httpx client on the host sends POST /assess to the service's published port and reads the whole response body; this includes the loopback hop and, for a container, the runtime's port forwarding, and excludes the review screen",
+  "server_boundary": "duration_ms in the response: from the handler's start until the response dict is ready",
+  "subset": "validation_product_like",
+  "workload": {
+    "drawn": "every validation_product_like draft in send order, one permutation with seed 20260926, fixed before timing; the four groups are disjoint",
+    "warmup_calls": 20,
+    "warmup": "the first drafts of the permutation, sent once each and not timed",
+    "measured_calls": 1000,
+    "concurrent_calls": 400,
+    "concurrent_clients": 4,
+    "max_input_probes": 30
+  },
+  "target_p95_ms": 300.0,
+  "ac05": {
+    "concurrency": 1,
+    "result": "met",
+    "client_p95_ms": 64.469962496878,
+    "requests": 1000,
+    "statuses": {
+      "assessed": 1000
+    },
+    "failures": 0,
+    "transport_errors": 0,
+    "client": {
+      "p50_ms": 27.844625001307577,
+      "p95_ms": 64.469962496878,
+      "p99_ms": 80.3116494941787,
+      "max_ms": 206.26291699591093,
+      "mean_ms": 31.21848800693988
+    },
+    "server": {
+      "p50_ms": 25.0985,
+      "p95_ms": 61.51685,
+      "p99_ms": 77.64041,
+      "max_ms": 199.013,
+      "mean_ms": 28.160152999999998
+    },
+    "parity_with_stored_validation_scores": {
+      "compared": 1000,
+      "decisions_matching": 1000,
+      "max_abs_email_risk_difference": 1.4099832412739488e-14
+    },
+    "recipient_mix": {
+      "1": 894,
+      "2": 23,
+      "3": 16,
+      "4": 56,
+      "5": 11
+    },
+    "wall_seconds": 31.26
+  },
+  "concurrent_probe": {
+    "requests": 400,
+    "statuses": {
+      "assessed": 400
+    },
+    "failures": 0,
+    "transport_errors": 0,
+    "client": {
+      "p50_ms": 99.04999949867488,
+      "p95_ms": 320.1434833488746,
+      "p99_ms": 435.6085202477698,
+      "max_ms": 494.88133300474146,
+      "mean_ms": 115.2595037275023
+    },
+    "server": {
+      "p50_ms": 77.3825,
+      "p95_ms": 301.64354999999995,
+      "p99_ms": 393.27192999999977,
+      "max_ms": 467.972,
+      "mean_ms": 92.3364125
+    },
+    "parity_with_stored_validation_scores": {
+      "compared": 400,
+      "decisions_matching": 400,
+      "max_abs_email_risk_difference": 2.831068712794149e-15
+    },
+    "clients": 4,
+    "wall_seconds": 12.01,
+    "requests_per_second": 33.3
+  },
+  "maximum_input_probe": {
+    "requests": 30,
+    "statuses": {
+      "assessed": 30
+    },
+    "failures": 0,
+    "transport_errors": 0,
+    "client": {
+      "p50_ms": 76.92354199753026,
+      "p95_ms": 88.37738545007595,
+      "p99_ms": 96.24995181809938,
+      "max_ms": 98.88258399587357,
+      "mean_ms": 73.25506949879734
+    },
+    "server": {
+      "p50_ms": 70.968,
+      "p95_ms": 84.68704999999999,
+      "p99_ms": 91.53301,
+      "max_ms": 93.978,
+      "mean_ms": 68.8906
+    },
+    "shape": "20 unique recipients, a 500-character subject, a 20,000-character body"
+  },
+  "served": {
+    "contract_version": "med-api-v1",
+    "snapshot_id": "med-synth-v4",
+    "model_version": "med-model-v2",
+    "feature_spec_version": "med-features-v2",
+    "policy_version": "med-policy-v2",
+    "T_warn": 0.9996767050340489,
+    "blocking_enabled": false,
+    "load_seconds": 10.603
+  },
+  "target": {
+    "kind": "container",
+    "container": {
+      "name": "med-demo-api-1",
+      "image_id": "sha256:85d67e46cbf709ac8fedb7d3fa0219929bba940f3f109a4c582714650707d8ee",
+      "status": "running",
+      "health": "healthy",
+      "read_only_root_filesystem": true,
+      "cpus": 2.0,
+      "memory_limit_bytes": 2147483648,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "user": "10001",
+      "published_ports": {
+        "8000/tcp": [
+          "127.0.0.1:8000"
+        ]
+      },
+      "mounts": [
+        {
+          "destination": "/feedback",
+          "read_write": true,
+          "type": "bind"
+        }
+      ]
+    },
+    "image": {
+      "reference": "sha256:85d67e46cbf709ac8fedb7d3fa0219929bba940f3f109a4c582714650707d8ee",
+      "id": "sha256:85d67e46cbf709ac8fedb7d3fa0219929bba940f3f109a4c582714650707d8ee",
+      "repo_tags": [
+        "med-api:phase9"
+      ],
+      "architecture": "arm64",
+      "os": "linux",
+      "size_bytes": 601372486,
+      "created": "2026-10-01T00:26:03.881603792Z",
+      "user": "10001",
+      "exposed_ports": [
+        "8000/tcp"
+      ],
+      "healthcheck": [
+        "CMD",
+        "python",
+        "-c",
+        "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/ready', timeout=4)"
+      ],
+      "layers": 15
+    },
+    "docker": {
+      "server_version": "29.4.0",
+      "operating_system": "Docker Desktop",
+      "architecture": "aarch64",
+      "cpus": 10,
+      "memory_bytes": 8217059328,
+      "storage_driver": "overlay2",
+      "client_version": "29.4.0"
+    },
+    "note": "The container runs inside the runtime's Linux VM. Its cpus and memory_limit_bytes are the limits the measurement ran under.",
+    "peak_memory_bytes_after_run": 471158784
+  },
+  "environment_of_measured_process": {
+    "kind": "environment",
+    "python": "3.11.14",
+    "python_matches_tested": true,
+    "tested_python": "3.11.14",
+    "platform": "Linux-6.12.76-linuxkit-aarch64-with-glibc2.36",
+    "machine": "aarch64",
+    "project_version": "0.9.0",
+    "packages": 23,
+    "key_packages": {
+      "numpy": "2.4.6",
+      "pandas": "3.0.6",
+      "scikit-learn": "1.9.1",
+      "scipy": "1.17.1",
+      "fastapi": "0.141.1",
+      "uvicorn": "0.54.0"
+    },
+    "pyarrow_importable": false,
+    "pyarrow_version": null,
+    "pandas_string_storage": {
+      "option": "auto",
+      "series_dtype": "str",
+      "backend": "StringArray"
+    }
+  },
+  "client": {
+    "platform": "macOS-27.0.1-arm64-arm-64bit",
+    "machine": "arm64",
+    "python": "3.11.14",
+    "httpx": "0.28.1",
+    "numpy": "2.4.6"
+  }
+}

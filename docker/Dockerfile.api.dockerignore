@@ -1,0 +1,29 @@
+# Build context for docker/Dockerfile.api: default deny, then only what the API
+# image needs. The data and artifact files are the ones the API opens, measured
+# with `python -m med_deploy reads` (docs/phase_9/LOCAL_DEPLOYMENT.md). Never in
+# the image: .git, .venv, private local notes, var and any local feedback, tests,
+# docs, secrets, the superseded v1/v2 baseline data and artifacts, and every file
+# that stores frozen test outcomes.
+*
+!constraints.txt
+!pyproject.toml
+!src
+**/__pycache__
+**/*.py[cod]
+src/*.egg-info
+# Of the deployment-check package, the images need only the bundle check and the
+# environment report (both run at build time and by hand). The other modules
+# drive checks from the host and stay out, so editing one does not change an image.
+src/med_deploy/*
+!src/med_deploy/__init__.py
+!src/med_deploy/__main__.py
+!src/med_deploy/bundle.py
+!src/med_deploy/cli.py
+!src/med_deploy/environment.py
+!src/med_deploy/version.py
+!data/med-synth-v4
+!artifacts/med-features-v2
+!artifacts/med-model-v2/model.joblib
+!artifacts/med-policy-v2/policy.json
+# Bind-mounted by the build's bundle check only (the Dockerfile does not copy it).
+!artifacts/med-deploy-v1/bundle_digests.json

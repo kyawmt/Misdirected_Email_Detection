@@ -1,0 +1,39 @@
+{
+  "kind": "browser_check",
+  "deploy_version": "med-deploy-v1",
+  "date_utc": "2026-10-01T00:41:14Z",
+  "how": "manual: the page was opened in a browser and its visible text saved; this command parsed it and compared it with the API's response for the same example",
+  "example": "added_recipient",
+  "page": "http://127.0.0.1:<port>/?example=added_recipient&assess=1",
+  "shown_in_browser": {
+    "decision": "warn",
+    "email_risk_score": "0.9997260",
+    "t_warn": "0.9996767",
+    "codes": [
+      "CONTENT_RELATIONSHIP_MISMATCH",
+      "EXTERNAL_RECIPIENT",
+      "UNUSUAL_RECIPIENT_COMBINATION"
+    ],
+    "action_message": "Pause and review before sending.",
+    "flagged_count": 1
+  },
+  "from_the_api": {
+    "decision": "warn",
+    "email_risk_score": "0.9997260",
+    "t_warn": "0.9996767",
+    "codes": [
+      "CONTENT_RELATIONSHIP_MISMATCH",
+      "EXTERNAL_RECIPIENT",
+      "UNUSUAL_RECIPIENT_COMBINATION"
+    ],
+    "flagged_count": 1
+  },
+  "matches": {
+    "decision": true,
+    "email_risk_score": true,
+    "t_warn": true,
+    "flagged": true,
+    "codes": true
+  },
+  "passed": true
+}

@@ -1,0 +1,92 @@
+{
+  "kind": "mutation_checks",
+  "deploy_version": "med-deploy-v1",
+  "date_utc": "2026-09-30T17:49:34Z",
+  "method": "each change is applied to a scratch copy of src/; the API is started from that copy against the published bundle; the recorded fixtures are replayed; the real source tree is never edited",
+  "control": {
+    "fixtures": 20,
+    "failed": 0,
+    "first_problem": null,
+    "first_failed_fixture": null
+  },
+  "control_passed": true,
+  "mutations": [
+    {
+      "mutation": "equality_allows",
+      "file": "src/med_policy/decision.py",
+      "change": "a score exactly at the cutoff allows instead of warning",
+      "detected": true,
+      "fixtures": 20,
+      "failed": 1,
+      "first_problem": "decision 'allow', expected 'warn'",
+      "first_failed_fixture": "threshold_equality_warn"
+    },
+    {
+      "mutation": "mean_instead_of_maximum",
+      "file": "src/med_policy/decision.py",
+      "change": "the email risk is the mean recipient risk, not the maximum",
+      "detected": true,
+      "fixtures": 20,
+      "failed": 7,
+      "first_problem": "the email risk score is not the maximum recipient risk score",
+      "first_failed_fixture": "routine_allow"
+    },
+    {
+      "mutation": "score_shifted",
+      "file": "src/med_api/service.py",
+      "change": "the reported email risk score is 0.1% lower than the decision's",
+      "detected": true,
+      "fixtures": 20,
+      "failed": 15,
+      "first_problem": "the email risk score is not the maximum recipient risk score",
+      "first_failed_fixture": "routine_allow"
+    },
+    {
+      "mutation": "evidence_limitations_dropped",
+      "file": "src/med_api/service.py",
+      "change": "no recipient carries an evidence limitation",
+      "detected": true,
+      "fixtures": 20,
+      "failed": 6,
+      "first_problem": "recipient 0 evidence limitations [], expected ['LIMITED_RELATIONSHIP_HISTORY']",
+      "first_failed_fixture": "legitimate_first_contact_allow"
+    },
+    {
+      "mutation": "history_rule_changed",
+      "file": "src/med_api/service.py",
+      "change": "provenance states a different history rule",
+      "detected": true,
+      "fixtures": 20,
+      "failed": 15,
+      "first_problem": "provenance history_rule is 'all mail', expected 'sent mail strictly earlier than the cutoff'",
+      "first_failed_fixture": "routine_allow"
+    },
+    {
+      "mutation": "cutoff_misreported",
+      "file": "src/med_api/service.py",
+      "change": "provenance reports a different cutoff than the one applied",
+      "detected": true,
+      "fixtures": 20,
+      "failed": 15,
+      "first_problem": "provenance T_warn is 0.49983835251702446, expected 0.9996767050340489",
+      "first_failed_fixture": "routine_allow"
+    },
+    {
+      "mutation": "failure_carries_an_allow",
+      "file": "src/med_api/service.py",
+      "change": "an unable_to_assess response carries the decision allow",
+      "detected": true,
+      "fixtures": 20,
+      "failed": 5,
+      "first_problem": "a failure carries a decision or a risk score",
+      "first_failed_fixture": "invalid_malformed_address"
+    }
+  ],
+  "all_detected": true,
+  "machine": {
+    "platform": "macOS-27.0.1-arm64-arm-64bit",
+    "machine": "arm64",
+    "python": "3.11.14",
+    "cpu_count": 10
+  }
+}

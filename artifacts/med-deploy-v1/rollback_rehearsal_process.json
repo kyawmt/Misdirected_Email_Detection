@@ -1,0 +1,264 @@
+{
+  "kind": "rollback_rehearsal",
+  "deploy_version": "med-deploy-v1",
+  "mode": "process",
+  "date_utc": "2026-10-01T00:42:57Z",
+  "passed": true,
+  "trigger": "GET /ready returned 503 and the scenario suite flagged every assessed fixture (docs/phase_8/RUNBOOK.md: roll back when /ready no longer reports the expected versions)",
+  "identities": {
+    "known_good": {
+      "kind": "bundle paths",
+      "files": {
+        "policy.json": "be39929a3c92cf978dc00c1773f9bf9dd6bdbdfc73984381033979b46152e8e5",
+        "model.joblib": "f698b69f7ff20fc9df9068ff06c1be44c9c6bc8ee6ce8cfacea851dbd7f9dfaa",
+        "artifact_manifest.json": "b9ef336f22952042cb64c61b6080a2040bec9b232848f93729b645e2e4d5fff9"
+      }
+    },
+    "candidates": {
+      "tampered_model": {
+        "construction": "one byte of model.joblib is flipped; policy.json records the model's SHA-256 (a disposable copy; the published file is untouched)"
+      },
+      "missing_policy": {
+        "construction": "policy.json is absent (a disposable copy; the published file is untouched)"
+      }
+    },
+    "known_good_after": {
+      "kind": "bundle paths",
+      "files": {
+        "policy.json": "be39929a3c92cf978dc00c1773f9bf9dd6bdbdfc73984381033979b46152e8e5",
+        "model.joblib": "f698b69f7ff20fc9df9068ff06c1be44c9c6bc8ee6ce8cfacea851dbd7f9dfaa",
+        "artifact_manifest.json": "b9ef336f22952042cb64c61b6080a2040bec9b232848f93729b645e2e4d5fff9"
+      }
+    },
+    "known_good_unchanged": true
+  },
+  "steps": [
+    {
+      "step": "baseline: known-good deployed and verified",
+      "passed": true,
+      "seconds": 11.4,
+      "deployable": "known_good",
+      "seconds_until_the_port_answered": 10.7,
+      "pid": 82154,
+      "health_http": 200,
+      "ready_http": 200,
+      "served": {
+        "contract_version": "med-api-v1",
+        "snapshot_id": "med-synth-v4",
+        "model_version": "med-model-v2",
+        "feature_spec_version": "med-features-v2",
+        "policy_version": "med-policy-v2",
+        "T_warn": 0.9996767050340489,
+        "blocking_enabled": false
+      },
+      "matches_policy_file": true,
+      "scenario_fixtures": {
+        "passed": 20,
+        "failed": 0
+      },
+      "allow": {
+        "fixture": "routine_allow",
+        "decision": "allow"
+      },
+      "warning": {
+        "fixture": "added_recipient_warn",
+        "decision": "warn"
+      },
+      "feedback": {
+        "lines_added_by_one_click": 1,
+        "next_assessment_identical": true,
+        "bundle_files_unchanged": true
+      }
+    },
+    {
+      "step": "review screen container: not part of the process-level rehearsal",
+      "passed": true,
+      "seconds": 0.0,
+      "ui_health": "not applicable: there is no review screen container in the process-level rehearsal",
+      "ui_container_sees_ready_http": null
+    },
+    {
+      "step": "candidate fails closed: tampered_model",
+      "passed": true,
+      "seconds": 3.8,
+      "deployable": "tampered_model",
+      "fault": "one byte of model.joblib is flipped; policy.json records the model's SHA-256",
+      "seconds_until_the_port_answered": 2.9,
+      "pid": 82237,
+      "health_http": 200,
+      "ready_http": 503,
+      "ready_reason": "PolicyError: Checksum mismatch for model.joblib",
+      "assess": {
+        "routine_allow": {
+          "http": 503,
+          "status": "unable_to_assess",
+          "category": "unavailable",
+          "message": "The scoring bundle is not loaded",
+          "decision": null,
+          "email_risk_score": null
+        },
+        "added_recipient_warn": {
+          "http": 503,
+          "status": "unable_to_assess",
+          "category": "unavailable",
+          "message": "The scoring bundle is not loaded",
+          "decision": null,
+          "email_risk_score": null
+        }
+      },
+      "scenario_suite": {
+        "assessed_fixtures": 15,
+        "flagged_by_the_suite": 15
+      },
+      "feedback_file_unchanged": true,
+      "health_command_exit_code": 1,
+      "review_screen": {
+        "checked_by": "the screen script, run headlessly (AppTest) on the host against this API",
+        "assessment_disabled": true,
+        "banner": [
+          "Scoring service is not ready. Assessment is disabled."
+        ],
+        "no_decision_shown": true
+      }
+    },
+    {
+      "step": "restore: known-good redeployed after tampered_model",
+      "passed": true,
+      "seconds": 10.9,
+      "deployable": "known_good",
+      "seconds_until_the_port_answered": 10.1,
+      "pid": 82260,
+      "health_http": 200,
+      "ready_http": 200,
+      "served": {
+        "contract_version": "med-api-v1",
+        "snapshot_id": "med-synth-v4",
+        "model_version": "med-model-v2",
+        "feature_spec_version": "med-features-v2",
+        "policy_version": "med-policy-v2",
+        "T_warn": 0.9996767050340489,
+        "blocking_enabled": false
+      },
+      "matches_policy_file": true,
+      "scenario_fixtures": {
+        "passed": 20,
+        "failed": 0
+      },
+      "allow": {
+        "fixture": "routine_allow",
+        "decision": "allow"
+      },
+      "warning": {
+        "fixture": "added_recipient_warn",
+        "decision": "warn"
+      },
+      "feedback": {
+        "lines_added_by_one_click": 1,
+        "next_assessment_identical": true,
+        "bundle_files_unchanged": true
+      }
+    },
+    {
+      "step": "candidate fails closed: missing_policy",
+      "passed": true,
+      "seconds": 3.1,
+      "deployable": "missing_policy",
+      "fault": "policy.json is absent",
+      "seconds_until_the_port_answered": 2.6,
+      "pid": 82320,
+      "health_http": 200,
+      "ready_http": 503,
+      "ready_reason": "PolicyError: Policy file <scratch>/candidate-missing-policy/policy.json does not exist",
+      "assess": {
+        "routine_allow": {
+          "http": 503,
+          "status": "unable_to_assess",
+          "category": "unavailable",
+          "message": "The scoring bundle is not loaded",
+          "decision": null,
+          "email_risk_score": null
+        },
+        "added_recipient_warn": {
+          "http": 503,
+          "status": "unable_to_assess",
+          "category": "unavailable",
+          "message": "The scoring bundle is not loaded",
+          "decision": null,
+          "email_risk_score": null
+        }
+      },
+      "scenario_suite": {
+        "assessed_fixtures": 15,
+        "flagged_by_the_suite": 15
+      },
+      "feedback_file_unchanged": true,
+      "health_command_exit_code": 1,
+      "review_screen": {
+        "checked_by": "the screen script, run headlessly (AppTest) on the host against this API",
+        "assessment_disabled": true,
+        "banner": [
+          "Scoring service is not ready. Assessment is disabled."
+        ],
+        "no_decision_shown": true
+      }
+    },
+    {
+      "step": "restore: known-good redeployed after missing_policy",
+      "passed": true,
+      "seconds": 10.7,
+      "deployable": "known_good",
+      "seconds_until_the_port_answered": 9.9,
+      "pid": 82346,
+      "health_http": 200,
+      "ready_http": 200,
+      "served": {
+        "contract_version": "med-api-v1",
+        "snapshot_id": "med-synth-v4",
+        "model_version": "med-model-v2",
+        "feature_spec_version": "med-features-v2",
+        "policy_version": "med-policy-v2",
+        "T_warn": 0.9996767050340489,
+        "blocking_enabled": false
+      },
+      "matches_policy_file": true,
+      "scenario_fixtures": {
+        "passed": 20,
+        "failed": 0
+      },
+      "allow": {
+        "fixture": "routine_allow",
+        "decision": "allow"
+      },
+      "warning": {
+        "fixture": "added_recipient_warn",
+        "decision": "warn"
+      },
+      "feedback": {
+        "lines_added_by_one_click": 1,
+        "next_assessment_identical": true,
+        "bundle_files_unchanged": true
+      }
+    },
+    {
+      "step": "review screen container: not applicable",
+      "passed": true,
+      "seconds": 0.0,
+      "ui_health": "not applicable"
+    }
+  ],
+  "published_bundle_files_unchanged": true,
+  "feedback_lines_in_the_rehearsal_file": 3,
+  "limits": [
+    "A local rehearsal on one machine. It is not a live hot swap, a canary, or a shadow router; none exists.",
+    "A candidate is the known-good bundle with one injected fault. It shows that a broken bundle fails closed and that the known-good deployable can be restored; it does not show that a different, healthy model can be promoted.",
+    "The previous bundle (med-policy-v1) cannot be swapped in: the current code refuses it by design.",
+    "In the failed-candidate state the review screen's behavior was observed with the screen script run headlessly on the host against the failing API. The review screen container was observed through its health endpoint and its own view of /ready from inside its network; its served page was not opened in a browser in that state (a browser check covers one healthy page)."
+  ],
+  "machine": {
+    "platform": "macOS-27.0.1-arm64-arm-64bit",
+    "machine": "arm64",
+    "python": "3.11.14",
+    "cpu_count": 10
+  },
+  "docker": null
+}

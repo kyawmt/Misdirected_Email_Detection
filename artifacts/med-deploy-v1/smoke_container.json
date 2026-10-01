@@ -1,0 +1,88 @@
+{
+  "kind": "smoke",
+  "deploy_version": "med-deploy-v1",
+  "date_utc": "2026-10-01T00:40:38Z",
+  "target": "container",
+  "api_url": "http://127.0.0.1:<port>",
+  "ui_url": "http://127.0.0.1:<port>",
+  "served": {
+    "contract_version": "med-api-v1",
+    "snapshot_id": "med-synth-v4",
+    "model_version": "med-model-v2",
+    "feature_spec_version": "med-features-v2",
+    "policy_version": "med-policy-v2",
+    "T_warn": 0.9996767050340489,
+    "blocking_enabled": false
+  },
+  "feedback_checked": true,
+  "checks": [
+    {
+      "name": "api_health",
+      "passed": true,
+      "detail": "process is up (liveness only)"
+    },
+    {
+      "name": "api_ready",
+      "passed": true,
+      "detail": "contract med-api-v1, snapshot med-synth-v4, versions and cutoff equal the policy file, blocking disabled"
+    },
+    {
+      "name": "screen_ready",
+      "passed": true,
+      "detail": "no readiness banner; Assess enabled; served versions and cutoff equal /ready"
+    },
+    {
+      "name": "screen_allow",
+      "passed": true,
+      "detail": "decision allow; email risk score, cutoff, flagged recipients, and versions equal the API's"
+    },
+    {
+      "name": "screen_warn",
+      "passed": true,
+      "detail": "decision warn; email risk score, cutoff, flagged recipients, and versions equal the API's"
+    },
+    {
+      "name": "screen_edit_then_reassess",
+      "passed": true,
+      "detail": "edit hid the decision until reassessed (decision warn; email risk score, cutoff, flagged recipients, and versions equal the API's); after removing the flagged recipient: decision allow; email risk score, cutoff, flagged recipients, and versions equal the API's"
+    },
+    {
+      "name": "screen_invalid_input",
+      "passed": true,
+      "detail": "malformed address: the API returned 422 invalid_input with no decision or score; the screen shows the failure and no decision"
+    },
+    {
+      "name": "screen_unavailable",
+      "passed": true,
+      "detail": "address outside the directory: the API returned 503 unavailable with no decision or score; the screen shows the failure and no decision"
+    },
+    {
+      "name": "screen_feedback",
+      "passed": true,
+      "detail": "one click added one line (no address) to the disposable feedback file; no bundle file changed; the next assessment is identical"
+    },
+    {
+      "name": "screen_no_local_scoring",
+      "passed": true,
+      "detail": "the screen process never imported the scoring modules"
+    },
+    {
+      "name": "ui_endpoint",
+      "passed": true,
+      "detail": "the UI process answers its health endpoint and serves its page (the running screen is exercised by the steps above and, for the container, in a browser)"
+    },
+    {
+      "name": "bundle_files_unchanged",
+      "passed": true,
+      "detail": "policy, model, and manifest files on disk have the same SHA-256 before and after"
+    }
+  ],
+  "passed": true,
+  "machine": {
+    "platform": "macOS-27.0.1-arm64-arm-64bit",
+    "machine": "arm64",
+    "python": "3.11.14",
+    "cpu_count": 10
+  },
+  "httpx": "0.28.1"
+}

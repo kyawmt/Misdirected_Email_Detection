@@ -879,7 +879,7 @@ def test_commands_refuse_to_overwrite_a_record(tmp_path, capsys):
 
 def test_package_version_script_and_light_dependencies():
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
-    assert project["version"] == "0.8.0"
+    assert tuple(int(part) for part in project["version"].split(".")) >= (0, 8, 0)
     assert project["scripts"]["med-monitor"] == "med_monitor.cli:main"
     heavy = ("torch", "tensorflow", "transformers", "openai", "anthropic", "keras", "jax")
     everything = list(project["dependencies"]) + [item for group in project["optional-dependencies"].values() for item in group]

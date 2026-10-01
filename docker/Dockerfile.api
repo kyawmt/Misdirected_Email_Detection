@@ -1,0 +1,53 @@
+# Scoring API image (simulation). Core install only: no Streamlit and no pyarrow.
+#
+# With pyarrow importable, pandas 3 stores strings in Arrow and the scoring
+# pipeline runs about three times slower (same results), so the process that
+# scores is kept in an environment without it. The review screen has its own
+# image and calls this one over HTTP.
+#
+# The frozen bundle is baked into the image, owned by root, and the container
+# runs as an unprivileged user on a read-only root filesystem: nothing can edit
+# it in place. A new bundle is a new image. The only writable path is the
+# feedback mount, /feedback. What the image holds is exactly what the API reads;
+# docker/Dockerfile.api.dockerignore lists it and the build checks it.
+FROM python:3.11.14-slim-bookworm@sha256:65a93d69fa75478d554f4ad27c85c1e69fa184956261b4301ebaf6dbb0a3543d
+
+LABEL org.opencontainers.image.title="med-api" \
+      org.opencontainers.image.description="Simulated misdirected-email scoring API over a frozen fictional bundle" \
+      org.opencontainers.image.base.name="python:3.11.14-slim-bookworm"
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Third-party packages exactly as pinned; wheels only, so nothing is compiled.
+WORKDIR /build
+COPY constraints.txt pyproject.toml ./
+COPY src ./src
+RUN pip install --only-binary=:all: -c constraints.txt . \
+    && cd / && rm -rf /build
+
+# The frozen bundle: the files the API reads at startup and nothing else.
+WORKDIR /app
+COPY data/med-synth-v4 ./data/med-synth-v4
+COPY artifacts/med-features-v2 ./artifacts/med-features-v2
+COPY artifacts/med-model-v2/model.joblib ./artifacts/med-model-v2/model.joblib
+COPY artifacts/med-policy-v2/policy.json ./artifacts/med-policy-v2/policy.json
+
+# Fail the build on a missing, extra, or incompatible file, on a frozen-outcome file, and on a policy.json that is
+# not the anchored published one. The digest manifest is bind-mounted for this check only; it is not copied into the image.
+RUN --mount=type=bind,source=artifacts/med-deploy-v1/bundle_digests.json,target=/tmp/bundle_digests.json \
+    python -m med_deploy check-bundle --scope api --root /app --image --digests /tmp/bundle_digests.json
+
+RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin med \
+    && mkdir /feedback && chown 10001 /feedback
+USER 10001
+
+ENV MED_API_ROOT=/app \
+    MED_API_FEEDBACK=/feedback/feedback.jsonl
+EXPOSE 8000
+# /ready, not /health: a live process with no loaded bundle is not ready to serve.
+HEALTHCHECK --interval=10s --timeout=5s --start-period=90s --retries=3 \
+    CMD ["python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/ready', timeout=4)"]
+CMD ["python", "-m", "med_api", "serve", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,7 +1,7 @@
 [project]
 name = "med-data"
-version = "0.8.0"
-description = "Fictional data, features, model comparison, warning policy, scoring API, simulated review UI, and monitoring for misdirected email detection"
+version = "0.9.0"
+description = "Fictional data, features, model comparison, warning policy, scoring API, simulated review UI, monitoring, and local deployment checks for misdirected email detection"
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.26",
@@ -33,6 +33,7 @@ med-policy = "med_policy.cli:main"
 med-api = "med_api.cli:main"
 med-ui = "med_ui.cli:main"
 med-monitor = "med_monitor.cli:main"
+med-deploy = "med_deploy.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -40,3 +41,6 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+markers = [
+    "slow: minutes-long checks (dataset rebuilds, full-history parity, live replays); run by the release gate, deselected in CI with -m 'not slow'",
+]

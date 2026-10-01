@@ -205,6 +205,7 @@ def test_selection_tie_break_uses_training_fold_mean():
     assert chosen == "higher_cv"
 
 
+@pytest.mark.slow
 def test_score_query_matches_batch_and_scoring_view():
     from med_data.io import read_dataset
     from med_data.views import scoring_view

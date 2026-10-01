@@ -1,0 +1,171 @@
+{
+  "kind": "bundle_check",
+  "deploy_version": "med-deploy-v1",
+  "scope": "api",
+  "ok": true,
+  "bundle": {
+    "dataset_version": "med-synth-v4",
+    "generator_version": "1.3.0",
+    "feature_spec_version": "med-features-v2",
+    "policy_version": "med-policy-v2",
+    "model_version": "med-model-v2",
+    "model_run_name": "logistic_all_balanced",
+    "T_warn": 0.9996767050340489,
+    "blocking_enabled": false,
+    "calibration": "not_fit",
+    "scores_are": "risk_scores",
+    "checksums": {
+      "model.joblib": "f698b69f7ff20fc9df9068ff06c1be44c9c6bc8ee6ce8cfacea851dbd7f9dfaa",
+      "artifact_manifest.json": "b9ef336f22952042cb64c61b6080a2040bec9b232848f93729b645e2e4d5fff9"
+    }
+  },
+  "checks": [
+    {
+      "name": "dataset_files",
+      "passed": true,
+      "detail": "every table and the quality report match dataset_manifest.json (checksums and record counts)"
+    },
+    {
+      "name": "dataset_version",
+      "passed": true,
+      "detail": "med-synth-v4, generator 1.3.0"
+    },
+    {
+      "name": "feature_artifact",
+      "passed": true,
+      "detail": "med-features-v2: 7 files match artifact_manifest.json"
+    },
+    {
+      "name": "policy_and_model",
+      "passed": true,
+      "detail": "versions, run name, model and feature-manifest checksums, blocking disabled, cutoff finite, calibration not fit"
+    },
+    {
+      "name": "policy_matches_snapshot",
+      "passed": true,
+      "detail": "policy dataset med-synth-v4"
+    },
+    {
+      "name": "text_transformer",
+      "passed": true,
+      "detail": "loads without refitting"
+    },
+    {
+      "name": "no_frozen_features",
+      "passed": true,
+      "detail": "no features_test_* file in the feature artifact"
+    },
+    {
+      "name": "anchored_digests",
+      "passed": true,
+      "detail": "1 file(s) equal the digests anchored in bundle_digests.json: policy.json"
+    }
+  ],
+  "files": [
+    {
+      "path": "artifacts/med-features-v2/artifact_manifest.json",
+      "bytes": 1087,
+      "sha256": "b9ef336f22952042cb64c61b6080a2040bec9b232848f93729b645e2e4d5fff9"
+    },
+    {
+      "path": "artifacts/med-features-v2/feature_schema.json",
+      "bytes": 4978,
+      "sha256": "b6a05a5fe436a870e8aef48cae1cf7996552e948d510db36e311cac79062c117"
+    },
+    {
+      "path": "artifacts/med-features-v2/features_train.csv",
+      "bytes": 895724,
+      "sha256": "7c96eef737cefe7576663d713f0e569e124a7f5a20330b614c7dbb14a201de04"
+    },
+    {
+      "path": "artifacts/med-features-v2/features_validation_diagnostic.csv",
+      "bytes": 137091,
+      "sha256": "d3fdcc3a35b5e47e93021bf12a9e4b2d2792bc4572e44aba3feca9e547147c99"
+    },
+    {
+      "path": "artifacts/med-features-v2/features_validation_product_like.csv",
+      "bytes": 1124844,
+      "sha256": "d6fd579d165a3087dd50bc517cacbe3df5dae3cc36db9e6539d93d3b9ce56a80"
+    },
+    {
+      "path": "artifacts/med-features-v2/fit_metadata.json",
+      "bytes": 4272,
+      "sha256": "ccc07fcd048679caad82b345db1b57cee624c7364dc6e938072f1eb0035d5f4c"
+    },
+    {
+      "path": "artifacts/med-features-v2/quality_report.json",
+      "bytes": 68694,
+      "sha256": "418031f351a3b86023477e1c791590ccf9c225f29723dd53c5794606262c5cce"
+    },
+    {
+      "path": "artifacts/med-features-v2/text_transformer.joblib",
+      "bytes": 36678,
+      "sha256": "a9c59597bd46dbbcfbb1f86bf3dc9ebc1d796c5b3415e2e06e77f604665ae228"
+    },
+    {
+      "path": "artifacts/med-model-v2/model.joblib",
+      "bytes": 5244,
+      "sha256": "f698b69f7ff20fc9df9068ff06c1be44c9c6bc8ee6ce8cfacea851dbd7f9dfaa"
+    },
+    {
+      "path": "artifacts/med-policy-v2/policy.json",
+      "bytes": 3597,
+      "sha256": "be39929a3c92cf978dc00c1773f9bf9dd6bdbdfc73984381033979b46152e8e5"
+    },
+    {
+      "path": "data/med-synth-v4/contacts.csv",
+      "bytes": 39993,
+      "sha256": "a4770802579ded45d5852dc6f3d2b0fa0a50e8d8a0432ef197cfb096c186b480"
+    },
+    {
+      "path": "data/med-synth-v4/dataset_manifest.json",
+      "bytes": 4107,
+      "sha256": "9f53c114c8cbbb7fda51b80ce7d27b2071ae5e2524e75e23592d6e17de2751b6"
+    },
+    {
+      "path": "data/med-synth-v4/draft_recipients.csv",
+      "bytes": 392653,
+      "sha256": "8fa99a3dff8dceac765f3cecc8c42b58da1f005aebc807903e79959309ccac0f"
+    },
+    {
+      "path": "data/med-synth-v4/drafts.csv",
+      "bytes": 6257081,
+      "sha256": "0ac162ef401649400e26e853da4e3c84b79ed4c6c6af5fcba98d0f08e26400e0"
+    },
+    {
+      "path": "data/med-synth-v4/invalid_fixtures.csv",
+      "bytes": 611,
+      "sha256": "8cb601a0e07ce51971bad4e1da750115be70042ecd927f0e9a25c29d323fc13d"
+    },
+    {
+      "path": "data/med-synth-v4/labels.csv",
+      "bytes": 2313478,
+      "sha256": "96a991dd6d4503ac8a0880fa6a87fb0c9ca23b1a3747e9f7f311392240e49021"
+    },
+    {
+      "path": "data/med-synth-v4/message_recipients.csv",
+      "bytes": 3724475,
+      "sha256": "3a6bdb85977800d29eea54eb45da6bd481c428cc07e1e26d793aa038ca4b3d14"
+    },
+    {
+      "path": "data/med-synth-v4/messages.csv",
+      "bytes": 52325110,
+      "sha256": "3fd61c7afb8d1ffeaae523a72ae850c187837a5a83bb2cbc2c33007450bb2492"
+    },
+    {
+      "path": "data/med-synth-v4/quality_report.json",
+      "bytes": 5271,
+      "sha256": "85695561792d6ac6fad6a08836ebad7f22aef7364f34d4b7924f2b4cee7d8f6a"
+    },
+    {
+      "path": "data/med-synth-v4/reviewer_feedback.csv",
+      "bytes": 588,
+      "sha256": "07db14105a5a9027de302b0ed6168379011439d46c1eabdf60eaa799393c2a64"
+    },
+    {
+      "path": "data/med-synth-v4/split_manifest.csv",
+      "bytes": 1658218,
+      "sha256": "831b3553e99e34c3bc5ced094eb44934c18db7ab70b171db8dac32086e3fc184"
+    }
+  ]
+}
