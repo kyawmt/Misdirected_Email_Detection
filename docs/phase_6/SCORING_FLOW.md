@@ -7,8 +7,8 @@ Served bundle: dataset snapshot `med-synth-v4`, features `med-features-v2`, mode
 At startup the app loads, once and without fitting anything:
 
 1. the feature artifact manifest, with every file checksum verified
-2. the `med-synth-v4` tables, with dataset checksums verified
-3. the model and the policy through `med_policy.decision.load_bundle`, which refuses a version, run-name, or checksum mismatch
+2. the `med-synth-v4` dataset directory: the SHA-256 of every file in its manifest is verified, then only the contact directory and the sent-mail history are parsed (`contacts.csv`, `messages.csv`, and `message_recipients.csv`, with their record counts checked); no draft, draft-recipient, label, split, or feedback table is parsed
+3. the model and the policy through `med_policy.decision.load_bundle`, which refuses a version, run-name, or checksum mismatch, a cutoff outside 0 to 1, and a `policy.json` whose own SHA-256 is not the one recorded in `med_policy.version`
 4. the saved text transformer
 5. the contact directory and the sent-mail history index; the transformer is bound to the index once
 
@@ -19,7 +19,7 @@ At startup the app loads, once and without fitting anything:
 1. Parse the JSON body. Reject label, scenario, split, family, and score fields by name, and any field outside the contract.
 2. Normalize (A7): timestamp with timezone, `.example` addresses, merge repeated addresses across roles, limits.
 3. Resolve the snapshot id (`med-synth-v4` only), the sender (internal contact), and every recipient in the directory.
-4. Build one `DraftQuery`. The family exclusion is empty, because a client draft has no family. A non-empty body's hash is excluded from history so the draft is not its own earlier mail. History is sent mail strictly earlier than the cutoff.
+4. Build one `DraftQuery`. The family exclusion is empty, because a client draft has no family. A non-empty body's hash is excluded from history so the draft is not its own earlier mail. History is sent mail strictly earlier than the cutoff. The offline build of the training and evaluation rows also drops the draft's own family; the service cannot, so an earlier message of the same family with a different body stays in the history.
 5. Call `med_policy.decision.assess_draft` under the scoring timeout. It runs `transform_draft`, the frozen model, and the policy. The API does not reimplement the cutoff, the maximum, or the model.
 6. Map the result to the response. Reason codes and limitations are read from the same feature rows. They do not change the decision.
 
@@ -47,7 +47,7 @@ Workload: every validation_product_like draft, in one permutation with seed 2026
 | Server-side p50 / p95 / max | 26.06 / 56.28 / 443.53 ms |
 | Target | p95 below 300 ms |
 | AC05 | **met** |
-| Cold start | 7.95 s (app creation and startup: dataset read with checksums, bundle load with checksum checks, transformer load, directory and history index, history vectorization) |
+| Cold start | 7.95 s (app creation and startup: dataset read with checksums, bundle load with checksum checks, transformer load, directory and history index, history vectorization); the record was made before the startup load was narrowed to the contacts and the sent-mail history, and was not remeasured |
 | Statuses | assessed: 4000 |
 | Recipients per request | 1: 3600, 2: 100, 3: 69, 4: 195, 5: 33, 6: 3 |
 | Month of draft | 2025-03: 45, 2025-04: 813, 2025-05: 806, 2025-06: 759, 2025-07: 823, 2025-08: 754 |

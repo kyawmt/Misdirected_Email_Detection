@@ -17,12 +17,14 @@ The published tables are in `data/med-synth-v4/`. Regenerating with this seed an
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-python -m med_data build --output data/med-synth-v4
-python -m med_data validate --data data/med-synth-v4
+SCRATCH="$(mktemp -d)"
+python -m med_data build --output "$SCRATCH/med-synth-v4"
+python -m med_data validate --data "$SCRATCH/med-synth-v4"
+diff "$SCRATCH/med-synth-v4/dataset_manifest.json" data/med-synth-v4/dataset_manifest.json && echo "same manifest as the published dataset"
 pytest tests/test_phase2.py
 ```
 
-`build` runs the quality checks before it writes. `validate` reloads the tables, checks the SHA-256 manifest, and runs the same checks.
+`build` runs the quality checks before it writes. `validate` reloads the tables, checks the SHA-256 manifest, and runs the same checks. The build goes into a new scratch directory because `data/med-synth-v4` is the published dataset and its frozen test subsets have been evaluated: `build` refuses to write into a directory that already holds a dataset, and the published directory is never the output. `data/med-synth-v4` holds the historical output of this build; the `diff` shows that a rebuild reproduces its manifest.
 
 ## What the generator builds
 

@@ -2,7 +2,13 @@
 
 Nothing here fits. The text transformer is loaded from its saved file and
 bound to the history index once. The model and policy come through
-`med_policy.decision.load_bundle`, which checks versions and checksums.
+`med_policy.decision.load_bundle`, which checks versions, checksums, the cutoff
+range, and the policy file's own digest.
+
+The dataset directory is read in two steps: the SHA-256 of every file in its
+manifest is checked, then only the contact directory and the sent-mail history
+(`contacts.csv`, `messages.csv`, `message_recipients.csv`) are parsed. No draft,
+label, split, or feedback table is parsed.
 """
 
 from __future__ import annotations
@@ -13,7 +19,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from med_data.io import read_dataset, verify_files
+from med_data.io import read_serving_tables
 from med_features.profiles import directory_from_dataset, history_index_from_dataset
 from med_features.text_model import FittedText
 from med_models.data import verify_feature_artifact
@@ -67,16 +73,16 @@ def load_context(paths: ApiPaths) -> ScoringContext:
     """Load everything once. Raises on any missing or mismatched artifact."""
     started = time.perf_counter()
     verify_feature_artifact(paths.features)
-    verify_files(paths.data)
-    dataset = read_dataset(paths.data)
-    if dataset.summary["dataset_version"] != SNAPSHOT_ID:
-        raise ValueError(f"Snapshot {dataset.summary['dataset_version']} is not {SNAPSHOT_ID}")
+    # The policy and model are checked before the large dataset read, so a refused bundle fails fast.
     bundle = load_bundle(paths.policy, paths.model, paths.features / "artifact_manifest.json")
+    tables = read_serving_tables(paths.data)
+    if tables.dataset_version != SNAPSHOT_ID:
+        raise ValueError(f"Snapshot {tables.dataset_version} is not {SNAPSHOT_ID}")
     transformer = FittedText.load(paths.features / "text_transformer.joblib")
-    directory = directory_from_dataset(dataset)
-    history = history_index_from_dataset(dataset)
+    directory = directory_from_dataset(tables)
+    history = history_index_from_dataset(tables)
     history.bind(transformer)
-    contacts = dataset.contacts
+    contacts = tables.contacts
     address_index = {
         str(address).strip().casefold(): str(contact_id)
         for address, contact_id in zip(contacts["email_address"], contacts["contact_id"], strict=True)

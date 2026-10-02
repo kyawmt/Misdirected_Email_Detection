@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 from pathlib import Path
@@ -10,6 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import med_policy.decision as decision_module
 from med_data.io import read_dataset
 from med_features.build import queries_for
 from med_features.profiles import directory_from_dataset, history_index_from_dataset
@@ -27,7 +29,9 @@ from med_policy.version import (
     MODEL_PATH,
     MODEL_VERSION,
     POLICY_DIR as POLICY_REL,
+    POLICY_SHA256,
     POLICY_VERSION,
+    T_WARN_RANGE,
     PolicyError,
 )
 
@@ -145,6 +149,64 @@ def test_policy_version_and_field_mismatch_is_refused(tmp_path, field, value, ma
     path = tmp_path / "policy.json"
     path.write_text(json.dumps(policy), encoding="utf-8")
     with pytest.raises(PolicyError, match=match):
+        load_bundle(path, MODEL, MANIFEST)
+
+
+def _policy_copy(tmp_path, name="policy.json", **changes) -> Path:
+    policy = json.loads((POLICY_DIR / "policy.json").read_text(encoding="utf-8"))
+    policy.update(changes)
+    path = tmp_path / name
+    path.write_text(json.dumps(policy, indent=2), encoding="utf-8")
+    return path
+
+
+def test_policy_digest_kept_with_the_policy_version_is_the_frozen_file():
+    assert hashlib.sha256((POLICY_DIR / "policy.json").read_bytes()).hexdigest() == POLICY_SHA256
+    # Phase 9 anchors the same digest for builds; the two records must agree.
+    anchored = json.loads((ROOT / "artifacts/med-deploy-v1/bundle_digests.json").read_text(encoding="utf-8"))
+    assert anchored["files"][(POLICY_REL / "policy.json").as_posix()]["sha256"] == POLICY_SHA256
+    assert T_WARN_RANGE == (0.0, 1.0)
+
+
+@pytest.mark.parametrize("cutoff", [2.0, 1.0000000000000002, -0.5, -1e-12])
+def test_cutoff_outside_the_risk_score_range_is_refused(tmp_path, cutoff):
+    with pytest.raises(PolicyError, match="outside the risk-score range"):
+        load_bundle(_policy_copy(tmp_path, T_warn=cutoff), MODEL, MANIFEST)
+    bundle, reason = try_load_bundle(_policy_copy(tmp_path, T_warn=cutoff), MODEL, MANIFEST)
+    assert bundle is None and "outside the risk-score range" in reason
+    assert assess_draft(bundle, None, None, None, None, reason=reason)["status"] == "unable_to_assess"
+
+
+@pytest.mark.parametrize("cutoff", [0.0, 0.5, 1.0])
+def test_an_edited_cutoff_inside_the_range_is_refused_by_the_policy_digest(tmp_path, cutoff):
+    # In range, so only the digest can refuse it: 0.0 and 1.0 are valid scores, 1.0 because equality warns.
+    with pytest.raises(PolicyError, match="Checksum mismatch for policy.json"):
+        load_bundle(_policy_copy(tmp_path, T_warn=cutoff), MODEL, MANIFEST)
+
+
+@pytest.mark.parametrize("cutoff", [0.0, 1.0])
+def test_the_ends_of_the_score_range_are_valid_cutoffs(tmp_path, monkeypatch, cutoff):
+    path = _policy_copy(tmp_path, T_warn=cutoff)
+    monkeypatch.setattr(decision_module, "POLICY_SHA256", hashlib.sha256(path.read_bytes()).hexdigest())
+    assert load_bundle(path, MODEL, MANIFEST).t_warn == cutoff
+
+
+def test_any_edit_of_the_policy_file_is_refused_and_the_unchanged_copy_loads(tmp_path):
+    original = (POLICY_DIR / "policy.json").read_bytes()
+    copied = tmp_path / "policy.json"
+    copied.write_bytes(original)
+    assert load_bundle(copied, MODEL, MANIFEST).t_warn == json.loads(original)["T_warn"]
+    for edited in (original + b"\n", original.replace(b'"not_fit"', b'"not_fit" '), original.replace(b"validation_product_like", b"validation_diagnostic", 1)):
+        assert edited != original
+        copied.write_bytes(edited)
+        with pytest.raises(PolicyError, match="Checksum mismatch for policy.json"):
+            load_bundle(copied, MODEL, MANIFEST)
+
+
+def test_a_policy_that_is_not_a_json_object_is_refused(tmp_path):
+    path = tmp_path / "policy.json"
+    path.write_text("[1, 2]", encoding="utf-8")
+    with pytest.raises(PolicyError, match="not a JSON object"):
         load_bundle(path, MODEL, MANIFEST)
 
 

@@ -34,7 +34,7 @@ from med_ui.examples import (
     select_draft,
     unknown_address_form,
 )
-from med_ui.walkthrough import generate
+from med_ui.walkthrough import generate, load_evaluations, scenario_counts
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / DEFAULT_PATHS["data"]
@@ -622,6 +622,34 @@ def test_walkthrough_document_is_reproducible_from_the_api(client, catalog):
     shown = set(re.findall(r"\bd\d{6}\b", text))
     assert shown and all(catalog.subset_of[draft] in EXAMPLE_SUBSETS for draft in shown)
     _assert_clean_wording(text.splitlines())
+
+
+def test_walkthrough_reads_evaluation_records_without_their_per_draft_members(tmp_path):
+    """The sealed members are cut out of the text before parsing, so unparseable content in them is harmless."""
+    sentinel = "SEALED-SENTINEL-9917"
+    broken_member = '[{"draft_id": "d000001", "note": "' + sentinel + '", NOT JSON <<< }]'
+    record = (
+        '{"policy_version": "p", "T_warn": 0.5, "subsets": {"test_product_like": {"policy": {"cutoff": 0.5}, '
+        '"outcomes": ' + broken_member + ', '
+        '"slices": {"email_by_scenario": [{"slice": "S01", "misdirected": 2, "warned_misdirected": 0}], '
+        '"examples": ' + broken_member + '}}}, "examples_validation": ' + broken_member + "}"
+    )
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(record)  # a plain parse of the whole file would fail on the sealed members
+    (tmp_path / "test_evaluation.json").write_text(record, encoding="utf-8")
+    (tmp_path / "validation_evaluation.json").write_text(record.replace("test_product_like", "validation_product_like"), encoding="utf-8")
+    evaluations = load_evaluations(tmp_path)
+    assert evaluations["test"]["subsets"]["test_product_like"]["slices"]["email_by_scenario"][0]["warned_misdirected"] == 0
+    assert evaluations["validation"]["subsets"]["validation_product_like"]["policy"]["cutoff"] == 0.5
+    assert sentinel not in json.dumps(evaluations) and "outcomes" not in json.dumps(evaluations)
+    assert scenario_counts(evaluations, "S01") == [("validation_product_like", 0, 2), ("test_product_like (recorded test pass)", 0, 2)]
+
+
+def test_walkthrough_parses_no_evaluation_record_directly():
+    """A guard on the source: every evaluation file goes through the stripped reader."""
+    source = (UI_SRC / "walkthrough.py").read_text(encoding="utf-8")
+    assert source.count("json.loads(") == 1 and "strip_members(" in source
+    assert "read_aggregates(" in source
 
 
 # ------------------------------------------------------------- Streamlit app

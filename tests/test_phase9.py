@@ -393,14 +393,18 @@ def test_a_file_changed_without_changing_its_shape_fails_the_digest_check(tmp_pa
     assert _passed(changed, "validation_files") and not _passed(changed, "anchored_digests")
     shutil.copyfile(POLICY.parent / "validation_evaluation.json", evaluation)
 
-    # A different but finite cutoff: both scopes' existing policy checks accept it, the anchor does not.
+    # A different but finite cutoff. The screen's structural check accepts it and only the anchor refuses it.
+    # The service's own loader refuses it as well since the policy digest is checked at load (WP-01), so the
+    # api scope fails its policy check and the anchor.
     policy = json.loads(POLICY.read_text(encoding="utf-8"))
     policy["T_warn"] = policy["T_warn"] - 1e-6
     (policy_dir / "policy.json").write_text(json.dumps(policy), encoding="utf-8")
-    for scope, structural in (("ui", "policy_file"), ("api", "policy_and_model")):
-        changed = check_bundle(scope, root=root, digests=digests)
-        assert _passed(changed, structural), f"{scope}: the structural check should accept a finite cutoff"
-        assert not _passed(changed, "anchored_digests") and changed["ok"] is False
+    changed = check_bundle("ui", root=root, digests=digests)
+    assert _passed(changed, "policy_file"), "ui: the structural check should accept a finite cutoff"
+    assert not _passed(changed, "anchored_digests") and changed["ok"] is False
+    changed = check_bundle("api", root=root, digests=digests)
+    assert not _passed(changed, "policy_and_model") and not _passed(changed, "anchored_digests") and changed["ok"] is False
+    assert "Checksum mismatch for policy.json" in next(c["detail"] for c in changed["checks"] if c["name"] == "policy_and_model")
     # An anchor manifest that lacks an entry fails too, rather than passing silently.
     bare = tmp_path / "bare.json"
     bare.write_text(json.dumps({"files": {}}), encoding="utf-8")

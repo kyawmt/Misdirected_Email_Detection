@@ -74,7 +74,7 @@ The boundary is the frozen bundle. Everything on the left of it runs offline and
 | When | Once per bundle, offline | For every assessment |
 | Code | `med_data`, `med_features`, `med_models`, `med_policy` | `med_api`, with `med_features.transform`, `med_models.package`, and `med_policy.decision` called in process |
 | Does | Generates fictional data and chronological splits; fits the text model on training-window mail only; compares baselines and one tree; selects one logistic scorer on validation; chooses one cutoff on validation; scores the frozen test subsets once | Loads and verifies the bundle once at startup; normalizes the request; builds the history visible strictly before the draft; scores each unique recipient; takes the maximum; applies the cutoff; returns the decision with provenance |
-| Fits or learns | Yes, on training data only | Never. The service fits nothing, picks no threshold, and reads no label |
+| Fits or learns | Yes, on training data only | Never. The service fits nothing and picks no threshold. At startup it checks the SHA-256 of every dataset file but parses only the contact directory and the sent-mail history, never a label, draft, or split table |
 | Writes | Versioned artifacts. The dataset build and the monitoring and deployment records refuse to overwrite, and the policy commands refuse to run again once the test result exists. The feature and model builds do not refuse, which is why they are never run with their default paths | Feedback lines only, never read back into scoring |
 | On a bad input or bundle | The command refuses | `unable_to_assess`, never an allow |
 
@@ -99,10 +99,10 @@ Each part of a bundle has a version and a checksum, and a change to any part is 
 <!-- med-docs:begin artifact_table -->
 | Artifact | Version | Identity (SHA-256 prefix) | Checksum rule | Refusal rule |
 | --- | --- | --- | --- | --- |
-| Dataset snapshot | `med-synth-v4` | `dataset_manifest.json` `9f53c114c8cbbb7f…` | `dataset_manifest.json` holds a SHA-256 and a record count per table; the API and `check-bundle` compare them | API: `/ready` 503 and `unable_to_assess`; `check-bundle` fails |
+| Dataset snapshot | `med-synth-v4` | `dataset_manifest.json` `9f53c114c8cbbb7f…` | `dataset_manifest.json` holds a SHA-256 and a record count per table; the API checks every SHA-256 and parses only the contacts and the sent-mail history, comparing the record counts of those tables; `check-bundle` compares every SHA-256 and count | API: `/ready` 503 and `unable_to_assess`; `check-bundle` fails |
 | Feature artifact | `med-features-v2` | `artifact_manifest.json` `b9ef336f22952042…` | `artifact_manifest.json` holds a SHA-256 per file; verified when the artifact loads | API: `/ready` 503 and `unable_to_assess`; `check-bundle` also fails if a frozen feature file exists |
 | Model | `med-model-v2` (`logistic_all_balanced`) | `model.joblib` `f698b69f7ff20fc9…` | `policy.json` records the model's SHA-256 and the feature manifest's SHA-256 | API: checksum mismatch refused |
-| Policy | `med-policy-v2` | `policy.json` `be39929a3c92cf97…` | names the model run, versions, and checksums; its own digest is anchored in `bundle_digests.json` for builds and CI | refused on another version, run, or checksum; blocking on; a non-finite cutoff; a calibrated claim; a missing file |
+| Policy | `med-policy-v2` | `policy.json` `be39929a3c92cf97…` | names the model run, versions, and checksums; its own digest is recorded in `med_policy.version`, checked every time the service loads, and also anchored in `bundle_digests.json` for builds and CI | refused on another version, run, or checksum; a policy file whose own digest is not the recorded one; blocking on; a cutoff that is not a finite number from 0 to 1; a calibrated claim; a missing file |
 | Stored validation files | `validation_scores.csv`, `validation_evaluation.json` | `ee03e70a0f8c1683…`, `39c1165f7052095b…` | anchored digests, compared when the review-screen image is built | image build and CI fail |
 | Monitoring and deployment records | `med-monitor-v1`, `med-deploy-v1` | - | write-once: a command that names an existing record is refused | the command refuses; nothing is overwritten |
 <!-- med-docs:end artifact_table -->
@@ -120,7 +120,8 @@ The two images are built from a base image pinned by tag and digest, from pinned
 
 A draft is assessed against what existed before it was written, and nothing else.
 
-- **History.** Sent mail with a send time strictly earlier than the draft. The draft's own family is dropped, and so is any earlier copy of its non-empty body. Empty bodies may repeat.
+- **History, offline.** Used to build the training and evaluation rows. Sent mail with a send time strictly earlier than the draft. The draft's own family is dropped, and so is any earlier copy of its non-empty body. Empty bodies may repeat.
+- **History, serving.** Used by the service for a client's draft. Sent mail with a send time strictly earlier than the draft, and any earlier copy of the draft's own non-empty body is dropped. No family is dropped, because a client's draft has none: an earlier message of the same family with a different body stays in the history. Empty bodies may repeat.
 - **Model inputs.** Only the scoring view's allow-list. The model never receives scenario ids, variants, generator topics, withheld contacts, counterfactual flags, family ids, splits, subsets, labels, stipulations, feedback, or fixture reasons. The API rejects such fields by name, at any depth, before reading their values.
 - **Learned preprocessing.** The text vocabulary and weights are fit on mail from before the validation window; the scaler and the model are fit on training data only.
 - **Frozen subsets.** Features, model, and cutoff are never chosen on the frozen test subsets, which were scored once. The documentation generator reads an allow-list of aggregate fields of that record. It removes the per-draft outcomes the record also stores from the text before parsing, so none of them is ever decoded.
@@ -143,8 +144,8 @@ See [training and serving parity](phase_3/TRAINING_SERVING_PARITY.md) and the [P
 A failure is `unable_to_assess`. It carries a category and a short message and no decision, no risk score, and no recipient list, and no code path turns it into an allow.
 
 - `invalid_input`: malformed JSON or address, a non-fictional domain, a timestamp without a timezone, no recipients or too many, over-long text, an unsupported or label-like field.
-- `unavailable`: an unknown snapshot, a well-formed address that is not in the directory snapshot, a bundle that failed to load or verify, a feature or model error, a non-finite score, or the scoring timeout.
-- **A bad bundle fails closed.** The process stays up, `/health` answers, `/ready` returns `503` with the reason, and `/assess` returns `unavailable`. A wrong version, run name, checksum, a policy that enables blocking, a non-numeric cutoff, a missing file, or the previous bundle are each refused.
+- `unavailable`: an unknown snapshot, a well-formed address that is not in the directory snapshot, a bundle that failed to load or verify, a feature or model error, a non-finite score, the scoring timeout, or any other unexpected error while scoring or building the response (a fixed message, no draft text, no decision, no score).
+- **A bad bundle fails closed.** The process stays up, `/health` answers, `/ready` returns `503` with the reason, and `/assess` returns `unavailable`. A wrong version, run name, checksum, a policy that enables blocking, a cutoff that is not a number from zero to one, a policy file that is not the recorded frozen one, a missing file, or the previous bundle are each refused.
 - **No history is not a failure.** A cold-start sender or a first-contact recipient is assessed with a visible evidence limitation, not forced to allow or warn.
 - **The screen mirrors this.** The review screen shows a response only if it is complete and consistent with the readiness check; it hides a result when the draft is edited, and it shows no decision for a failure or an unexpected body.
 

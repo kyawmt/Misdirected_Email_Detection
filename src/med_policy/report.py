@@ -12,6 +12,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from med_docs.records import strip_members
+from med_docs.version import SEALED_KEYS
 from med_policy.version import (
     ARTIFACT_ROOT,
     BUDGET_PER_1000,
@@ -51,12 +53,18 @@ def write_documents(policy_dir: Path, docs_dir: Path) -> list[Path]:
 
 
 def stored_results(policy_dir: Path) -> dict:
-    """The policy and its one-shot frozen result, as stored. Reads files only."""
+    """The policy and the aggregate part of its one-shot frozen result, as stored. Reads files only.
+
+    The per-draft members of the frozen record (`outcomes`, `examples`, `examples_validation`) are cut out
+    of the text by `med_docs.records.strip_members` before it is parsed, so no per-draft value becomes a
+    Python object here. Callers get counts, intervals, and slices; the Phase 5 report itself (`_context`)
+    is the one reader that keeps the per-draft outcomes, because its error-analysis page lists them.
+    """
     policy_dir = Path(policy_dir)
     frozen = policy_dir / "test_evaluation.json"
     return {
         "policy": json.loads((policy_dir / "policy.json").read_text(encoding="utf-8")),
-        "test": json.loads(frozen.read_text(encoding="utf-8")) if frozen.exists() else None,
+        "test": json.loads(strip_members(frozen.read_text(encoding="utf-8"), SEALED_KEYS)) if frozen.exists() else None,
     }
 
 

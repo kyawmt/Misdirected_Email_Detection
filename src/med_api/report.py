@@ -193,8 +193,8 @@ def _flow(latency: dict | None, results: dict) -> str:
         "At startup the app loads, once and without fitting anything:",
         "",
         "1. the feature artifact manifest, with every file checksum verified",
-        f"2. the `{SNAPSHOT_ID}` tables, with dataset checksums verified",
-        "3. the model and the policy through `med_policy.decision.load_bundle`, which refuses a version, run-name, or checksum mismatch",
+        f"2. the `{SNAPSHOT_ID}` dataset directory: the SHA-256 of every file in its manifest is verified, then only the contact directory and the sent-mail history are parsed (`contacts.csv`, `messages.csv`, and `message_recipients.csv`, with their record counts checked); no draft, draft-recipient, label, split, or feedback table is parsed",
+        "3. the model and the policy through `med_policy.decision.load_bundle`, which refuses a version, run-name, or checksum mismatch, a cutoff outside 0 to 1, and a `policy.json` whose own SHA-256 is not the one recorded in `med_policy.version`",
         "4. the saved text transformer",
         "5. the contact directory and the sent-mail history index; the transformer is bound to the index once",
         "",
@@ -205,7 +205,7 @@ def _flow(latency: dict | None, results: dict) -> str:
         "1. Parse the JSON body. Reject label, scenario, split, family, and score fields by name, and any field outside the contract.",
         "2. Normalize (A7): timestamp with timezone, `.example` addresses, merge repeated addresses across roles, limits.",
         f"3. Resolve the snapshot id (`{SNAPSHOT_ID}` only), the sender (internal contact), and every recipient in the directory.",
-        "4. Build one `DraftQuery`. The family exclusion is empty, because a client draft has no family. A non-empty body's hash is excluded from history so the draft is not its own earlier mail. History is sent mail strictly earlier than the cutoff.",
+        "4. Build one `DraftQuery`. The family exclusion is empty, because a client draft has no family. A non-empty body's hash is excluded from history so the draft is not its own earlier mail. History is sent mail strictly earlier than the cutoff. The offline build of the training and evaluation rows also drops the draft's own family; the service cannot, so an earlier message of the same family with a different body stays in the history.",
         "5. Call `med_policy.decision.assess_draft` under the scoring timeout. It runs `transform_draft`, the frozen model, and the policy. The API does not reimplement the cutoff, the maximum, or the model.",
         "6. Map the result to the response. Reason codes and limitations are read from the same feature rows. They do not change the decision.",
         "",
@@ -242,7 +242,7 @@ def _flow(latency: dict | None, results: dict) -> str:
         f"| Server-side p50 / p95 / max | {latency['server_p50_ms']:.2f} / {latency['server_p95_ms']:.2f} / {latency['server_max_ms']:.2f} ms |",
         f"| Target | p95 below {latency['target_p95_ms']:.0f} ms |",
         f"| AC05 | **{latency['ac05']}** |",
-        f"| Cold start | {latency['cold_start_seconds']:.2f} s ({latency['cold_start_includes']}) |",
+        f"| Cold start | {latency['cold_start_seconds']:.2f} s ({latency['cold_start_includes']}); the record was made before the startup load was narrowed to the contacts and the sent-mail history, and was not remeasured |",
         f"| Statuses | {', '.join(f'{k}: {v}' for k, v in latency['statuses'].items())} |",
         f"| Recipients per request | {', '.join(f'{k}: {v}' for k, v in latency['recipient_mix'].items())} |",
         f"| Month of draft | {', '.join(f'{k}: {v}' for k, v in workload.get('months', {}).items())} |",
@@ -272,12 +272,14 @@ def _limits(results: dict) -> list[str]:
     product = test["subsets"]["test_product_like"]
     fi = product["policy"]["interventions"]
     email = product["policy"]["email"]
-    missed = {}
+    # Aggregate counts per scenario (the per-draft outcomes are not read): never warned means at least one
+    # misdirected email in the scenario across the test subsets and none of them warned.
+    misdirected, warned = {}, {}
     for subset in test["subsets"].values():
-        for row in subset["outcomes"]["missed_mistakes"]:
-            missed[row["scenario_id"]] = missed.get(row["scenario_id"], 0) + 1
-    warned = {row["scenario_id"] for subset in test["subsets"].values() for row in subset["outcomes"]["warned_mistakes"]}
-    never = sorted(set(missed) - warned)
+        for cell in subset["slices"]["email_by_scenario"]:
+            misdirected[cell["slice"]] = misdirected.get(cell["slice"], 0) + cell["misdirected"]
+            warned[cell["slice"]] = warned.get(cell["slice"], 0) + cell["warned_misdirected"]
+    never = sorted(scenario for scenario, count in misdirected.items() if count > 0 and warned[scenario] == 0)
     budget = "within" if fi["interval_per_1000_exact"]["high"] <= fi["budget_per_1000"] else "above"
     return [
         f"- The service serves the frozen cutoff. On the one `test_product_like` pass it warned on {email['true_positives']} of {email['positives']} misdirected emails with {fi['false_interventions']} false interventions on {fi['legitimate_emails']:,} legitimate emails. The exact upper 95% bound, {fi['interval_per_1000_exact']['high']:.2f} per 1,000, is {budget} the budget of {fi['budget_per_1000']:g} only if emails were independent; most test drafts share one sender, so AC01 is recorded as insufficient evidence. That is a simulation result.",
@@ -295,9 +297,9 @@ def _errors(examples: dict) -> str:
             "| Category | HTTP | When |",
             "| --- | --- | --- |",
             f"| `invalid_input` | 422 | Malformed JSON or address, non-`.example` domain, non-ASCII address, timestamp without a timezone, 0 or more than {MAX_RECIPIENTS} unique recipients, subject over {MAX_SUBJECT_CHARS} or body over {MAX_BODY_CHARS:,} characters, sender not an internal `{ORGANIZATION_DOMAIN}` address, unsupported fields, or a label, scenario, split, family, or score field. |",
-            "| `unavailable` | 503 | Unknown snapshot id, sender or recipient address well formed but not in the directory, bundle failed to load, version or checksum mismatch, `FeatureError` or `ModelError` while scoring, a non-finite risk score, or the scoring timeout. |",
+            "| `unavailable` | 503 | Unknown snapshot id, sender or recipient address well formed but not in the directory, bundle failed to load, version or checksum mismatch, `FeatureError` or `ModelError` while scoring, a non-finite risk score, the scoring timeout, or any other unexpected error while scoring or building the response. |",
             "",
-            "A failure body carries the request id, the category, a short message, and versions only when they are known. If the bundle did not load, no model or policy version is reported.",
+            "A failure body carries the request id, the category, a short message, and versions only when they are known. If the bundle did not load, no model or policy version is reported. An unexpected error while scoring or building the response gives the same body with the fixed message `Scoring could not complete`: no draft text, no error text, no stack trace, no decision, and no score, and the log line keeps only its allow-listed fields.",
             "",
             "No history is not a failure. A sender or recipient with no earlier mail is assessed with the existing feature fallback and may carry `LIMITED_RELATIONSHIP_HISTORY`. It is not forced to allow or warn.",
             "",

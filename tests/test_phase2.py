@@ -7,6 +7,8 @@ from pathlib import Path
 import pytest
 
 from med_data.history import visible_history
+import med_data.io as data_io
+import med_data.validate as validate_module
 from med_data.io import _row_count, read_dataset, write_dataset
 from med_data.prevalence import precision_from_rates
 from med_data.schema import MODEL_INPUT_DENYLIST, TABLES
@@ -20,8 +22,11 @@ PUBLISHED = ROOT / DATA_DIR
 
 
 @pytest.mark.slow
-def test_published_contract_passes_validation(dataset):
+def test_published_contract_passes_validation(dataset, validation_checks, monkeypatch):
+    # `assert_valid` itself runs; it gets the session's one validation of this same dataset object.
+    monkeypatch.setattr(validate_module, "validate_dataset", lambda candidate: validation_checks if candidate is dataset else pytest.fail("another dataset"))
     checks = assert_valid(dataset)
+    assert checks is validation_checks
     ids = [check.check_id for check in checks]
     assert ids == [f"Q{index:02d}" for index in range(1, len(ids) + 1)]
     assert dataset.seed == SEED
@@ -112,7 +117,9 @@ def test_two_generations_match(dataset):
 
 
 @pytest.mark.slow
-def test_roundtrip_and_published_checksums(dataset, tmp_path):
+def test_roundtrip_and_published_checksums(dataset, validation_checks, tmp_path, monkeypatch):
+    # `write_dataset` runs the checks to write the quality report; this dataset's checks were already run once.
+    monkeypatch.setattr(data_io, "validate_dataset", lambda candidate: validation_checks if candidate is dataset else pytest.fail("another dataset"))
     written = write_dataset(dataset, tmp_path / "fresh", validate=False)
     loaded = read_dataset(written)
     assert loaded.drafts["draft_id"].tolist() == dataset.drafts["draft_id"].tolist()

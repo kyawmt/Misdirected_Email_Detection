@@ -28,7 +28,7 @@ Product-like mail assumes a simulated, low share of misdirected emails; the assu
 - Never warned on any subset: S01, S04, S11. The policy allows these mistakes.
 - AC01 (at most 1 false warning per 1,000 legitimate emails): **insufficient evidence**. 0 / 5,970 is a descriptive pass on this corpus; the exact upper bound, 0.62 per 1,000, holds only if emails are independent, and most test drafts come from one sender.
 - Client p95 latency 57.04 ms in process and 64.47 ms against the container, one request in flight, on one machine; target 300 ms.
-- Acceptance criteria: 8 met, 2 insufficient evidence, 0 not met. See [results](docs/RESULTS.md) for denominators, intervals, and each rule.
+- Acceptance criteria: 7 met, 3 insufficient evidence, 0 not met. See [results](docs/RESULTS.md) for denominators, intervals, and each rule.
 - Scores are uncalibrated risk scores, not probabilities. Blocking is disabled. Nothing here shows that detection improved.
 <!-- med-docs:end headline -->
 
@@ -97,7 +97,7 @@ flowchart LR
     J["Offline monitoring<br/>med_monitor"] -->|"replays validation mail"| G
 ```
 
-Everything left of the frozen bundle runs offline and is finished before a request exists. The service loads and verifies the bundle once, fits nothing, and reads no label. For each draft it builds the history visible strictly before the draft (dropping the draft's family and any earlier copy of its body), scores each unique recipient with the same code that built the training rows, takes the maximum, applies the cutoff, and returns the decision with the versions that produced it. A failure is `unable_to_assess`, with no decision and no score, never an allow. The full picture, the versioned artifacts and their refusal rules, and what was not built (shadow mode, canary, live rollback, real mail) are in [architecture](docs/ARCHITECTURE.md).
+Everything left of the frozen bundle runs offline and is finished before a request exists. The service loads and verifies the bundle once and fits nothing. At startup it checks the SHA-256 of every dataset file, then parses only the contact directory and the sent-mail history; it parses no label, draft, or split table. For each draft it builds the history visible strictly before the draft and drops any earlier copy of the draft's own body (the offline build of the training and evaluation rows also drops the draft's family; a client's draft has no family), scores each unique recipient with the same code that built the training rows, takes the maximum, applies the cutoff, and returns the decision with the versions that produced it. A failure is `unable_to_assess`, with no decision and no score, never an allow. The full picture, the versioned artifacts and their refusal rules, and what was not built (shadow mode, canary, live rollback, real mail) are in [architecture](docs/ARCHITECTURE.md).
 
 Dataset construction uses Python, pandas, and NumPy. Features and models use scikit-learn. The API uses FastAPI and the screen uses Streamlit. Interpretable methods only: rules, logistic regression, and one small tree.
 

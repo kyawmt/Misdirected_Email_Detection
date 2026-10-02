@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import shutil
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -12,12 +13,15 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
+import med_api.context as context_module
+import med_api.service as service_module
+import med_data.io as data_io
 import med_policy.decision as decision_module
-from med_data.io import read_dataset
+from med_data.io import read_dataset, read_serving_tables
 from med_api.app import create_app
 from med_api.context import ApiPaths
 from med_api.fixtures import FixtureError, example_draft_ids, request_from_draft
-from med_api.service import CONTENT_FEATURES, format_log_record
+from med_api.service import CONTENT_FEATURES, LOG_FIELDS, format_log_record
 from med_api.version import API_CONTRACT_VERSION, DEFAULT_PATHS, SNAPSHOT_ID
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -192,6 +196,70 @@ def test_checksum_mismatch_is_unavailable(tmp_path):
     with TestClient(create_app(_paths(tmp_path, policy=bad))) as broken:
         assert broken.get("/ready").status_code == 503
         _assert_unable(broken.post("/assess", json=_base()), "unavailable")
+
+
+def _altered_policy(tmp_path: Path, name: str, **changes) -> Path:
+    policy = json.loads(POLICY.read_text(encoding="utf-8"))
+    policy.update(changes)
+    path = tmp_path / name
+    path.write_text(json.dumps(policy, indent=2), encoding="utf-8")
+    return path
+
+
+def _assert_fails_closed(broken):
+    ready = broken.get("/ready")
+    assert ready.status_code == 503 and ready.json()["ready"] is False
+    response = broken.post("/assess", json=_base())
+    assert response.status_code == 503
+    body = _assert_unable(response, "unavailable")
+    assert "provenance" not in body
+    return ready.json()["reason"]
+
+
+@pytest.mark.parametrize(
+    ("name", "changes", "reason"),
+    [
+        ("cutoff_above_one.json", {"T_warn": 2.0}, "outside the risk-score range"),
+        ("cutoff_negative.json", {"T_warn": -0.5}, "outside the risk-score range"),
+        ("cutoff_edited_in_range.json", {"T_warn": 0.5}, "Checksum mismatch for policy.json"),
+    ],
+)
+def test_an_invalid_or_edited_policy_leaves_the_service_unready_and_failing_closed(tmp_path, name, changes, reason):
+    """A cutoff of 2.0 would allow every score; it must never start. An edited file is refused too."""
+    bad = _altered_policy(tmp_path, name, **changes)
+    with TestClient(create_app(_paths(tmp_path, policy=bad))) as broken:
+        assert reason in _assert_fails_closed(broken)
+
+
+def test_a_policy_file_with_any_other_byte_changed_is_refused(tmp_path):
+    bad = tmp_path / "policy_whitespace.json"
+    bad.write_bytes(POLICY.read_bytes() + b"\n")
+    with TestClient(create_app(_paths(tmp_path, policy=bad))) as broken:
+        assert "Checksum mismatch for policy.json" in _assert_fails_closed(broken)
+
+
+def test_an_unchanged_copy_of_the_policy_is_the_control_and_serves_with_three_tables_parsed(tmp_path, monkeypatch):
+    """The control for the refused policies above. The same load shows the service parses only
+    the contacts and the sent-mail history; every other dataset file is only checksummed."""
+    parsed = []
+    original = data_io._read_frame
+
+    def spy(path, columns):
+        parsed.append(Path(path).name)
+        return original(path, columns)
+
+    monkeypatch.setattr(data_io, "_read_frame", spy)
+    control = tmp_path / "policy_copy.json"
+    shutil.copyfile(POLICY, control)
+    with TestClient(create_app(_paths(tmp_path, policy=control))) as served:
+        ready = served.get("/ready")
+        assert ready.status_code == 200
+        assert ready.json()["T_warn"] == json.loads(POLICY.read_text(encoding="utf-8"))["T_warn"]
+        assert served.post("/assess", json=_base()).json()["status"] == "assessed"
+    assert sorted(parsed) == ["contacts.csv", "message_recipients.csv", "messages.csv"]
+    assert not hasattr(context_module, "read_dataset")
+    manifest = json.loads((DATA / "dataset_manifest.json").read_text(encoding="utf-8"))
+    assert {"labels.csv", "drafts.csv", "draft_recipients.csv", "split_manifest.csv"} <= set(manifest["files"]) - set(parsed)
 
 
 def test_health_works_when_bundle_path_is_missing(tmp_path):
@@ -373,6 +441,156 @@ def test_scoring_timeout_is_unavailable(client, monkeypatch):
     body = _assert_unable(response, "unavailable")
     assert "timed out" in body["message"]
     time.sleep(0.4)
+
+
+SECRET = "QUOKKA-SECRET-7731"
+
+
+def _inject_scorer_runtime_error(monkeypatch):
+    def explode(*args, **kwargs):
+        raise RuntimeError(f"scorer failed for {SECRET}")
+
+    monkeypatch.setattr(service_module, "assess_draft", explode)
+
+
+def _inject_scorer_key_error(monkeypatch):
+    def explode(*args, **kwargs):
+        raise KeyError(f"{SECRET}@demo.example")
+
+    monkeypatch.setattr(service_module, "assess_draft", explode)
+
+
+def _inject_transform_runtime_error(monkeypatch):
+    def explode(*args, **kwargs):
+        raise RuntimeError(f"transform failed for {SECRET}")
+
+    monkeypatch.setattr(decision_module, "transform_draft", explode)
+
+
+def _inject_mapping_key_error(monkeypatch):
+    def explode(self, *args, **kwargs):
+        raise KeyError(SECRET)
+
+    monkeypatch.setattr(service_module.AssessmentService, "_assessed", explode)
+
+
+def _inject_mapping_runtime_error(monkeypatch):
+    def explode(self, *args, **kwargs):
+        raise RuntimeError(SECRET)
+
+    monkeypatch.setattr(service_module.AssessmentService, "_assessed", explode)
+
+
+@pytest.mark.parametrize(
+    "inject",
+    [
+        _inject_scorer_runtime_error,
+        _inject_scorer_key_error,
+        _inject_transform_runtime_error,
+        _inject_mapping_key_error,
+        _inject_mapping_runtime_error,
+    ],
+)
+def test_an_unexpected_scoring_error_is_the_structured_unavailable_failure(client, monkeypatch, caplog, inject):
+    inject(monkeypatch)
+    with caplog.at_level(logging.INFO, logger="med_api"):
+        response = client.post("/assess", json=_base(subject=f"Subject {SECRET}", body=f"Body {SECRET}"))
+    assert response.status_code == 503
+    body = _assert_unable(response, "unavailable")
+    assert body["request_id"].startswith("req_")
+    assert body["message"] == service_module.UNEXPECTED_MESSAGE
+    # The body carries no draft text, no error text, and no stack trace.
+    assert SECRET not in response.text and "Traceback" not in response.text and "scorer failed" not in response.text and "transform failed" not in response.text
+    # One log line, allow-listed fields only, and none of the draft or the error text.
+    lines = [record.getMessage() for record in caplog.records if record.name == "med_api"]
+    assert len(lines) == 1
+    assert set(json.loads(lines[0])) <= set(LOG_FIELDS)
+    assert json.loads(lines[0])["category"] == "unavailable"
+    assert SECRET not in "\n".join(record.getMessage() + str(record.exc_info) for record in caplog.records)
+
+
+def test_the_service_keeps_assessing_after_an_unexpected_error(client, monkeypatch):
+    with monkeypatch.context() as patch:
+        _inject_scorer_runtime_error(patch)
+        assert client.post("/assess", json=_base()).status_code == 503
+    after = client.post("/assess", json=_base())
+    assert after.status_code == 200 and after.json()["status"] == "assessed"
+
+
+def test_the_service_scores_a_sample_of_validation_drafts_exactly_as_the_stored_table(client, dataset, validation_scores):
+    """Decisions and scores through the API equal validation_scores.csv: every warned draft and a spread of the rest."""
+    table = validation_scores.reset_index()
+    warned = table.loc[table["warned"], "draft_id"].tolist()
+    rest = table.loc[~table["warned"], "draft_id"].tolist()
+    sample = warned + rest[:: max(len(rest) // 40, 1)]
+    assert len(warned) == 8 and len(sample) >= 40
+    for draft_id in sample:
+        body = client.post("/assess", json=request_from_draft(dataset, draft_id)).json()
+        assert body["status"] == "assessed"
+        assert body["decision"] == ("warn" if validation_scores.loc[draft_id, "warned"] else "allow"), draft_id
+        assert abs(body["email_risk_score"] - float(validation_scores.loc[draft_id, "email_risk"])) <= 1e-12, draft_id
+
+
+def test_every_dataset_file_is_still_checksummed_before_the_serving_tables_are_parsed(tmp_path):
+    copy = tmp_path / "data"
+    shutil.copytree(DATA, copy)
+    read_serving_tables(copy)
+    for name in ("labels.csv", "drafts.csv", "quality_report.json", "messages.csv"):
+        target = copy / name
+        original = target.read_bytes()
+        target.write_bytes(original[:-1] + bytes([original[-1] ^ 1]))
+        with pytest.raises(AssertionError, match=f"Checksum mismatch for {name}"):
+            read_serving_tables(copy)
+        target.write_bytes(original)
+    read_serving_tables(copy)
+
+
+def _keys(value):
+    if isinstance(value, dict):
+        for key, item in value.items():
+            yield key
+            yield from _keys(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _keys(item)
+
+
+def test_the_phase_6_report_reads_the_frozen_record_without_its_per_draft_members(tmp_path):
+    """`stored_results` cuts the sealed members out of the text, so unparseable per-draft content is harmless."""
+    from med_policy.report import stored_results
+
+    sentinel = "SEALED-SENTINEL-4471"
+    broken = '[{"draft_id": "d000001", "note": "' + sentinel + '", NOT JSON <<< }]'
+    record = (
+        '{"policy_version": "p", "subsets": {"test_product_like": {"policy": {"cutoff": 0.5}, "outcomes": ' + broken + ', '
+        '"slices": {"email_by_scenario": [{"slice": "S01", "misdirected": 2, "warned_misdirected": 0}], "examples": ' + broken + '}}}, '
+        '"examples_validation": ' + broken + "}"
+    )
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(record)
+    shutil.copyfile(POLICY, tmp_path / "policy.json")
+    (tmp_path / "test_evaluation.json").write_text(record, encoding="utf-8")
+    results = stored_results(tmp_path)
+    assert results["test"]["subsets"]["test_product_like"]["slices"]["email_by_scenario"][0]["misdirected"] == 2
+    assert sentinel not in json.dumps(results) and not {"outcomes", "examples", "examples_validation"} & set(_keys(results["test"]))
+    # Without a frozen record there is no test result.
+    (tmp_path / "no_test").mkdir()
+    shutil.copyfile(POLICY, tmp_path / "no_test" / "policy.json")
+    assert stored_results(tmp_path / "no_test")["test"] is None
+
+
+def test_the_phase_6_scoring_flow_page_is_what_the_generator_writes_from_aggregates_only():
+    """The page equals the generator's output for the stored aggregates; no per-draft outcome is read to write it."""
+    from med_api.report import _flow, _limits
+    from med_policy.report import stored_results
+
+    results = stored_results(POLICY.parent)
+    assert not {"outcomes", "examples", "examples_validation"} & set(_keys(results["test"]))
+    latency = json.loads((ROOT / "artifacts/med-api-latency" / json.loads(POLICY.read_text(encoding="utf-8"))["policy_version"] / "latency.json").read_text(encoding="utf-8"))
+    page = (ROOT / "docs/phase_6/SCORING_FLOW.md").read_text(encoding="utf-8")
+    assert _flow(latency, results) == page
+    assert "- Scenarios never warned in the frozen test subsets: S01, S04, S11. The API does not change that." in _limits(results)
+    assert "Scenarios never warned in the frozen test subsets: S01, S04, S11." in page
 
 
 def test_no_frozen_test_writer_or_fixture(dataset):

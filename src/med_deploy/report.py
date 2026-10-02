@@ -762,7 +762,7 @@ def deployment_report(rec: dict) -> str:
         out.append(
             "Measured, not guessed: each process ran under a Python audit hook that logs every file it opens, was driven with real requests, and the files it opened under `data/` and `artifacts/` are listed. "
             "The per-image ignore lists (`docker/Dockerfile.*.dockerignore`) are default-deny lists of exactly these files, and the build fails if an image holds anything else. "
-            "The commands that regenerate documents from stored results (`python -m med_ui walkthrough`, `python -m med_policy report`, `python -m med_api report`) read the recorded Phase 5 test result, `test_evaluation.json`; no served process does, and no image contains it.\n"
+            "The commands that regenerate documents from stored results (`python -m med_ui walkthrough`, `python -m med_policy report`, `python -m med_api report`) read the recorded Phase 5 test result, `test_evaluation.json`; the walkthrough and `python -m med_api report` remove the file's per-draft members from the text before parsing it, while `python -m med_policy report` parses the whole file because the Phase 5 error-analysis page lists those per-draft outcomes. No served process reads it, and no image contains it.\n"
         )
         for name, label in (("api", "API"), ("ui", "Review screen")):
             process = reads["processes"][name]

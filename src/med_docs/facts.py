@@ -166,17 +166,17 @@ def acceptance(records: dict, points: dict, scenarios: dict) -> list[dict]:
 
     # AC01 ------------------------------------------------------------------
     if test["per_1000_legitimate"] > budget:
-        status = NOT_MET
+        ac01 = NOT_MET
     elif test["false_upper_per_1000"] <= budget and INDEPENDENCE_ESTABLISHED:
-        status = MET
+        ac01 = MET
     else:
-        status = INSUFFICIENT
+        ac01 = INSUFFICIENT
     out.append(
         {
             "id": "AC01",
             "name": "Interruption budget",
             "headline": f"{fmt.of(test['false_warnings'], test['legitimate'])} legitimate emails warned ({fmt.f(test['per_1000_legitimate'], 2)} per 1,000); exact upper {fmt.f(test['false_upper_per_1000'], 2)} only if emails were independent",
-            "status": status,
+            "status": ac01,
             "measured": (
                 f"{fmt.of(test['false_warnings'], test['legitimate'])} legitimate `{TEST_PRODUCT}` emails warned "
                 f"({fmt.f(test['per_1000_legitimate'], 2)} per 1,000; warnings {test['warnings']}, blocks {test['blocks']}, coverage {fmt.pct(test['coverage'])}). "
@@ -195,33 +195,43 @@ def acceptance(records: dict, points: dict, scenarios: dict) -> list[dict]:
     test_cells = scenarios[TEST_PRODUCT]
     phrase = ac02_phrase(test_cells)
     base = baseline(records["validation"]["subsets"][SELECTION_SUBSET])
-    # One overall status for the Phase 1 criterion: useful detections beyond
-    # always-allow and the rules policy at a comparable budget. It sets no recall
-    # floor; the per-scenario reading Phase 5 printed stays in the measured text.
-    beaten = (
+    # Phase 1 defines AC02 as recall maximized subject to AC01, with useful detections beyond always-allow
+    # and the rules policy. The constraint is part of the criterion, so AC02 cannot be better supported than
+    # AC01: utility alone gives insufficient evidence while AC01 is. The per-scenario reading Phase 5 printed
+    # stays in the measured text.
+    utility = (
         test["warned_mistakes"] > 0
         and test["recall_exact"][0] > 0
-        and test["per_1000_legitimate"] <= budget
         and selection["warned_mistakes"] > base["always_allow"]["warned"]
         and selection["warned_mistakes"] > base["rules_same_budget"]["warned"]
     )
+    if not utility or ac01 == NOT_MET:
+        ac02 = NOT_MET
+    elif ac01 == MET:
+        ac02 = MET
+    else:
+        ac02 = INSUFFICIENT
+    measured = (
+        f"`{TEST_PRODUCT}`: {fmt.of(test['warned_mistakes'], test['misdirected'])} mistakes warned, recall {fmt.f(test['recall'])} {fmt.ci(*test['recall_exact'])} if emails were independent, with {test['false_warnings']} false warnings. "
+        f"Always-allow warns on none. On `{SELECTION_SUBSET}` the rules policy at the same selection rule warned {base['rules_same_budget']['warned']} of {base['rules_same_budget']['positives']}, "
+        f"the policy {fmt.of(selection['warned_mistakes'], selection['misdirected'])}. "
+        f"Per scenario (the Phase 5 reading): {phrase}."
+    )
+    if ac02 == INSUFFICIENT:
+        measured += " The detections and the baseline comparison are descriptive results on this corpus; the status is insufficient evidence because the budget they are held to (AC01) is."
     out.append(
         {
             "id": "AC02",
             "name": "Detection utility",
             "headline": f"{fmt.of(test['warned_mistakes'], test['misdirected'])} mistakes warned, recall {fmt.f(test['recall'])} {fmt.ci(*test['recall_exact'])}; no mistake warned in {', '.join(scenario_groups(test_cells)[2]) or 'no scenario'}",
-            "status": MET if beaten else NOT_MET,
-            "measured": (
-                f"`{TEST_PRODUCT}`: {fmt.of(test['warned_mistakes'], test['misdirected'])} mistakes warned, recall {fmt.f(test['recall'])} {fmt.ci(*test['recall_exact'])} if emails were independent, with {test['false_warnings']} false warnings. "
-                f"Always-allow warns on none. On `{SELECTION_SUBSET}` the rules policy at the same selection rule warned {base['rules_same_budget']['warned']} of {base['rules_same_budget']['positives']}, "
-                f"the policy {fmt.of(selection['warned_mistakes'], selection['misdirected'])}. "
-                f"Per scenario (the Phase 5 reading): {phrase}."
-            ),
+            "status": ac02,
+            "measured": measured,
             "rule": (
-                "met when, within the budget, the policy warns on mistakes that always-allow and the rules policy at the same selection rule do not. "
-                "The Phase 1 criterion asks for useful detections beyond those baselines and sets no recall floor. "
-                "The per-scenario reading is reported, not part of the status: a scenario is met when every mistake of it on `" + TEST_PRODUCT + "` was warned, partly met when some were, not met when none were. "
-                "The budget it is held to is a descriptive pass on this corpus (AC01 is insufficient evidence)."
+                "Phase 1 defines AC02 as recall maximized subject to AC01, with useful detections beyond always-allow and the rules policy at the same selection rule. "
+                "Not met when the policy does not beat both baselines, warns on no mistake of `" + TEST_PRODUCT + "`, or AC01 is not met. "
+                "Met only when the baselines are beaten and AC01 is met. Otherwise insufficient evidence: the baselines are beaten but the budget is held to AC01's standard, "
+                "and AC01 is insufficient evidence, so the constraint is not shown to hold. "
+                "No recall floor is set. The per-scenario reading is reported, not part of the status: a scenario is met when every mistake of it on `" + TEST_PRODUCT + "` was warned, partly met when some were, not met when none were."
             ),
             "evidence": [("Evaluation report", "phase_5/EVALUATION_REPORT.md"), ("Error analysis", "phase_5/ERROR_ANALYSIS.md")],
         }

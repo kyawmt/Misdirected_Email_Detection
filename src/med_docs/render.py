@@ -490,7 +490,7 @@ def results(facts: dict) -> str:
     add("")
     add(
         f"The criteria are defined in the [acceptance criteria](phase_1/ACCEPTANCE_CRITERIA.md), which is the product contract and keeps its Phase 1 wording. This is the final status of each, on this simulation only: {acceptance_summary(facts)}. "
-        "Each status is **met**, **not met**, or **insufficient evidence**. AC02 is judged as a whole; its per-scenario results are in its row and in section 2."
+        "Each status is **met**, **not met**, or **insufficient evidence**. AC02 is judged as a whole. Phase 1 defines it as recall subject to AC01, so it is no better supported than AC01; its per-scenario results are in its row and in section 2."
     )
     add("")
     add(acceptance_table(facts))
@@ -907,10 +907,10 @@ def architecture_artifacts(facts: dict) -> str:
     digests = records["deploy"]["digests"]
     anchored = digests["files"]
     rows = [
-        ["Dataset snapshot", f"`{b['snapshot']}`", f"`dataset_manifest.json` {fmt.cut(files['data/med-synth-v4/dataset_manifest.json'])}", "`dataset_manifest.json` holds a SHA-256 and a record count per table; the API and `check-bundle` compare them", "API: `/ready` 503 and `unable_to_assess`; `check-bundle` fails"],
+        ["Dataset snapshot", f"`{b['snapshot']}`", f"`dataset_manifest.json` {fmt.cut(files['data/med-synth-v4/dataset_manifest.json'])}", "`dataset_manifest.json` holds a SHA-256 and a record count per table; the API checks every SHA-256 and parses only the contacts and the sent-mail history, comparing the record counts of those tables; `check-bundle` compares every SHA-256 and count", "API: `/ready` 503 and `unable_to_assess`; `check-bundle` fails"],
         ["Feature artifact", f"`{b['features']}`", f"`artifact_manifest.json` {fmt.cut(files['artifacts/med-features-v2/artifact_manifest.json'])}", "`artifact_manifest.json` holds a SHA-256 per file; verified when the artifact loads", "API: `/ready` 503 and `unable_to_assess`; `check-bundle` also fails if a frozen feature file exists"],
         ["Model", f"`{b['model']}` (`{b['run']}`)", f"`model.joblib` {fmt.cut(files['artifacts/med-model-v2/model.joblib'])}", "`policy.json` records the model's SHA-256 and the feature manifest's SHA-256", "API: checksum mismatch refused"],
-        ["Policy", f"`{b['policy']}`", f"`policy.json` {fmt.cut(records['policy_sha256'])}", "names the model run, versions, and checksums; its own digest is anchored in `bundle_digests.json` for builds and CI", "refused on another version, run, or checksum; blocking on; a non-finite cutoff; a calibrated claim; a missing file"],
+        ["Policy", f"`{b['policy']}`", f"`policy.json` {fmt.cut(records['policy_sha256'])}", "names the model run, versions, and checksums; its own digest is recorded in `med_policy.version`, checked every time the service loads, and also anchored in `bundle_digests.json` for builds and CI", "refused on another version, run, or checksum; a policy file whose own digest is not the recorded one; blocking on; a cutoff that is not a finite number from 0 to 1; a calibrated claim; a missing file"],
         ["Stored validation files", "`validation_scores.csv`, `validation_evaluation.json`", f"{fmt.cut(anchored['artifacts/med-policy-v2/validation_scores.csv'])}, {fmt.cut(anchored['artifacts/med-policy-v2/validation_evaluation.json'])}", "anchored digests, compared when the review-screen image is built", "image build and CI fail"],
         ["Monitoring and deployment records", f"`{b['monitor']}`, `{b['deploy']}`", "-", "write-once: a command that names an existing record is refused", "the command refuses; nothing is overwritten"],
     ]

@@ -7,6 +7,7 @@ failure yields `unable_to_assess` with no decision and no risk score.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 from dataclasses import dataclass
@@ -20,7 +21,7 @@ from med_features.transform import transform_draft
 from med_models.data import sha256_file
 from med_models.package import LoadedModel, load_model
 from med_models.version import MODEL_VERSION, ModelError
-from med_policy.version import POLICY_VERSION, PolicyError
+from med_policy.version import POLICY_SHA256, POLICY_VERSION, T_WARN_RANGE, PolicyError
 
 REQUIRED_KEYS = (
     "policy_version",
@@ -53,14 +54,21 @@ class PolicyBundle:
 
 
 def load_bundle(policy_path: Path, model_path: Path, feature_manifest_path: Path) -> PolicyBundle:
-    """Load and cross-check the policy, model, and feature manifest. Raises PolicyError."""
+    """Load and cross-check the policy, model, and feature manifest. Raises PolicyError.
+
+    Refuses a cutoff outside the risk-score range and a `policy.json` whose SHA-256 is not the one
+    recorded for this policy version.
+    """
     policy_path = Path(policy_path)
     if not policy_path.exists():
         raise PolicyError(f"Policy file {policy_path} does not exist")
     try:
-        policy = json.loads(policy_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
+        raw = policy_path.read_bytes()
+        policy = json.loads(raw.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise PolicyError(f"Policy file is not readable JSON: {error}") from error
+    if not isinstance(policy, dict):
+        raise PolicyError("Policy file is not a JSON object")
     missing = [key for key in REQUIRED_KEYS if key not in policy]
     if missing:
         raise PolicyError(f"Policy is missing {missing}")
@@ -79,12 +87,19 @@ def load_bundle(policy_path: Path, model_path: Path, feature_manifest_path: Path
     t_warn = policy["T_warn"]
     if isinstance(t_warn, bool) or not isinstance(t_warn, (int, float)) or not math.isfinite(t_warn):
         raise PolicyError("T_warn must be a finite number")
+    low, high = T_WARN_RANGE
+    if not low <= t_warn <= high:
+        raise PolicyError(f"T_warn {t_warn} is outside the risk-score range {low} to {high}")
     checksums = policy["checksums"]
     for label, path in (("model.joblib", Path(model_path)), ("artifact_manifest.json", Path(feature_manifest_path))):
         if not path.exists():
             raise PolicyError(f"{label} not found at {path}")
         if sha256_file(path) != checksums.get(label):
             raise PolicyError(f"Checksum mismatch for {label}")
+    # The policy file's own digest, against the value kept with the policy version. It is hashed from the
+    # bytes parsed above. It comes after the checks that name a specific problem in an edited file.
+    if hashlib.sha256(raw).hexdigest() != POLICY_SHA256:
+        raise PolicyError("Checksum mismatch for policy.json: it is not the frozen policy of this version")
     try:
         model = load_model(Path(model_path))
     except ModelError as error:

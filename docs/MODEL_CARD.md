@@ -23,7 +23,7 @@ The tables in this card are generated from stored records by `python -m med_docs
 
 The scorer is one logistic regression on standardized features, one row per addressed recipient. The email's risk score is the maximum over its unique recipients, and a recipient is flagged when its own score reaches the cutoff. Role (To, Cc, or Bcc) is not a feature.
 
-The inputs are computed only from mail sent strictly before the draft, after dropping the draft's family and any earlier copy of its body:
+The inputs are computed only from mail sent strictly before the draft. When the training and evaluation rows are built offline, the draft's family and any earlier copy of its body are also dropped. The service has no family for a client's draft, so it drops only an earlier copy of the draft's own body:
 
 - **Relationship:** how often the sender wrote to the recipient and the recipient's domain, how often the recipient wrote back, how recently, over the lifetime and over a fixed recent window, and whether the recipient is internal.
 - **Recipient group:** how much earlier mail supports this set of addressees together.
@@ -122,7 +122,7 @@ Acceptance status (rules and measured values in [results](RESULTS.md#5-acceptanc
 | ID | Criterion | Status |
 | --- | --- | --- |
 | AC01 | Interruption budget | **insufficient evidence** |
-| AC02 | Detection utility | **met** |
+| AC02 | Detection utility | **insufficient evidence** |
 | AC03 | Threshold integrity | **met** |
 | AC04 | Conservative blocking | **met** |
 | AC05 | Latency | **met** |

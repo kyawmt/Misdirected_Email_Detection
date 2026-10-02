@@ -17,6 +17,12 @@ from med_models.version import (
 from med_models.version import ARTIFACT_DIR as MODEL_DIR
 
 POLICY_VERSION = "med-policy-v2"
+# SHA-256 of the frozen `policy.json` of this version. `load_bundle` refuses any other file, so an edited
+# cutoff cannot be served. It belongs to POLICY_VERSION: a new policy version needs a new value, set after
+# `policy.json` is written and before it is evaluated or served. Phase 9 also anchors it for builds and CI.
+POLICY_SHA256 = "be39929a3c92cf978dc00c1773f9bf9dd6bdbdfc73984381033979b46152e8e5"
+# A risk score lies in [0, 1] and equality warns, so a cutoff of exactly 1.0 is still a valid cutoff.
+T_WARN_RANGE = (0.0, 1.0)
 SEED = 20260926
 N_BOOTSTRAP = 1000
 # AC01: false interventions per 1,000 legitimate emails.
@@ -49,11 +55,13 @@ __all__ = [
     "N_BOOTSTRAP",
     "POLICY_DIR",
     "POLICY_PATH",
+    "POLICY_SHA256",
     "POLICY_VERSION",
     "PREVALENCES",
     "SEED",
     "SELECTION_SUBSET",
     "TEST_SUBSETS",
+    "T_WARN_RANGE",
     "PolicyError",
 ]
 

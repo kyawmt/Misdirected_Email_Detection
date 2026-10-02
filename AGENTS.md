@@ -34,7 +34,9 @@ Work only on the phase the user requested. Phases are dependency order, not perm
 
 Do not start feature engineering, model training, threshold selection, API, or UI work while a data-phase task is open. Do not tune features, models, or thresholds on `test_product_like` or `test_diagnostic`.
 
-Dataset identity is `med-synth-v2`, generator `1.1.0`, seed `20260926`. Bump `DATASET_VERSION` when the seed, quotas, or generation rules change, and treat the new test subsets as the frozen sets. Do not silently rewrite a version whose test set has already been used for evaluation.
+Dataset identity is `med-synth-v4`, generator `1.3.0`, seed `20260926` (the source of truth is `src/med_data/version.py`). Bump `DATASET_VERSION` when the seed, quotas, or generation rules change, and treat the new test subsets as the frozen sets. Do not silently rewrite a version whose test set has already been used for evaluation.
+
+Note, 2026-10-01: `med-synth-v2` (generator `1.1.0`) was the original dataset. It is kept unchanged under `data/med-synth-v2`, with the `-v1` feature, model, policy, and API-latency artifacts built on it, as a historical baseline; current code cannot load that bundle. `med-synth-v3` was superseded before anything was built on it.
 
 ## Research rules
 
@@ -70,13 +72,16 @@ python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 pytest
-python -m med_data validate --data data/med-synth-v2
+python -m med_data validate --data data/med-synth-v4
 ```
 
-Rebuild only when generation rules change, then validate the new version:
+Rebuild only when generation rules change, and bump `DATASET_VERSION` first: `build` writes the new `data/` directory and refuses one that already holds a dataset. To check that the published dataset still reproduces, build into a scratch directory, validate it, and compare the manifests:
 
 ```bash
-python -m med_data build --output data/med-synth-v2
+SCRATCH="$(mktemp -d)"
+python -m med_data build --output "$SCRATCH/med-synth-v4"
+python -m med_data validate --data "$SCRATCH/med-synth-v4"
+diff "$SCRATCH/med-synth-v4/dataset_manifest.json" data/med-synth-v4/dataset_manifest.json
 ```
 
 Install from the pinned versions with `pip install -c constraints.txt -e ".[dev,ui,monitor]"` (Python 3.11.14 is the tested interpreter). The full `pytest` is the release gate. CI and quick iteration use `pytest -m "not slow"`, which deselects the tests marked `slow` and stays under about three minutes.

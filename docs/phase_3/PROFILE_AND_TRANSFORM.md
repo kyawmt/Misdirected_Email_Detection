@@ -38,12 +38,15 @@ The index is derived from the dataset plus that transformer. It is not a second 
 
 ## What the build writes
 
-From the repository root, after the package is installed:
+From the repository root, after the package is installed, build into a scratch directory:
 
 ```bash
-python -m med_features build --data data/med-synth-v4 --output artifacts/med-features-v2 \
-  --quality-markdown docs/phase_3/FEATURE_QUALITY_REPORT.md
+SCRATCH="$(mktemp -d)"
+python -m med_features build --data data/med-synth-v4 --output "$SCRATCH/med-features-v2" \
+  --quality-markdown "$SCRATCH/FEATURE_QUALITY_REPORT.md"
 ```
+
+`artifacts/med-features-v2` and [the feature quality report](FEATURE_QUALITY_REPORT.md) are the historical published outputs of this build. The command overwrites its output directory and its quality report without refusing, so never give it those paths: the published artifact is the one the policy, the model, and the service verify by checksum. A scratch build with the command above (checked 2026-10-01) reproduces every file of the published feature artifact byte for byte; the quality report has the same lines, although one of its tables can list its rows in a different order from run to run.
 
 The command checks the dataset checksums, fits the transformer, and writes recipient rows for `train`, `validation_product_like`, and `validation_diagnostic` only. `test_product_like` and `test_diagnostic` are refused. The transform function itself does not receive a subset name. A later one-time evaluation can call it on a frozen draft. This phase's build does not.
 

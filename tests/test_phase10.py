@@ -236,8 +236,8 @@ def test_statuses_and_numbers_agree_with_the_earlier_generated_documents():
         assert earlier and now, criterion
         if criterion == "AC02":
             # Phase 5 printed a per-scenario reading; the final table judges the criterion as a whole
-            # and keeps that reading in the measured text.
-            assert now.group(1) in ("met", "not met")
+            # (recall subject to AC01, so no better supported than AC01) and keeps that reading in the measured text.
+            assert now.group(1) == "insufficient evidence"
             assert f"Per scenario (the Phase 5 reading): {earlier.group(1)}." in results
             continue
         assert earlier.group(1) == now.group(1), f"{criterion}: Phase 5 says {earlier.group(1)!r}, results say {now.group(1)!r}"
@@ -268,6 +268,47 @@ def test_ac01_is_insufficient_evidence_and_the_misses_are_shown_plainly():
         assert "insufficient evidence" in text or path.name == "MODEL_CARD.md"
     assert "insufficient evidence" in _text(DOCS / "MODEL_CARD.md")
     assert "Diagnostic subsets" in results and "not product-like" in results
+
+
+def _status(mutated, criterion):
+    return next(item["status"] for item in facts.derive(mutated)["acceptance"] if item["id"] == criterion)
+
+
+def test_ac02_is_recall_subject_to_ac01_and_no_better_supported_than_ac01(loaded, monkeypatch):
+    """Phase 1 defines AC02 as recall maximized subject to AC01; AC01 is insufficient evidence."""
+    assert _status(loaded, "AC01") == "insufficient evidence"
+    assert _status(loaded, "AC02") == "insufficient evidence"
+    counts = render.acceptance_counts(facts.derive(loaded))
+    assert counts == {"met": 7, "insufficient evidence": 3, "not met": 0}
+    assert render.acceptance_summary(facts.derive(loaded)) == "7 met, 3 insufficient evidence, 0 not met"
+    results = _text(DOCS / "RESULTS.md")
+    assert "7 met, 3 insufficient evidence, 0 not met" in results
+    assert re.search(r"^\| AC02 \| [^|]+ \| \*\*insufficient evidence\*\*", results, re.M)
+    assert "| AC02 | Detection utility | **insufficient evidence** |" in _text(DOCS / "MODEL_CARD.md")
+    # The descriptive result, the baseline comparison, and the per-scenario reading stay in its measured text.
+    section = results[results.index("**AC02 — Detection utility"):results.index("**AC03")]
+    assert "insufficient evidence" in section and "9 / 30" in section and "0 of 20" in section and "Per scenario (the Phase 5 reading)" in section
+    assert "7 met, 3 insufficient evidence, 0 not met" in _text(ROOT / "README.md")
+
+    # If independence were established, AC01 would be met and AC02 with it: AC02 follows AC01, not the other way round.
+    monkeypatch.setattr(facts, "INDEPENDENCE_ESTABLISHED", True)
+    assert _status(loaded, "AC01") == "met" and _status(loaded, "AC02") == "met"
+
+
+def test_ac02_is_not_met_when_a_baseline_is_not_beaten_or_the_budget_is_broken(loaded):
+    # The rules policy warns as often as the policy on the selection subset: no useful detections beyond it.
+    tied = copy.deepcopy(loaded)
+    block = tied["validation"]["subsets"]["validation_product_like"]
+    block["rules_same_budget"]["email"]["true_positives"] = block["policy"]["email"]["true_positives"]
+    assert _status(tied, "AC02") == "not met"
+    # Always-allow cannot be beaten by a policy that warns on nothing.
+    silent = copy.deepcopy(loaded)
+    silent["test"]["subsets"]["test_product_like"]["policy"]["email"]["true_positives"] = 0
+    assert _status(silent, "AC02") == "not met"
+    # The budget constraint is part of the criterion.
+    over = copy.deepcopy(loaded)
+    over["test"]["subsets"]["test_product_like"]["policy"]["interventions"]["per_1000_legitimate"] = 2.0
+    assert _status(over, "AC01") == "not met" and _status(over, "AC02") == "not met"
 
 
 def test_statuses_turn_to_not_met_when_a_record_stops_supporting_them(loaded):

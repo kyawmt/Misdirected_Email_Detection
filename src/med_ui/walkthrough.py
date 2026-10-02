@@ -15,6 +15,8 @@ import json
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from med_docs.records import strip_members
+from med_docs.version import SEALED_KEYS
 from med_ui import exploration as xp
 from med_ui.client import ApiClient, ApiResponse
 from med_ui.config import (
@@ -322,12 +324,22 @@ def _cell(text: str) -> str:
     return text.replace("|", "\\|").replace("\n", " ")
 
 
+def read_aggregates(path: Path) -> dict:
+    """An evaluation record without its per-draft members.
+
+    The sealed members (`outcomes`, `examples`, `examples_validation`) are cut out of the text by
+    `med_docs.records.strip_members` before it is parsed, so no per-draft value, and above all none of the
+    frozen test record's, ever becomes a Python object here.
+    """
+    return json.loads(strip_members(Path(path).read_text(encoding="utf-8"), SEALED_KEYS))
+
+
 def load_evaluations(policy_dir: Path) -> dict:
     policy_dir = Path(policy_dir)
-    evaluations = {"validation": json.loads((policy_dir / VALIDATION_EVALUATION_FILE).read_text(encoding="utf-8"))}
+    evaluations = {"validation": read_aggregates(policy_dir / VALIDATION_EVALUATION_FILE)}
     test_path = policy_dir / TEST_EVALUATION_FILE
     if test_path.exists():
-        evaluations["test"] = json.loads(test_path.read_text(encoding="utf-8"))
+        evaluations["test"] = read_aggregates(test_path)
     return evaluations
 
 

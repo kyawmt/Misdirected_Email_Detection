@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -126,6 +127,49 @@ def verify_files(input_dir: str | Path) -> None:
             raise AssertionError(f"Checksum mismatch for {filename}")
         if filename.endswith(".csv") and _row_count(path) != expected["rows"]:
             raise AssertionError(f"Row count mismatch for {filename}")
+
+
+# What a scoring service needs from the dataset: the contact directory and the sent-mail history.
+SERVING_TABLES = ("contacts", "messages", "message_recipients")
+
+
+@dataclass(frozen=True)
+class ServingTables:
+    """The three tables the scoring service parses. No draft, label, split, or feedback table is here."""
+
+    contacts: pd.DataFrame
+    messages: pd.DataFrame
+    message_recipients: pd.DataFrame
+    dataset_version: str
+
+
+def verify_checksums(input_dir: str | Path) -> dict:
+    """Check the SHA-256 of every file the manifest lists. Nothing is parsed. Returns the manifest."""
+    source = Path(input_dir)
+    manifest = json.loads((source / MANIFEST_FILE).read_text(encoding="utf-8"))
+    for filename, expected in manifest["files"].items():
+        if hashlib.sha256((source / filename).read_bytes()).hexdigest() != expected["sha256"]:
+            raise AssertionError(f"Checksum mismatch for {filename}")
+    return manifest
+
+
+def read_serving_tables(input_dir: str | Path) -> ServingTables:
+    """Verify every file's checksum, then parse only the serving tables.
+
+    The SHA-256 of every file in the manifest is checked, so the service still refuses a changed
+    dataset. After that only `contacts.csv`, `messages.csv`, and `message_recipients.csv` are parsed,
+    and each record count is compared with the manifest. The draft, draft-recipient, label, split,
+    feedback, and fixture tables are hashed but never parsed.
+    """
+    source = Path(input_dir)
+    manifest = verify_checksums(source)
+    frames = {}
+    for name in SERVING_TABLES:
+        filename = TABLE_FILES[name]
+        frames[name] = _read_frame(source / filename, TABLES[name])
+        if len(frames[name]) != manifest["files"][filename]["rows"]:
+            raise AssertionError(f"Row count mismatch for {filename}")
+    return ServingTables(dataset_version=manifest["dataset_version"], **frames)
 
 
 def _manifest(dataset: Dataset, directory: Path) -> dict:

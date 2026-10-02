@@ -67,6 +67,8 @@ LOG_FIELDS = (
     "flagged_count",
 )
 REGISTRY_LIMIT = 10_000
+# One fixed sentence for an unexpected failure. It never repeats the error, which could quote the draft.
+UNEXPECTED_MESSAGE = "Scoring could not complete"
 FEEDBACK_LABELS = ("intended", "unintended")
 
 
@@ -131,28 +133,36 @@ class AssessmentService:
             return self._failure(request_id, reference, "invalid_input", str(error), started, context, 0)
         except Unavailable as error:
             return self._failure(request_id, reference, "unavailable", str(error), started, context, 0)
+        except Exception:  # a defect while reading the request must still fail closed, with the contract body
+            return self._failure(request_id, reference, "unavailable", UNEXPECTED_MESSAGE, started, context, 0)
 
-        query = _query(request_id, request)
-        future = self._pool.submit(
-            assess_draft,
-            context.bundle,
-            context.directory,
-            context.history,
-            context.transformer,
-            query,
-            include_features=True,
-        )
         try:
-            result = future.result(timeout=scoring_timeout_seconds())
-        except FutureTimeout:
-            future.cancel()
-            return self._failure(request_id, reference, "unavailable", "Scoring timed out", started, context, len(request.recipients))
-        if result["status"] != "assessed":
-            return self._failure(request_id, reference, "unavailable", "Scoring could not complete", started, context, len(request.recipients))
-        body = self._assessed(request_id, request, result, context, started)
-        self._remember(request_id, request)
-        self._log(body, len(request.recipients), len(body["flagged_recipients"]))
-        return 200, body
+            query = _query(request_id, request)
+            future = self._pool.submit(
+                assess_draft,
+                context.bundle,
+                context.directory,
+                context.history,
+                context.transformer,
+                query,
+                include_features=True,
+            )
+            try:
+                result = future.result(timeout=scoring_timeout_seconds())
+            except FutureTimeout:
+                future.cancel()
+                return self._failure(request_id, reference, "unavailable", "Scoring timed out", started, context, len(request.recipients))
+            if result["status"] != "assessed":
+                return self._failure(request_id, reference, "unavailable", UNEXPECTED_MESSAGE, started, context, len(request.recipients))
+            body = self._assessed(request_id, request, result, context, started)
+            self._remember(request_id, request)
+            self._log(body, len(request.recipients), len(body["flagged_recipients"]))
+            return 200, body
+        except Exception:
+            # Any other error in scoring or in building the response is not an allow. The body carries no
+            # draft text, no error text, no stack trace, no decision, and no score; the log record keeps
+            # only its allow-listed fields.
+            return self._failure(request_id, reference, "unavailable", UNEXPECTED_MESSAGE, started, context, len(request.recipients))
 
     def _assessed(self, request_id: str, request: NormalizedRequest, result: dict, context: ScoringContext, started: float) -> dict:
         frame = result["feature_rows"]

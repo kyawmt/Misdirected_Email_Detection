@@ -5,9 +5,9 @@ Both failure categories are **unable to assess** (assumption A9). `decision`, `e
 | Category | HTTP | When |
 | --- | --- | --- |
 | `invalid_input` | 422 | Malformed JSON or address, non-`.example` domain, non-ASCII address, timestamp without a timezone, 0 or more than 20 unique recipients, subject over 500 or body over 20,000 characters, sender not an internal `demo.example` address, unsupported fields, or a label, scenario, split, family, or score field. |
-| `unavailable` | 503 | Unknown snapshot id, sender or recipient address well formed but not in the directory, bundle failed to load, version or checksum mismatch, `FeatureError` or `ModelError` while scoring, a non-finite risk score, or the scoring timeout. |
+| `unavailable` | 503 | Unknown snapshot id, sender or recipient address well formed but not in the directory, bundle failed to load, version or checksum mismatch, `FeatureError` or `ModelError` while scoring, a non-finite risk score, the scoring timeout, or any other unexpected error while scoring or building the response. |
 
-A failure body carries the request id, the category, a short message, and versions only when they are known. If the bundle did not load, no model or policy version is reported.
+A failure body carries the request id, the category, a short message, and versions only when they are known. If the bundle did not load, no model or policy version is reported. An unexpected error while scoring or building the response gives the same body with the fixed message `Scoring could not complete`: no draft text, no error text, no stack trace, no decision, and no score, and the log line keeps only its allow-listed fields.
 
 No history is not a failure. A sender or recipient with no earlier mail is assessed with the existing feature fallback and may carry `LIMITED_RELATIONSHIP_HISTORY`. It is not forced to allow or warn.
 
